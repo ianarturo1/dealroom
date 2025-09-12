@@ -32,10 +32,16 @@ export async function handler(event, context){
     }
 
     // From GitHub (same repo), path: data/investors/<slug>.json
-    const file = await getFile(contentRepo, `data/investors/${resolved}.json`, branch)
-    const buff = Buffer.from(file.content, file.encoding || 'base64')
-    const json = JSON.parse(buff.toString('utf-8'))
-    return ok(json)
+    try {
+      const file = await getFile(contentRepo, `data/investors/${resolved}.json`, branch)
+      const buff = Buffer.from(file.content, file.encoding || 'base64')
+      const json = JSON.parse(buff.toString('utf-8'))
+      return ok(json)
+    } catch (err) {
+      // Fallback to local data if GitHub lookup fails (e.g. 404)
+      const data = await loadLocal()
+      return ok(data)
+    }
   }catch(err){
     return text(500, err.message)
   }
