@@ -61,6 +61,9 @@ DOCS_BRANCH=main
 
 # Token con permisos de contents:read/write en ambos repos
 GITHUB_TOKEN=ghp_xxx
+
+# Token Admin de Netlify Identity
+IDENTITY_ADMIN_TOKEN=netlify_identity_admin_token
 ```
 
 > Sin `GITHUB_TOKEN`, el sitio funciona en modo demo (lee `/data` local y no lista documentos).
@@ -147,3 +150,11 @@ npm run build # genera /dist
 - **Reportes** (CSV/JSON) desde Functions para métricas trimestrales.
 - **MFA** via Netlify Identity + enforced roles.
 ```)
+
+## 12) Pruebas manuales create-investor
+
+1. **Caso feliz** (dominio nuevo): llenar el formulario en `/admin` con un dominio corporativo y verificar que se crean commits en `data/investor-index.json`, `data/investors/<slug>.json` y las carpetas en el repo de documentos. Debe enviarse la invitación Identity.
+2. **Mapping existente**: repetir con el mismo dominio y confirmar que no falla y los commits retornan `null` donde no hubo cambios.
+3. **Dominio genérico**: usar un correo de `gmail.com`; el slug se deriva del nombre y no se crea mapping.
+4. **Sin permisos**: probar con un usuario sin rol `ri`/`admin` y verificar respuesta 403.
+5. **Falta IDENTITY_ADMIN_TOKEN**: remover la variable y confirmar que la función responde 500 con mensaje claro.
