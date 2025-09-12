@@ -9,8 +9,8 @@ export default function Updates(){
     <div className="container">
       <div className="h1">Actualizaciones</div>
       <div className="grid">
-        {items.map((u,i) => (
-          <div key={i} className="card">
+        {items.map((u) => (
+          <div key={u.date} className="card">
             <div className="h2">{u.title}</div>
             <div style={{color:'#8b8b8b'}}>{u.date}</div>
             <p>{u.body}</p>

@@ -4,7 +4,14 @@ export default function KPIs({ metrics = {} }){
   const items = [
     { key:'decisionTime', label:'Días a decisión', value: metrics.decisionTime ?? '—' },
     { key:'investorsActive', label:'Inversionistas activos', value: metrics.investorsActive ?? '—' },
-    { key:'dealsAccelerated', label:'Deals acelerados', value: metrics.dealsAccelerated ? (metrics.dealsAccelerated+'%') : '—' },
+    {
+      key: 'dealsAccelerated',
+      label: 'Deals acelerados',
+      value:
+        metrics.dealsAccelerated !== null && metrics.dealsAccelerated !== undefined
+          ? metrics.dealsAccelerated + '%'
+          : '—'
+    },
     { key:'nps', label:'NPS', value: metrics.nps ?? '—' },
   ]
   return (
