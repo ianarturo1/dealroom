@@ -149,6 +149,7 @@ npm run build # genera /dist
 - **Firmas de NDA/LOI** con GitHub PRs + checks (sin salirte de GH/NF).
 - **Reportes** (CSV/JSON) desde Functions para métricas trimestrales.
 - **MFA** via Netlify Identity + enforced roles.
+main
 
 ## 12) Pruebas manuales create-investor
 

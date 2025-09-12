@@ -47,41 +47,7 @@ export async function handler(event, context){
     if (!contentRepo || !docsRepo || !process.env.GITHUB_TOKEN){
       return text(500, 'CONTENT_REPO/DOCS_REPO/GITHUB_TOKEN no configurados')
     }
-
-    // Step A: update investor-index.json with retry on conflict
-    let indexSha = null
-    if (!generic){
-      const idxPath = 'data/investor-index.json'
-      for (let attempt = 0; attempt < 2; attempt++){
-        let idx = { domains: {} }
-        let idxSha
-        try{
-          const idxFile = await getFile(contentRepo, idxPath, contentBranch)
-          idx = JSON.parse(Buffer.from(idxFile.content, 'base64').toString('utf-8'))
-          idxSha = idxFile.sha
-        }catch(err){
-          if (!err.message.includes('GitHub 404')) throw err
-        }
-        const existing = idx.domains[domain]
-        if (existing && existing !== slug) return text(409, `Dominio ${domain} ya mapeado a ${existing}`)
-        const conflict = Object.entries(idx.domains).find(([d,s]) => s === slug && d !== domain)
-        if (conflict) return text(409, `Slug ${slug} ya usado por ${conflict[0]}`)
-        if (existing) break
-        idx.domains[domain] = slug
-        const contentBase64 = Buffer.from(JSON.stringify(idx, null, 2)).toString('base64')
-        try{
-          const resIdx = await putFile(contentRepo, idxPath, contentBase64, `map(domain -> slug): ${domain} -> ${slug}`, idxSha, contentBranch)
-          indexSha = resIdx.commit && resIdx.commit.sha
-          break
-        }catch(err){
-          if (attempt === 0 && err.message.includes('GitHub 409')) continue
-          throw err
-        }
-      }
-    }
-
-    // Step B: create/update investor file with retry on conflict
-    const invPath = `data/investors/${slug}.json`
+ main
     const investorData = {
       id: slug,
       name: body.companyName,
@@ -90,22 +56,7 @@ export async function handler(event, context){
       metrics: { decisionTime: 45, investorsActive: 1, dealsAccelerated: 0, nps: 70 }
     }
     const invContent = Buffer.from(JSON.stringify(investorData, null, 2)).toString('base64')
-    let investorSha = null
-    for (let attempt = 0; attempt < 2; attempt++){
-      let invSha
-      try{
-        const f = await getFile(contentRepo, invPath, contentBranch)
-        invSha = f.sha
-      }catch(_){ /* new */ }
-      try{
-        const resInv = await putFile(contentRepo, invPath, invContent, `create/update investor: ${slug}`, invSha, contentBranch)
-        investorSha = resInv.commit && resInv.commit.sha
-        break
-      }catch(err){
-        if (attempt === 0 && err.message.includes('GitHub 409')) continue
-        throw err
-      }
-    }
+ main
 
     // Step C: scaffold docs folders
     const categories = ['NDA','Propuestas','Contratos','LOIs','Sustento fiscal','Mitigación de riesgos','Procesos']
