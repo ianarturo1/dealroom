@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../lib/api'
-import { identity } from '../lib/identity'
 
 export default function Documents(){
   const [docs, setDocs] = useState([])
