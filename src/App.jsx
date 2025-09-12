@@ -5,6 +5,7 @@ import Documents from './pages/Documents'
 import Projects from './pages/Projects'
 import Admin from './pages/Admin'
 import Updates from './pages/Updates'
+import Login from './pages/Login'
 import NotFound from './pages/NotFound'
 import { identity } from './lib/identity'
 import './styles.css'
@@ -51,7 +52,7 @@ export default function App(){
           <Route path="/documents" element={<Documents />} />
           <Route path="/updates" element={<Updates />} />
           <Route path="/admin" element={<Admin user={user} />} />
-          <Route path="/login" element={<div className="container"><p>Usa el botón Acceso arriba.</p></div>} />
+          <Route path="/login" element={<Login />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
