@@ -1,0 +1,38 @@
+[
+  {
+    "id": "proj-001",
+    "name": "DG Comercial Norte",
+    "client": "Tiendas 3B",
+    "location": "CDMX y EDOMEX",
+    "power_kwp": 5000,
+    "energy_mwh": 8200,
+    "co2_tons": 4100,
+    "model": "ExpandSolar – Venta total a CFE",
+    "status": "Disponible",
+    "notes": "Pipeline inicial con 20 MWp, contratos marco listos.",
+    "loi_template": "#"
+  },
+  {
+    "id": "proj-002",
+    "name": "Planta Remota Bajío",
+    "client": "AB InBev Proveedores",
+    "location": "Guanajuato",
+    "power_kwp": 7200,
+    "energy_mwh": 11500,
+    "co2_tons": 5700,
+    "model": "Renovafund – Arrendamiento puro",
+    "status": "Due diligence",
+    "notes": "Asegurado con Marsh; offtakers AAA."
+  },
+  {
+    "id": "proj-003",
+    "name": "DG Multisitio Telecom",
+    "client": "América Móvil – Piloto",
+    "location": "Nacional",
+    "power_kwp": 3000,
+    "energy_mwh": 4700,
+    "co2_tons": 2300,
+    "model": "ExpandSolar – Mix",
+    "status": "Disponible"
+  }
+]
