@@ -1,0 +1,12 @@
+{
+  "id": "deploy",
+  "name": "Empresa Deploy",
+  "status": "NDA",
+  "deadlines": {},
+  "metrics": {
+    "decisionTime": 45,
+    "investorsActive": 1,
+    "dealsAccelerated": 0,
+    "nps": 70
+  }
+}
