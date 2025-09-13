@@ -2,6 +2,7 @@
   "domains": {
     "femsa.com": "femsa",
     "ab-inbev.com": "abinbev",
-    "americamovil.com": "americamovil"
+    "americamovil.com": "americamovil",
+    "fin.solar": "deploy"
   }
 }
