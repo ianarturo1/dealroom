@@ -52,8 +52,9 @@ export default function Admin({ user }){
       if (inv.slug) payload.slug = inv.slug
       const res = await api.createInvestor(payload)
       setProgress(100)
-      setInvMsg(res)
-    }catch(error){ setInvErr(error.message); setProgress(0) }
+      setInvMsg(res.link)
+      try{ await navigator.clipboard.writeText(res.link) }catch{}
+    }catch(error){ setInvErr(`Error al crear inversionista: ${error.message}`); setProgress(0) }
     finally{ setInvLoading(false) }
   }
 
@@ -84,7 +85,12 @@ export default function Admin({ user }){
             <button className="btn" type="submit" disabled={invLoading} style={{marginTop:8}}>Crear</button>
           </form>
           {invLoading && <div className="progress" style={{marginTop:8}}><div style={{width: progress + '%'}} /></div>}
-          {invMsg && <div className="notice" style={{marginTop:8}}><pre style={{margin:0}}>{JSON.stringify(invMsg, null, 2)}</pre></div>}
+          {invMsg && (
+            <div className="notice" style={{marginTop:8, display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+              <span style={{wordBreak:'break-all'}}>{invMsg}</span>
+              <button className="btn" type="button" onClick={() => navigator.clipboard && navigator.clipboard.writeText(invMsg)}>Copiar</button>
+            </div>
+          )}
           {invErr && <div className="notice" style={{marginTop:8}}>{invErr}</div>}
         </div>
         <div className="card">

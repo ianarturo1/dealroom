@@ -1,13 +1,13 @@
 # Dealroom Finsolar (Netlify + GitHub)
 
-**Objetivo:** un dealroom digital para inversionistas que centraliza documentación (NDA, propuestas, modelos, contratos, LOIs, sustentos, mitigación de riesgos, procesos) y muestra **avance del roadmap** por inversionista, proyectos activos y **fechas límite**. Basado 100% en **GitHub + Netlify (Identity + Functions)**.
+**Objetivo:** un dealroom digital para inversionistas que centraliza documentación (NDA, propuestas, modelos, contratos, LOIs, sustentos, mitigación de riesgos, procesos) y muestra **avance del roadmap** por inversionista, proyectos activos y **fechas límite**. Basado 100% en **GitHub + Netlify Functions**.
 
 ---
 
 ## 1) Stack
 
 - **Frontend:** React + Vite (SPA), HashRouter.
-- **Auth & Roles:** Netlify Identity (`investor`, `ri`, `admin`).
+- **Auth:** enlaces firmados (magic-links) vía Edge Functions.
 - **Backend serverless:** Netlify Functions (Node 18 ESM).
 - **Storage de documentos y datos:** GitHub (repos privados). Acceso vía API desde Functions.
 - **Branding:** Raleway (títulos), Lato (cuerpo). Colores: Púrpura `#7F4DAB`, Naranja `#F49A00`.
@@ -62,8 +62,8 @@ DOCS_BRANCH=main
 # Token con permisos de contents:read/write en ambos repos
 GITHUB_TOKEN=ghp_xxx
 
-# Token Admin de Netlify Identity
-IDENTITY_ADMIN_TOKEN=netlify_identity_admin_token
+# Secreto para firmar links mágicos (configurado en Netlify UI)
+SIGNING_SECRET=una_clave_segura
 ```
 
 > Sin `GITHUB_TOKEN`, el sitio funciona en modo demo (lee `/data` local y no lista documentos).
@@ -108,11 +108,10 @@ IDENTITY_ADMIN_TOKEN=netlify_identity_admin_token
 
 1. **Crear repo en GitHub** con este proyecto (público o privado).
 2. **Crear sitio en Netlify** desde ese repo.
-3. En Netlify → **Identity**: habilitar, **Invite-only**, y roles (`investor`, `ri`, `admin`).
-4. En Netlify → **Environment variables**: configurar `GITHUB_TOKEN`, `CONTENT_REPO`, `DOCS_REPO`.
-5. **Invitar usuarios**. Para mapear a un `slug`, agrega el dominio a `data/investor-index.json` y haz deploy.
-6. (Opcional) Crear **repo privado** aparte para documentos y poner su nombre en `DOCS_REPO`.
-7. Probar:
+3. En Netlify → **Environment variables**: configurar `GITHUB_TOKEN`, `CONTENT_REPO`, `DOCS_REPO`, `SIGNING_SECRET`.
+4. **Crear inversionistas** desde `/admin` para generar magic-links.
+5. (Opcional) Crear **repo privado** aparte para documentos y poner su nombre en `DOCS_REPO`.
+6. Probar:
    - Subir un archivo en `/documents` (debería ir a `/<Categoría>/<slug>/`).
    - Verlo listado y descargarlo.
    - Actualizar estado en `/admin` y comprobar commit en GitHub y rebuild automático.
@@ -122,7 +121,7 @@ IDENTITY_ADMIN_TOKEN=netlify_identity_admin_token
 ## 8) Seguridad y limitaciones (cándido)
 
 - **RBAC real**: la autorización se hace **en Functions**, no en assets estáticos, por lo que los documentos **no** se exponen públicamente.
-- **Gestión de usuarios**: Identity no permite (UI) editar metadatos complejos; por eso resolvemos slug por **dominio**. Si algún inversionista usa Gmail, mapea su dominio corporativo o gestiona su slug manualmente (puedes crear función adicional para admin).
+- **Gestión de usuarios**: el slug se resuelve por **dominio**. Si algún inversionista usa Gmail, mapea su dominio corporativo o gestiona su slug manualmente (puedes crear función adicional para admin).
 - **Notificaciones**: el PRD pedía notificaciones; con la restricción "solo GitHub y Netlify" se implementa **feed interno + ICS**. Para email/slack necesitarías un servicio externo. Alternativa mínima: los **commits** en GitHub ya notifican a los watchers (equipo interno).
 - **Uploads**: quedan auditablemente versionados en GitHub. Si el tamaño de archivos crece, considera Git LFS (también solo GitHub).
 
@@ -148,13 +147,10 @@ npm run build # genera /dist
 
 - **Firmas de NDA/LOI** con GitHub PRs + checks (sin salirte de GH/NF).
 - **Reportes** (CSV/JSON) desde Functions para métricas trimestrales.
-- **MFA** via Netlify Identity + enforced roles.
-main
 
 ## 12) Pruebas manuales create-investor
 
-1. **Caso feliz** (dominio nuevo): llenar el formulario en `/admin` con un dominio corporativo y verificar que se crean commits en `data/investor-index.json`, `data/investors/<slug>.json` y las carpetas en el repo de documentos. Debe enviarse la invitación Identity.
+1. **Caso feliz** (dominio nuevo): llenar el formulario en `/admin` con un dominio corporativo y verificar que se crean commits en `data/investor-index.json`, `data/investors/<slug>.json` y que se devuelve un magic-link válido.
 2. **Mapping existente**: repetir con el mismo dominio y confirmar que no falla y los commits retornan `null` donde no hubo cambios.
 3. **Dominio genérico**: usar un correo de `gmail.com`; el slug se deriva del nombre y no se crea mapping.
-4. **Sin permisos**: probar con un usuario sin rol `ri`/`admin` y verificar respuesta 403.
-5. **Falta IDENTITY_ADMIN_TOKEN**: remover la variable y confirmar que la función responde 500 con mensaje claro.
+4. **Falta SIGNING_SECRET**: remover la variable y confirmar que la función responde 500 con mensaje claro.
