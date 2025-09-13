@@ -1,14 +1,15 @@
-# Netlify configuration
 [build]
   command = "npm run build"
   publish = "dist"
   functions = "netlify/functions"
-  edge_functions = "netlify/edge-functions"
 
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
   included_files = ["data/**"]
+
+[edge_functions]
+  directory = "netlify/edge-functions"
 
 [[edge_functions]]
   path = "/i/*"
@@ -18,6 +19,7 @@
   from = "/i/*"
   to = "/index.html"
   status = 200
+  force = true
 
 # SPA fallback
 [[redirects]]
