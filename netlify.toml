@@ -4,8 +4,22 @@
   functions = "netlify/functions"
 
 [functions]
+  directory = "netlify/functions"
   node_bundler = "esbuild"
   included_files = ["data/**"]
+
+[edge_functions]
+  directory = "netlify/edge-functions"
+
+[[edge_functions]]
+  path = "/i/*"
+  function = "auth"
+
+[[redirects]]
+  from = "/i/*"
+  to = "/index.html"
+  status = 200
+  force = true
 
 # SPA fallback
 [[redirects]]

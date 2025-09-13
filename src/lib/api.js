@@ -1,11 +1,7 @@
-import { identity } from './identity'
-
 async function req(path, {method='GET', body, headers} = {}){
-  const token = await identity.token()
   const h = Object.assign({
     'Content-Type': 'application/json'
   }, headers || {})
-  if (token) h['Authorization'] = `Bearer ${token}`
   const res = await fetch(path, { method, headers: h, body: body ? JSON.stringify(body) : undefined })
   if (!res.ok){
     const msg = await res.text()
