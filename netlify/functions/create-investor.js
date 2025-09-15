@@ -1,6 +1,9 @@
 const jwt = require("jsonwebtoken");
 
-const { GITHUB_TOKEN, CONTENT_REPO, CONTENT_BRANCH = "main", SIGNING_SECRET, SITE_URL } = process.env;
+let { GITHUB_TOKEN, CONTENT_REPO, CONTENT_BRANCH = "main", SIGNING_SECRET, SITE_URL } = process.env;
+CONTENT_REPO = CONTENT_REPO || 'ianarturo1/dealroom';
+SITE_URL = SITE_URL || 'https://taxdealroom.netlify.app';
+SIGNING_SECRET = SIGNING_SECRET || '4f4fe635fe7077d4e3180151f2323c69e8a9856616f6f7b7bd56dc67f32c5221';
 
 const GH_API = "https://api.github.com";
 
@@ -58,7 +61,7 @@ exports.handler = async (event) => {
     if (event.httpMethod !== "POST") return jsonResponse(405, { ok: false, error: "Method not allowed" });
 
     if (!GITHUB_TOKEN || !CONTENT_REPO || !SIGNING_SECRET || !SITE_URL) {
-      return jsonResponse(500, { ok: false, error: "Missing env vars (GITHUB_TOKEN, CONTENT_REPO, SIGNING_SECRET, SITE_URL)" });
+      return jsonResponse(500, { ok: false, error: "Missing env var GITHUB_TOKEN" });
     }
 
     const body = JSON.parse(event.body || "{}");
