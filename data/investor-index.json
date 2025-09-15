@@ -15,6 +15,11 @@
       "name": "Empresa Demo3",
       "email": "demo3@fin.solar",
       "status": "NDA"
+    },
+    "prueba": {
+      "name": "prueba",
+      "email": "idelagarza@fin.solar",
+      "status": "NDA"
     }
   }
 }
