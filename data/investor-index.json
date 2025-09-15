@@ -10,6 +10,11 @@
       "name": "Empresa Demo2",
       "email": "demo2@fin.solar",
       "status": "NDA"
+    },
+    "demo3": {
+      "name": "Empresa Demo3",
+      "email": "demo3@fin.solar",
+      "status": "NDA"
     }
   }
 }
