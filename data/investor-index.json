@@ -4,5 +4,12 @@
     "ab-inbev.com": "abinbev",
     "americamovil.com": "americamovil",
     "fin.solar": "demo"
+  },
+  "investors": {
+    "demo2": {
+      "name": "Empresa Demo2",
+      "email": "demo2@fin.solar",
+      "status": "NDA"
+    }
   }
 }
