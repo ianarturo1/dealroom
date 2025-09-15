@@ -25,6 +25,11 @@
       "name": "Test Link",
       "email": "testlink@fin.solar",
       "status": "NDA"
+    },
+    "prueba2": {
+      "name": "prueba2",
+      "email": "prueba2@fin.solar",
+      "status": "NDA"
     }
   }
 }
