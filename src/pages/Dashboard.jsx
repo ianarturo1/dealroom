@@ -24,12 +24,11 @@ export default function Dashboard(){
 
   return (
     <div className="container">
-      <div className="row" style={{justifyContent:'space-between'}}>
+      <div className="row">
         <div>
           <div className="h1">Panel</div>
           <div style={{color:'#8b8b8b'}}>Visibilidad del roadmap y documentos.</div>
         </div>
-        {investor && <a className="btn secondary" href={api.calendarIcsUrl(investor.id)}>Suscribirse (ICS)</a>}
       </div>
 
       {err && <div className="notice">{err}</div>}
