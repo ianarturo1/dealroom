@@ -1,19 +1,34 @@
 import React from 'react'
 
-export default function KPIs({ metrics = {} }){
-  const items = [
-    { key:'decisionTime', label:'Días a decisión', value: metrics.decisionTime ?? '—' },
-    { key:'investorsActive', label:'Inversionistas activos', value: metrics.investorsActive ?? '—' },
-    {
-      key: 'dealsAccelerated',
-      label: 'Deals acelerados',
-      value:
-        metrics.dealsAccelerated !== null && metrics.dealsAccelerated !== undefined
-          ? metrics.dealsAccelerated + '%'
-          : '—'
-    },
-    { key:'nps', label:'NPS', value: metrics.nps ?? '—' },
-  ]
+const KPI_DEFINITIONS = [
+  { key:'decisionTime', label:'Días a decisión', format: (value) => value ?? '—' },
+  { key:'investorsActive', label:'Inversionistas activos', format: (value) => value ?? '—' },
+  {
+    key: 'dealsAccelerated',
+    label: 'Deals acelerados',
+    format: (value) =>
+      value !== null && value !== undefined
+        ? value + '%'
+        : '—'
+  },
+  { key:'nps', label:'NPS', format: (value) => value ?? '—' },
+]
+
+export default function KPIs({ metrics = {}, visibleKeys }){
+  const allowed = Array.isArray(visibleKeys) && visibleKeys.length
+    ? new Set(visibleKeys)
+    : null
+
+  const items = KPI_DEFINITIONS
+    .filter(def => !allowed || allowed.has(def.key))
+    .map(def => ({
+      key: def.key,
+      label: def.label,
+      value: def.format(metrics[def.key])
+    }))
+
+  if (!items.length) return null
+
   return (
     <div className="grid">
       {items.map(it => (
