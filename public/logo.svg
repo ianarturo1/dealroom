@@ -1,12 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 96" role="img" aria-labelledby="title desc">
   <title id="title">Finsolar logo</title>
-  <desc id="desc">Rounded stroke with a dot above the lowercase word finsolar in purple.</desc>
+
   <defs>
     <style>
       .word{font-family:'Raleway', 'Lato', 'Segoe UI', sans-serif;font-weight:700;font-size:64px;fill:#7F4DAB;letter-spacing:0.5px}
     </style>
   </defs>
-  <path d="M32 24c58-18 140-18 208 0" fill="none" stroke="#7F4DAB" stroke-width="6" stroke-linecap="round" />
-  <circle cx="255" cy="18" r="8" fill="#7F4DAB" />
   <text x="24" y="76" class="word">finsolar</text>
 </svg>
