@@ -54,9 +54,27 @@ a:hover{text-decoration:underline}
 
 .h1{font-family:'Raleway',sans-serif; font-size:28px; margin:8px 0 16px}
 .h2{font-family:'Raleway',sans-serif; font-size:20px; margin:12px 0 8px}
-.kpi{display:flex; gap:16px; align-items:center}
-.kpi .num{font-size:28px; font-weight:800; font-family:'Raleway',sans-serif;}
-.kpi .label{color:var(--muted)}
+.kpi{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  align-items:flex-start;
+}
+.kpi .num{
+  font-size:28px;
+  font-weight:800;
+  font-family:'Raleway',sans-serif;
+  line-height:1.2;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+}
+.kpi .label{
+  color:var(--muted);
+  font-size:14px;
+  font-weight:600;
+  text-transform:none;
+  letter-spacing:0;
+}
 
 .progress{
   width:100%; background:#eee; border-radius:999px; overflow:hidden; height:10px; border:1px solid var(--border);
