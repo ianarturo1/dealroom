@@ -77,6 +77,18 @@ exports.handler = async (event) => {
       return jsonResponse(400, { ok: false, error: "email, companyName y slug son requeridos" });
     }
 
+    const requestedRoles = Array.isArray(body.roles)
+      ? body.roles
+      : (body.role ? [body.role] : []);
+    const normalizedRoles = Array.from(
+      new Set(
+        requestedRoles
+          .map((r) => (typeof r === "string" ? r.trim().toLowerCase() : ""))
+          .filter(Boolean)
+      )
+    );
+    if (!normalizedRoles.includes("investor")) normalizedRoles.push("investor");
+
     const investorDoc = {
       id: slug,
       name: companyName,
@@ -84,6 +96,7 @@ exports.handler = async (event) => {
       status,
       createdAt: new Date().toISOString(),
     };
+    if (normalizedRoles.length) investorDoc.roles = normalizedRoles;
     await putFile(`data/investors/${slug}.json`, investorDoc, `chore(investor): upsert ${slug}`);
 
     let index = { investors: {} };
@@ -98,9 +111,11 @@ exports.handler = async (event) => {
       }
     }
     index.investors[slug] = { name: companyName, email, status };
+    if (normalizedRoles.length) index.investors[slug].roles = normalizedRoles;
     await putFile(indexPath, index, `chore(index): upsert ${slug}`);
 
-    const token = jwt.sign({ sub: slug, aud: "investor" }, SIGNING_SECRET, { expiresIn: "7d" });
+    const tokenPayload = { sub: slug, aud: "investor", email, roles: normalizedRoles };
+    const token = jwt.sign(tokenPayload, SIGNING_SECRET, { expiresIn: "7d" });
     const base = SITE_URL.replace(/\/$/, "");
     const link = `${base}/i/${slug}?t=${token}`;
 

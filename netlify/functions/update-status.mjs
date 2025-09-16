@@ -3,11 +3,13 @@ import { repoEnv, getFile, putFile } from './_lib/github.mjs'
 
 export async function handler(event, context){
   try{
-    const user = requireUser(context)
-    if (!hasAnyRole(user, ['admin','ri'])) return text(403, 'Requiere rol admin o ri')
+    const user = requireUser(event, context)
 
     const body = JSON.parse(event.body || '{}')
     if (!body.id) return text(400, 'Falta id (slug) de inversionista')
+
+    const canUpdate = hasAnyRole(user, ['admin','ri']) || (user && user.sub && user.sub === body.id)
+    if (!canUpdate) return text(403, 'Requiere rol admin o ri')
 
     const repo = repoEnv('CONTENT_REPO', '')
     const branch = process.env.CONTENT_BRANCH || 'main'
@@ -26,6 +28,7 @@ export async function handler(event, context){
     const res = await putFile(repo, path, contentBase64, `Update investor ${body.id} via Dealroom`, sha, branch)
     return ok({ ok:true, commit: res.commit && res.commit.sha })
   }catch(err){
-    return text(500, err.message)
+    const status = err.statusCode || 500
+    return text(status, err.message)
   }
 }
