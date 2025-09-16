@@ -1,21 +1,17 @@
-# Magic links
+# Acceso público
 
-Este proyecto usa enlaces firmados para autenticar a inversionistas sin Netlify Identity.
+El dealroom ahora es 100% público: no hay login ni Netlify Identity. Todo el contenido visible depende únicamente del slug que se indique en la URL o en las variables de entorno.
 
-## Flujo
+## Cómo funciona
 
-1. En `/admin`, se crea al inversionista con su correo y nombre.
-2. La función `create-investor` guarda los datos en GitHub y responde con un link firmado (`/i/<slug>?t=<jwt>`).
-3. Al abrir el link, la Edge Function `auth` valida el token y lo guarda en una cookie para las siguientes visitas.
+1. Desde `/admin` puedes crear o actualizar inversionistas. La función `create-investor` genera los JSON en GitHub y devuelve un enlace compartible del tipo `/#/?investor=<slug>`.
+2. El frontend lee el parámetro `investor` del hash (`HashRouter`) y consulta el backend usando ese slug.
+3. Las funciones serverless restringen lecturas/escrituras al slug público configurado (`PUBLIC_INVESTOR_SLUG`).
 
-## Variables de entorno
+## Variables de entorno relevantes
 
-Configura en Netlify → **Environment variables**:
+- `PUBLIC_INVESTOR_SLUG`: define el slug habilitado en las funciones (`femsa` por defecto).
+- `VITE_PUBLIC_INVESTOR_ID`: slug usado por el build de Vite si no hay query string (`femsa` por defecto).
+- `SITE_URL`, `GITHUB_TOKEN`, `CONTENT_REPO`, `DOCS_REPO` y ramas (`CONTENT_BRANCH`/`DOCS_BRANCH`) siguen siendo obligatorios para los commits.
 
-- `SIGNING_SECRET`: clave usada para firmar/verificar los tokens (no se versiona).
-- `SITE_URL`, `GITHUB_TOKEN`, `CONTENT_REPO` y opcional `CONTENT_BRANCH` ya existentes.
-
-## TTL y revocación
-
-- El token expira en **7 días** (`expiresIn: "7d"` en `create-investor`). Ajusta ese valor para cambiar el TTL.
-- Para revocar todos los enlaces activos, rota `SIGNING_SECRET` en Netlify y vuelve a desplegar.
+> Para compartir un inversionista diferente basta con actualizar los JSON correspondientes y ajustar `PUBLIC_INVESTOR_SLUG`/`VITE_PUBLIC_INVESTOR_ID` (o usar la query `/#/?investor=...`).

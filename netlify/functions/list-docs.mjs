@@ -1,23 +1,24 @@
-import { ok, text, requireUser, emailDomain, readLocalJson } from './_lib/utils.mjs'
+import { ok, text } from './_lib/utils.mjs'
 import { repoEnv, listDir } from './_lib/github.mjs'
 
-export async function handler(event, context){
+function publicSlug(){
+  const raw = typeof process.env.PUBLIC_INVESTOR_SLUG === 'string'
+    ? process.env.PUBLIC_INVESTOR_SLUG.trim().toLowerCase()
+    : ''
+  return raw || 'femsa'
+}
+
+export async function handler(event){
   try{
-    const user = requireUser(event, context)
     const category = (event.queryStringParameters && event.queryStringParameters.category) || 'NDA'
+    const slugParam = event.queryStringParameters && event.queryStringParameters.slug
+    const requested = typeof slugParam === 'string' ? slugParam.trim().toLowerCase() : ''
+    const slug = requested || publicSlug()
+
     const repo = repoEnv('DOCS_REPO', '')
     const branch = process.env.DOCS_BRANCH || 'main'
 
-    // Resolve investor slug by email domain
-    let slug = 'demo'
-    try {
-      const idx = await readLocalJson('data/investor-index.json')
-      const domain = emailDomain(user)
-      slug = idx.domains[domain] || 'femsa'
-    }catch(_){}
-
     if (!repo || !process.env.GITHUB_TOKEN){
-      // fallback: empty
       return ok({ files: [] })
     }
 
@@ -26,7 +27,9 @@ export async function handler(event, context){
     try{
       const items = await listDir(repo, basePath, branch)
       list = items.filter(x => x.type === 'file').map(x => ({
-        name: x.name, path: `${basePath}/${x.name}`, size: x.size || 0
+        name: x.name,
+        path: `${basePath}/${x.name}`,
+        size: x.size || 0
       }))
     }catch(_){
       list = []

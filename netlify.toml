@@ -2,20 +2,15 @@
   command = "npm run build"
   publish = "dist"
   functions = "netlify/functions"
-  edge_functions = "netlify/edge-functions"
 
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
   included_files = ["data/**"]
 
-[[edge_functions]]
-  path = "/i/*"
-  function = "auth"
-
 [[redirects]]
-  from = "/i/*"
-  to = "/index.html"
+  from = "/i/:slug"
+  to = "/#/?investor=:slug"
   status = 200
   force = true
 

@@ -1,9 +1,6 @@
-const jwt = require("jsonwebtoken");
-
-let { GITHUB_TOKEN, CONTENT_REPO, CONTENT_BRANCH = "main", SIGNING_SECRET, SITE_URL } = process.env;
+let { GITHUB_TOKEN, CONTENT_REPO, CONTENT_BRANCH = "main", SITE_URL } = process.env;
 CONTENT_REPO = CONTENT_REPO || 'ianarturo1/dealroom';
 SITE_URL = SITE_URL || 'https://taxdealroom.netlify.app';
-SIGNING_SECRET = SIGNING_SECRET || '4f4fe635fe7077d4e3180151f2323c69e8a9856616f6f7b7bd56dc67f32c5221';
 
 const GH_API = "https://api.github.com";
 
@@ -60,7 +57,7 @@ exports.handler = async (event) => {
   try {
     if (event.httpMethod !== "POST") return jsonResponse(405, { ok: false, error: "Method not allowed" });
 
-    if (!GITHUB_TOKEN || !CONTENT_REPO || !SIGNING_SECRET || !SITE_URL) {
+    if (!GITHUB_TOKEN || !CONTENT_REPO || !SITE_URL) {
       return jsonResponse(500, { ok: false, error: "Missing env var GITHUB_TOKEN" });
     }
 
@@ -77,18 +74,6 @@ exports.handler = async (event) => {
       return jsonResponse(400, { ok: false, error: "email, companyName y slug son requeridos" });
     }
 
-    const requestedRoles = Array.isArray(body.roles)
-      ? body.roles
-      : (body.role ? [body.role] : []);
-    const normalizedRoles = Array.from(
-      new Set(
-        requestedRoles
-          .map((r) => (typeof r === "string" ? r.trim().toLowerCase() : ""))
-          .filter(Boolean)
-      )
-    );
-    if (!normalizedRoles.includes("investor")) normalizedRoles.push("investor");
-
     const investorDoc = {
       id: slug,
       name: companyName,
@@ -96,7 +81,6 @@ exports.handler = async (event) => {
       status,
       createdAt: new Date().toISOString(),
     };
-    if (normalizedRoles.length) investorDoc.roles = normalizedRoles;
     await putFile(`data/investors/${slug}.json`, investorDoc, `chore(investor): upsert ${slug}`);
 
     let index = { investors: {} };
@@ -111,16 +95,13 @@ exports.handler = async (event) => {
       }
     }
     index.investors[slug] = { name: companyName, email, status };
-    if (normalizedRoles.length) index.investors[slug].roles = normalizedRoles;
     await putFile(indexPath, index, `chore(index): upsert ${slug}`);
 
-    const tokenPayload = { sub: slug, aud: "investor", email, roles: normalizedRoles };
-    const token = jwt.sign(tokenPayload, SIGNING_SECRET, { expiresIn: "7d" });
     const base = SITE_URL.replace(/\/$/, "");
-    const link = `${base}/i/${slug}?t=${token}`;
+    const link = `${base}/#/?investor=${slug}`;
 
     return jsonResponse(200, { ok: true, slug, link });
   } catch (err) {
-    return jsonResponse(500, { ok: false, error: String(err && err.message || err) });
+    return jsonResponse(500, { ok: false, error: String((err && err.message) || err) });
   }
 };

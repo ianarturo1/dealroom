@@ -1,21 +1,26 @@
 import React, { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
+import { DEFAULT_INVESTOR_ID } from '../lib/config'
 
 export default function Documents(){
   const [docs, setDocs] = useState([])
   const [loading, setLoading] = useState(false)
   const [category, setCategory] = useState('NDA')
   const [error, setError] = useState(null)
+  const [searchParams] = useSearchParams()
+  const searchSlug = searchParams.get('investor')
+  const investorId = (searchSlug && searchSlug.trim().toLowerCase()) || DEFAULT_INVESTOR_ID
 
   async function load(){
     try{
       setLoading(true); setError(null)
-      const res = await api.listDocs({ category })
+      const res = await api.listDocs({ category, slug: investorId })
       setDocs(res.files || [])
     }catch(e){ setError(e.message) }
     finally{ setLoading(false) }
   }
-  useEffect(() => { load() }, [category])
+  useEffect(() => { load() }, [category, investorId])
 
   async function onUpload(e){
     e.preventDefault()
@@ -26,11 +31,12 @@ export default function Documents(){
       try{
         setLoading(true); setError(null)
         const contentBase64 = reader.result.split(',')[1]
-        const r = await api.uploadDoc({
+        await api.uploadDoc({
           path: `${category}`,
           filename: file.name,
           message: `Upload ${file.name} from Dealroom UI`,
-          contentBase64
+          contentBase64,
+          slug: investorId
         })
         await load()
         alert('Archivo subido')
@@ -63,7 +69,7 @@ export default function Documents(){
         <form onSubmit={onUpload} className="form-row">
           <input name="file" type="file" className="input" />
           <button className="btn" type="submit">Subir</button>
-          <span className="notice">Los archivos se guardan en GitHub y se controlan por rol.</span>
+          <span className="notice">Los archivos se guardan en GitHub y se exponen públicamente.</span>
         </form>
       </div>
 

@@ -1,15 +1,10 @@
-import { ok, text, requireUser, hasAnyRole } from './_lib/utils.mjs'
+import { ok, text } from './_lib/utils.mjs'
 import { repoEnv, getFile, putFile } from './_lib/github.mjs'
 
-export async function handler(event, context){
+export async function handler(event){
   try{
-    const user = requireUser(event, context)
-
     const body = JSON.parse(event.body || '{}')
     if (!body.id) return text(400, 'Falta id (slug) de inversionista')
-
-    const canUpdate = hasAnyRole(user, ['admin','ri']) || (user && user.sub && user.sub === body.id)
-    if (!canUpdate) return text(403, 'Requiere rol admin o ri')
 
     const repo = repoEnv('CONTENT_REPO', '')
     const branch = process.env.CONTENT_BRANCH || 'main'

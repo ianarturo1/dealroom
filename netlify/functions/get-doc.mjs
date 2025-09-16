@@ -1,29 +1,29 @@
-import { text, requireUser, hasAnyRole, emailDomain, readLocalJson } from './_lib/utils.mjs'
+import { text } from './_lib/utils.mjs'
 import { repoEnv, getFile, contentTypeFor } from './_lib/github.mjs'
 
-export async function handler(event, context){
+function publicSlug(){
+  const raw = typeof process.env.PUBLIC_INVESTOR_SLUG === 'string'
+    ? process.env.PUBLIC_INVESTOR_SLUG.trim().toLowerCase()
+    : ''
+  return raw || 'femsa'
+}
+
+export async function handler(event){
   try{
-    const user = requireUser(event, context)
     const repo = repoEnv('DOCS_REPO', '')
     const branch = process.env.DOCS_BRANCH || 'main'
-    const relPath = (event.queryStringParameters && event.queryStringParameters.path) || ''
-    if (!relPath) return text(400, 'Falta path')
+    const relPathRaw = (event.queryStringParameters && event.queryStringParameters.path) || ''
+    if (!relPathRaw) return text(400, 'Falta path')
 
-    // check access: investors can only access their slug path, ri/admin any
-    let allowed = hasAnyRole(user, ['admin','ri'])
-    if (!allowed){
-      const domain = emailDomain(user)
-      try {
-        const idx = await readLocalJson('data/investor-index.json')
-        const slug = idx.domains[domain]
-        if (slug && relPath.includes(`/${slug}/`)) allowed = true
-      }catch(_){}
-    }
-    if (!allowed) return text(403, 'Sin acceso al recurso solicitado')
+    const normalized = relPathRaw.replace(/^\/+/, '')
+    const parts = normalized.split('/')
+    if (parts.length < 3) return text(400, 'Ruta inválida')
+    const [, slug] = parts
+    if (slug !== publicSlug()) return text(403, 'Acceso solo para contenido público')
 
     if (!repo || !process.env.GITHUB_TOKEN) return text(500, 'DOCS_REPO/GITHUB_TOKEN no configurados')
 
-    const file = await getFile(repo, relPath, branch)
+    const file = await getFile(repo, normalized, branch)
     const buff = Buffer.from(file.content, file.encoding || 'base64')
     return {
       statusCode: 200,

@@ -7,9 +7,9 @@
 ## 1) Stack
 
 - **Frontend:** React + Vite (SPA), HashRouter.
-- **Auth:** enlaces firmados (magic-links) vía Edge Functions.
 - **Backend serverless:** Netlify Functions (Node 18 ESM).
 - **Storage de documentos y datos:** GitHub (repos privados). Acceso vía API desde Functions.
+- **Acceso:** sitio público; el slug de inversionista se controla vía query string (`?investor=`) o variable de entorno.
 - **Branding:** Raleway (títulos), Lato (cuerpo). Colores: Púrpura `#7F4DAB`, Naranja `#F49A00`.
 
 > No se requiere infraestructura adicional fuera de GitHub y Netlify.
@@ -34,13 +34,13 @@ Rutas UI:
 
 ---
 
-## 3) Roles y control de acceso
+## 3) Acceso público
 
-- `investor`: acceso solo a su carpeta de documentos `/<Categoría>/<slug>/...` y a su propio estado.
-- `ri` o `admin`: acceso total (todas las carpetas y funciones de escritura).
-- Resolución de **slug** por dominio de email (`data/investor-index.json`). Ejemplo: `femsa.com -> femsa`.
+- Todo el contenido del dashboard es público; no se requieren tokens ni login.
+- El slug del inversionista visible se resuelve desde la query string `?investor=<slug>` o desde la variable de entorno `PUBLIC_INVESTOR_SLUG`/`VITE_PUBLIC_INVESTOR_ID` (por defecto `femsa`).
+- Los documentos siguen viviendo en GitHub. Las funciones validan que las rutas solicitadas correspondan al slug público configurado.
 
-> Puedes extender el mapping o migrarlo a un repo privado.
+> Puedes generar enlaces compartibles usando `/#/?investor=<slug>`.
 
 ---
 
@@ -62,8 +62,11 @@ DOCS_BRANCH=main
 # Token con permisos de contents:read/write en ambos repos
 GITHUB_TOKEN=ghp_xxx
 
-# Secreto para firmar links mágicos (configurado en Netlify UI)
-SIGNING_SECRET=una_clave_segura
+# Slug público por defecto (opcional)
+PUBLIC_INVESTOR_SLUG=femsa
+
+# Slug público para el build del frontend (opcional)
+VITE_PUBLIC_INVESTOR_ID=femsa
 ```
 
 > Sin `GITHUB_TOKEN`, el sitio funciona en modo demo (lee `/data` local y no lista documentos).
@@ -74,7 +77,7 @@ SIGNING_SECRET=una_clave_segura
 
 - **Listar:** `/.netlify/functions/list-docs?category=NDA` devuelve archivos en `NDA/<slug>/`.
 - **Subir:** UI de `/documents` llama `upload-doc` → commit al repo de documentos.
-- **Descargar:** `get-doc` stream del archivo desde GitHub con verificación de rol/slug.
+- **Descargar:** `get-doc` entrega el archivo desde GitHub siempre que pertenezca al slug público configurado.
 - **Auditoría:** el historial de cambios queda en GitHub (quién y qué).
 
 > Sugerencia: estructura de carpetas en el repo de docs
@@ -108,8 +111,8 @@ SIGNING_SECRET=una_clave_segura
 
 1. **Crear repo en GitHub** con este proyecto (público o privado).
 2. **Crear sitio en Netlify** desde ese repo.
-3. En Netlify → **Environment variables**: configurar `GITHUB_TOKEN`, `CONTENT_REPO`, `DOCS_REPO`, `SIGNING_SECRET`.
-4. **Crear inversionistas** desde `/admin` para generar magic-links.
+3. En Netlify → **Environment variables**: configurar `GITHUB_TOKEN`, `CONTENT_REPO`, `DOCS_REPO` y, si quieres personalizar el slug público, `PUBLIC_INVESTOR_SLUG`/`VITE_PUBLIC_INVESTOR_ID`.
+4. **Crear inversionistas** desde `/admin` para generar JSONs y enlaces públicos (`/#/?investor=<slug>`).
 5. (Opcional) Crear **repo privado** aparte para documentos y poner su nombre en `DOCS_REPO`.
 6. Probar:
    - Subir un archivo en `/documents` (debería ir a `/<Categoría>/<slug>/`).
@@ -120,8 +123,8 @@ SIGNING_SECRET=una_clave_segura
 
 ## 8) Seguridad y limitaciones (cándido)
 
-- **RBAC real**: la autorización se hace **en Functions**, no en assets estáticos, por lo que los documentos **no** se exponen públicamente.
-- **Gestión de usuarios**: el slug se resuelve por **dominio**. Si algún inversionista usa Gmail, mapea su dominio corporativo o gestiona su slug manualmente (puedes crear función adicional para admin).
+- **Datos públicos**: todo el contenido queda expuesto sin autenticación. Usa repos y datos que puedas compartir públicamente.
+- **Slug fijo**: las funciones solo permiten leer/escribir dentro del slug configurado (`PUBLIC_INVESTOR_SLUG`). Cambia ese valor para publicar otro inversionista.
 - **Notificaciones**: el PRD pedía notificaciones; con la restricción "solo GitHub y Netlify" se implementa **feed interno + ICS**. Para email/slack necesitarías un servicio externo. Alternativa mínima: los **commits** en GitHub ya notifican a los watchers (equipo interno).
 - **Uploads**: quedan auditablemente versionados en GitHub. Si el tamaño de archivos crece, considera Git LFS (también solo GitHub).
 
@@ -150,7 +153,6 @@ npm run build # genera /dist
 
 ## 12) Pruebas manuales create-investor
 
-1. **Caso feliz** (dominio nuevo): llenar el formulario en `/admin` con un dominio corporativo y verificar que se crean commits en `data/investor-index.json`, `data/investors/<slug>.json` y que se devuelve un magic-link válido.
-2. **Mapping existente**: repetir con el mismo dominio y confirmar que no falla y los commits retornan `null` donde no hubo cambios.
-3. **Dominio genérico**: usar un correo de `gmail.com`; el slug se deriva del nombre y no se crea mapping.
-4. **Falta SIGNING_SECRET**: remover la variable y confirmar que la función responde 500 con mensaje claro.
+1. Crear un inversionista desde `/admin` y verificar los commits en `data/investor-index.json` y `data/investors/<slug>.json`.
+2. Abrir el enlace público que devuelve la función (`/#/?investor=<slug>`) y comprobar que el dashboard muestra la información del nuevo slug.
+3. Subir un archivo en `/documents` para validar que se versiona dentro de la carpeta `<Categoría>/<slug>/` en el repo de documentos.
