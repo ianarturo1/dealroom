@@ -20,14 +20,29 @@ export default function Dashboard(){
   const investorId = (searchSlug && searchSlug.trim().toLowerCase()) || DEFAULT_INVESTOR_ID
 
   useEffect(() => {
-    api.getInvestor(investorId).then(setInvestor).catch(e => setErr(e.message))
+    let cancelled = false
+    setErr(null)
+    setInvestor(null)
+    api.getInvestor(investorId)
+      .then(data => {
+        if (!cancelled) setInvestor(data)
+      })
+      .catch(error => {
+        if (!cancelled){
+          setErr(error.message)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
   }, [investorId])
 
   const metrics = investor?.metrics || {}
-  const stage = investor?.status || STAGES[0]
-  const stageIndex = STAGES.findIndex(s => s === stage)
+  const stage = investor?.status ?? ''
+  const stageIndex = stage ? STAGES.findIndex(s => s === stage) : -1
   const nextSteps = stageIndex >= 0 ? STAGES.slice(stageIndex + 1) : []
   const deadlines = investor?.deadlines || {}
+  const stageLabel = stage || '—'
 
   return (
     <div className="container">
@@ -44,7 +59,7 @@ export default function Dashboard(){
         <div className="h2">Avance</div>
         <ProgressBar stages={STAGES} current={stage} />
         <div style={{marginTop:10, fontSize:14}}>
-          <strong>Etapa actual:</strong> {stage}
+          <strong>Etapa actual:</strong> {stageLabel}
         </div>
         <div style={{display:'flex', flexWrap:'wrap', gap:12, marginTop:8}}>
           {Object.entries(deadlines).map(([k,v]) => (
@@ -62,7 +77,7 @@ export default function Dashboard(){
 
       <div className="card" style={{marginTop:12}}>
         <div className="h2">Siguientes pasos</div>
-        {stageIndex < 0 && (
+        {stage && stageIndex < 0 && (
           <p style={{color:'#8b8b8b', marginBottom:0}}>
             No hay pasos siguientes configurados para la etapa actual.
           </p>
