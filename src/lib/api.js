@@ -14,6 +14,12 @@ async function req(path, {method='GET', body, headers} = {}){
 
 export const api = {
   listProjects(){ return req('/.netlify/functions/list-projects') },
+  saveProjects(projects){
+    return req('/.netlify/functions/save-projects', {
+      method: 'POST',
+      body: { projects }
+    })
+  },
   getInvestor(slug){ return req(`/.netlify/functions/get-investor${slug ? ('?slug='+encodeURIComponent(slug)) : ''}`) },
   listDocs(params){ 
     const q = new URLSearchParams(params || {}).toString()
