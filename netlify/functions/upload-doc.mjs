@@ -3,7 +3,7 @@ import { repoEnv, getFile, putFile } from './_lib/github.mjs'
 
 export async function handler(event, context){
   try{
-    const user = requireUser(context)
+    const user = requireUser(event, context)
     const body = JSON.parse(event.body || '{}')
     const categoryPath = (body.path || '').replace(/^\/+|\/+$/g,'') // sanitize
     const filename = body.filename
@@ -36,6 +36,7 @@ export async function handler(event, context){
     const res = await putFile(repo, relPath, contentBase64, body.message || `Upload ${filename}`, sha, branch)
     return ok({ ok:true, path: relPath })
   }catch(err){
-    return text(500, err.message)
+    const status = err.statusCode || 500
+    return text(status, err.message)
   }
 }

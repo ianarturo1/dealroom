@@ -3,7 +3,7 @@ import { repoEnv, getFile, contentTypeFor } from './_lib/github.mjs'
 
 export async function handler(event, context){
   try{
-    const user = requireUser(context)
+    const user = requireUser(event, context)
     const repo = repoEnv('DOCS_REPO', '')
     const branch = process.env.DOCS_BRANCH || 'main'
     const relPath = (event.queryStringParameters && event.queryStringParameters.path) || ''
@@ -35,6 +35,7 @@ export async function handler(event, context){
       isBase64Encoded: true
     }
   }catch(err){
-    return text(500, err.message)
+    const status = err.statusCode || 500
+    return text(status, err.message)
   }
 }
