@@ -18,8 +18,10 @@ export default function Dashboard(){
     api.getInvestor().then(setInvestor).catch(e => setErr(e.message))
   }, [])
 
-  const metrics = investor?.metrics || { decisionTime: '—', investorsActive: '—', dealsAccelerated: 0, nps: '—' }
+  const metrics = investor?.metrics || { decisionTime: '—' }
   const stage = investor?.status || STAGES[0]
+  const stageIndex = STAGES.findIndex(s => s === stage)
+  const nextSteps = stageIndex >= 0 ? STAGES.slice(stageIndex + 1) : []
   const deadlines = investor?.deadlines || {}
 
   return (
@@ -47,18 +49,28 @@ export default function Dashboard(){
       </div>
 
       <div style={{marginTop:12}}>
-        <KPIs metrics={metrics} />
+        <KPIs metrics={metrics} visibleKeys={['decisionTime']} />
       </div>
 
       <div className="card" style={{marginTop:12}}>
         <div className="h2">Siguientes pasos</div>
-        <ol>
-          <li>Completar NDA y carpeta de información.</li>
-          <li>Revisar propuesta técnica-financiera y confirmar alcance.</li>
-          <li>Emitir LOI con montos y plazos.</li>
-          <li>Iniciar due diligence y revisión de contratos.</li>
-          <li>Definir cronograma de inversión y firmar.</li>
-        </ol>
+        {stageIndex < 0 && (
+          <p style={{color:'#8b8b8b', marginBottom:0}}>
+            No hay pasos siguientes configurados para la etapa actual.
+          </p>
+        )}
+        {stageIndex >= 0 && nextSteps.length === 0 && (
+          <p style={{color:'#8b8b8b', marginBottom:0}}>
+            Has completado todas las etapas del proceso.
+          </p>
+        )}
+        {nextSteps.length > 0 && (
+          <ol>
+            {nextSteps.map(step => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+        )}
       </div>
     </div>
   )
