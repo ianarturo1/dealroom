@@ -25,11 +25,37 @@ export default function App(){
             <span>Dealroom</span>
           </div>
           <nav className="nav">
-            <NavLink to={withSearch('/')} end className={({isActive}) => isActive ? 'active' : undefined}>Panel</NavLink>
-            <NavLink to={withSearch('/projects')} className={({isActive}) => isActive ? 'active' : undefined}>Proyectos</NavLink>
-            <NavLink to={withSearch('/documents')} className={({isActive}) => isActive ? 'active' : undefined}>Documentos</NavLink>
-            <NavLink to={withSearch('/updates')} className={({isActive}) => isActive ? 'active' : undefined}>Updates</NavLink>
-            <NavLink to={withSearch('/admin')} className={({isActive}) => isActive ? 'active' : undefined}>Admin</NavLink>
+            <NavLink
+              to={withSearch('/')}
+              end
+              className={({ isActive }) => (isActive ? 'active' : undefined)}
+            >
+              Panel
+            </NavLink>
+            <NavLink
+              to={withSearch('/projects')}
+              className={({ isActive }) => (isActive ? 'active' : undefined)}
+            >
+              Proyectos
+            </NavLink>
+            <NavLink
+              to={withSearch('/documents')}
+              className={({ isActive }) => (isActive ? 'active' : undefined)}
+            >
+              Documentos
+            </NavLink>
+            <NavLink
+              to={withSearch('/updates')}
+              className={({ isActive }) => (isActive ? 'active' : undefined)}
+            >
+              Updates
+            </NavLink>
+            <NavLink
+              to={withSearch('/admin')}
+              className={({ isActive }) => (isActive ? 'active' : undefined)}
+            >
+              Admin
+            </NavLink>
           </nav>
         </div>
       </header>
