@@ -1,11 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 40">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 96" role="img" aria-labelledby="title desc">
+  <title id="title">Finsolar logo</title>
+  <desc id="desc">Lowercase word finsolar in purple.</desc>
   <defs>
     <style>
-      .t{font:800 22px 'Raleway', sans-serif; fill:#161616}
+      .word{font-family:'Raleway', 'Lato', 'Segoe UI', sans-serif;font-weight:700;font-size:64px;fill:#7F4DAB;letter-spacing:0.5px}
     </style>
   </defs>
-  <rect x="0" y="6" width="44" height="28" rx="6" fill="#7F4DAB"/>
-  <path d="M6 28c7-0.6 10.5-4.2 15.4-9.6 4.2-4.2 8.2-7.2 15.6-7.2v5c-5.7 0-9.4 3-14.6 9.2C16 31.9 11 35 4 35z" fill="#F49A00"/>
-  <circle cx="36" cy="12" r="4" fill="white"/>
-  <text x="54" y="27" class="t">Finsolar Dealroom</text>
+  <text x="24" y="76" class="word">finsolar</text>
 </svg>
