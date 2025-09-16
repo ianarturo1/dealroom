@@ -1,16 +1,13 @@
 import React, { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
-import { DEFAULT_INVESTOR_ID } from '../lib/config'
+import { useInvestorProfile } from '../lib/investor'
 
 export default function Documents(){
   const [docs, setDocs] = useState([])
   const [loading, setLoading] = useState(false)
   const [category, setCategory] = useState('NDA')
   const [error, setError] = useState(null)
-  const [searchParams] = useSearchParams()
-  const searchSlug = searchParams.get('investor')
-  const investorId = (searchSlug && searchSlug.trim().toLowerCase()) || DEFAULT_INVESTOR_ID
+  const { investorId } = useInvestorProfile()
 
   async function load(){
     try{

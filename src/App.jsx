@@ -7,14 +7,12 @@ import Admin from './pages/Admin'
 import Updates from './pages/Updates'
 import NotFound from './pages/NotFound'
 import './styles.css'
+import { useInvestorProfile } from './lib/investor'
 
 export default function App(){
   const location = useLocation()
   const search = location.search
-  const searchParams = React.useMemo(() => new URLSearchParams(search), [search])
-  const investorSlug = (searchParams.get('investor') || '').trim()
-  const envInvestorId = (import.meta.env.VITE_PUBLIC_INVESTOR_ID || '').trim()
-  const isInvestorProfile = Boolean(investorSlug || envInvestorId)
+  const { isInvestorProfile } = useInvestorProfile()
 
   function withSearch(pathname){
     return { pathname, search }

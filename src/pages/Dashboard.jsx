@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import ProgressBar from '../components/ProgressBar'
 import KPIs from '../components/KPIs'
-import { DEFAULT_INVESTOR_ID } from '../lib/config'
+import { useInvestorProfile } from '../lib/investor'
 
 const STAGES = [
   "Primera reunión","NDA","Entrega de información","Generación de propuesta",
@@ -15,9 +14,7 @@ const STAGES = [
 export default function Dashboard(){
   const [investor, setInvestor] = useState(null)
   const [err, setErr] = useState(null)
-  const [searchParams] = useSearchParams()
-  const searchSlug = searchParams.get('investor')
-  const investorId = (searchSlug && searchSlug.trim().toLowerCase()) || DEFAULT_INVESTOR_ID
+  const { investorId } = useInvestorProfile()
 
   useEffect(() => {
     let cancelled = false
