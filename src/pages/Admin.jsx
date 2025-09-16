@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import RoleGate from '../components/RoleGate'
 import { DEFAULT_INVESTOR_ID } from '../lib/config'
@@ -22,6 +22,26 @@ const MIX_FIELDS = [
   { key: 'aaaCompanies', label: 'Empresas AAA' },
   { key: 'ownSites', label: 'Sitios Propios' }
 ]
+
+const PROJECT_NUMBER_FIELDS = [
+  { key: 'power_kwp', label: 'Potencia (kWp)' },
+  { key: 'energy_mwh', label: 'Energía anual (MWh)' },
+  { key: 'co2_tons', label: 'CO₂ evitado (t/año)' }
+]
+
+const createEmptyProject = () => ({
+  id: '',
+  name: '',
+  client: '',
+  location: '',
+  power_kwp: '',
+  energy_mwh: '',
+  co2_tons: '',
+  model: '',
+  status: 'Disponible',
+  notes: '',
+  loi_template: ''
+})
 
 const parseNumber = (value) => {
   if (value === null || value === undefined || value === '') return null
@@ -59,6 +79,140 @@ export default function Admin({ user }){
   const [invErr, setInvErr] = useState(null)
   const [invLoading, setInvLoading] = useState(false)
   const [progress, setProgress] = useState(0)
+
+  const [projectList, setProjectList] = useState([])
+  const [projectsLoading, setProjectsLoading] = useState(true)
+  const [projectLoadErr, setProjectLoadErr] = useState(null)
+  const [projectSaveMsg, setProjectSaveMsg] = useState(null)
+  const [projectSaveErr, setProjectSaveErr] = useState(null)
+  const [projectSaving, setProjectSaving] = useState(false)
+
+  const toFormProject = (project) => ({
+    id: project.id || '',
+    name: project.name || '',
+    client: project.client || '',
+    location: project.location || '',
+    power_kwp: project.power_kwp ?? '',
+    energy_mwh: project.energy_mwh ?? '',
+    co2_tons: project.co2_tons ?? '',
+    model: project.model || '',
+    status: project.status || 'Disponible',
+    notes: project.notes || '',
+    loi_template: project.loi_template || ''
+  })
+
+  useEffect(() => {
+    let active = true
+    setProjectsLoading(true)
+    setProjectLoadErr(null)
+    api.listProjects()
+      .then(items => {
+        if (!active) return
+        setProjectList(items.map(toFormProject))
+      })
+      .catch(error => {
+        if (!active) return
+        setProjectLoadErr(error.message)
+      })
+      .finally(() => {
+        if (active) setProjectsLoading(false)
+      })
+    return () => { active = false }
+  }, [])
+
+  const resetProjectFeedback = () => {
+    setProjectSaveMsg(null)
+    setProjectSaveErr(null)
+  }
+
+  const updateProjectField = (index, field, value) => {
+    resetProjectFeedback()
+    setProjectList(prev => prev.map((item, idx) => idx === index ? { ...item, [field]: value } : item))
+  }
+
+  const addProject = () => {
+    resetProjectFeedback()
+    setProjectList(prev => [...prev, createEmptyProject()])
+  }
+
+  const removeProject = (index) => {
+    resetProjectFeedback()
+    if (typeof window !== 'undefined' && !window.confirm('¿Eliminar este proyecto?')) return
+    setProjectList(prev => prev.filter((_, idx) => idx !== index))
+  }
+
+  const toNumberOrThrow = (value, label, id) => {
+    const raw = (value === null || value === undefined) ? '' : String(value).trim()
+    if (!raw){
+      throw new Error(`Proyecto ${id} requiere ${label}`)
+    }
+    const num = Number(raw)
+    if (!Number.isFinite(num)){
+      throw new Error(`Proyecto ${id} tiene ${label} inválido`)
+    }
+    return num
+  }
+
+  const sanitizeProjects = () => {
+    const seen = new Set()
+    const sanitized = projectList.map((project, index) => {
+      const id = (project.id || '').trim()
+      if (!id) throw new Error(`El proyecto ${index + 1} requiere un ID`)
+      const name = (project.name || '').trim()
+      if (!name) throw new Error(`Proyecto ${id} requiere nombre`)
+      const client = (project.client || '').trim()
+      if (!client) throw new Error(`Proyecto ${id} requiere cliente`)
+      const location = (project.location || '').trim()
+      if (!location) throw new Error(`Proyecto ${id} requiere ubicación`)
+      const model = (project.model || '').trim()
+      if (!model) throw new Error(`Proyecto ${id} requiere modelo`)
+      const status = (project.status || '').trim() || 'Disponible'
+
+      const base = {
+        id,
+        name,
+        client,
+        location,
+        power_kwp: toNumberOrThrow(project.power_kwp, 'potencia (kWp)', id),
+        energy_mwh: toNumberOrThrow(project.energy_mwh, 'energía anual (MWh)', id),
+        co2_tons: toNumberOrThrow(project.co2_tons, 'CO₂ evitado (t/año)', id),
+        model,
+        status
+      }
+
+      const notes = (project.notes || '').trim()
+      if (notes) base.notes = notes
+      const loiTemplate = (project.loi_template || '').trim()
+      if (loiTemplate) base.loi_template = loiTemplate
+
+      return base
+    })
+
+    for (const project of sanitized){
+      if (seen.has(project.id)){
+        throw new Error(`ID duplicado: ${project.id}`)
+      }
+      seen.add(project.id)
+    }
+
+    return sanitized
+  }
+
+  const onSaveProjects = async (e) => {
+    e.preventDefault()
+    resetProjectFeedback()
+    setProjectSaving(true)
+    try{
+      const sanitized = sanitizeProjects()
+      await api.saveProjects(sanitized)
+      setProjectList(sanitized.map(toFormProject))
+      setProjectSaveMsg('Proyectos guardados y commiteados a GitHub.')
+    }catch(error){
+      setProjectSaveErr(error.message)
+    }finally{
+      setProjectSaving(false)
+    }
+  }
 
   const metrics = payload.metrics || {}
 
@@ -123,6 +277,8 @@ export default function Admin({ user }){
   const labelStyle = { fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 4 }
   const fieldStyle = { display: 'flex', flexDirection: 'column', flex: 1, minWidth: 200 }
   const mixFieldStyle = { display: 'flex', flexDirection: 'column', flex: 1, minWidth: 160 }
+  const projectBoxStyle = { border: '1px solid var(--border)', borderRadius: 12, padding: 12, marginTop: 12, background: '#f7f7fb' }
+  const noteAreaStyle = { minHeight: 96, resize: 'vertical' }
 
   const onSubmit = async (e) => {
     e.preventDefault()
@@ -356,6 +512,140 @@ export default function Admin({ user }){
           </form>
           {msg && <div className="notice" style={{marginTop:8}}>{msg}</div>}
           {err && <div className="notice" style={{marginTop:8}}>{err}</div>}
+        </div>
+        <div className="card" style={{marginTop:12}}>
+          <div className="h2">Gestionar proyectos activos</div>
+          <p style={{ margin: 0, color: 'var(--muted)', fontSize: 14 }}>Actualiza la lista que aparece en la sección de Proyectos.</p>
+          {projectLoadErr && <div className="notice" style={{marginTop:8}}>{projectLoadErr}</div>}
+          {projectsLoading ? (
+            <div style={{marginTop:8, color:'var(--muted)'}}>Cargando proyectos...</div>
+          ) : (
+            <form onSubmit={onSaveProjects}>
+              {projectList.map((project, index) => (
+                <div key={project.id || index} style={projectBoxStyle}>
+                  <div className="row" style={{justifyContent:'space-between'}}>
+                    <div style={{fontWeight:700}}>{project.name || project.id || `Proyecto ${index + 1}`}</div>
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      style={{padding:'6px 12px', fontSize:12}}
+                      onClick={() => removeProject(index)}
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                  <div className="form-row" style={{marginTop:8}}>
+                    <div style={fieldStyle}>
+                      <label htmlFor={`project-${index}-id`} style={labelStyle}>ID</label>
+                      <input
+                        id={`project-${index}-id`}
+                        className="input"
+                        value={project.id}
+                        onChange={e => updateProjectField(index, 'id', e.target.value)}
+                      />
+                    </div>
+                    <div style={fieldStyle}>
+                      <label htmlFor={`project-${index}-name`} style={labelStyle}>Nombre</label>
+                      <input
+                        id={`project-${index}-name`}
+                        className="input"
+                        value={project.name}
+                        onChange={e => updateProjectField(index, 'name', e.target.value)}
+                      />
+                    </div>
+                    <div style={fieldStyle}>
+                      <label htmlFor={`project-${index}-client`} style={labelStyle}>Cliente</label>
+                      <input
+                        id={`project-${index}-client`}
+                        className="input"
+                        value={project.client}
+                        onChange={e => updateProjectField(index, 'client', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="form-row" style={{marginTop:8}}>
+                    <div style={fieldStyle}>
+                      <label htmlFor={`project-${index}-location`} style={labelStyle}>Ubicación</label>
+                      <input
+                        id={`project-${index}-location`}
+                        className="input"
+                        value={project.location}
+                        onChange={e => updateProjectField(index, 'location', e.target.value)}
+                      />
+                    </div>
+                    <div style={fieldStyle}>
+                      <label htmlFor={`project-${index}-model`} style={labelStyle}>Modelo</label>
+                      <input
+                        id={`project-${index}-model`}
+                        className="input"
+                        value={project.model}
+                        onChange={e => updateProjectField(index, 'model', e.target.value)}
+                      />
+                    </div>
+                    <div style={fieldStyle}>
+                      <label htmlFor={`project-${index}-status`} style={labelStyle}>Estado</label>
+                      <input
+                        id={`project-${index}-status`}
+                        className="input"
+                        value={project.status}
+                        onChange={e => updateProjectField(index, 'status', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="form-row" style={{marginTop:8}}>
+                    {PROJECT_NUMBER_FIELDS.map(field => (
+                      <div key={field.key} style={fieldStyle}>
+                        <label htmlFor={`project-${index}-${field.key}`} style={labelStyle}>{field.label}</label>
+                        <input
+                          id={`project-${index}-${field.key}`}
+                          className="input"
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={project[field.key] ?? ''}
+                          onChange={e => updateProjectField(index, field.key, e.target.value)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="form-row" style={{marginTop:8}}>
+                    <div style={{ ...fieldStyle, minWidth: 260 }}>
+                      <label htmlFor={`project-${index}-notes`} style={labelStyle}>Notas</label>
+                      <textarea
+                        id={`project-${index}-notes`}
+                        className="input"
+                        style={noteAreaStyle}
+                        value={project.notes}
+                        onChange={e => updateProjectField(index, 'notes', e.target.value)}
+                      />
+                    </div>
+                    <div style={fieldStyle}>
+                      <label htmlFor={`project-${index}-loi`} style={labelStyle}>Enlace a LOI</label>
+                      <input
+                        id={`project-${index}-loi`}
+                        className="input"
+                        type="url"
+                        placeholder="https://"
+                        value={project.loi_template}
+                        onChange={e => updateProjectField(index, 'loi_template', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {!projectList.length && (
+                <div style={{marginTop:12, color:'var(--muted)'}}>No hay proyectos cargados. Usa "Agregar proyecto".</div>
+              )}
+              <div className="row" style={{marginTop:12, gap:8}}>
+                <button type="button" className="btn secondary" onClick={addProject}>Agregar proyecto</button>
+                <button type="submit" className="btn" disabled={projectSaving}>
+                  {projectSaving ? 'Guardando...' : 'Guardar proyectos'}
+                </button>
+              </div>
+            </form>
+          )}
+          {projectSaveMsg && <div className="notice" style={{marginTop:8}}>{projectSaveMsg}</div>}
+          {projectSaveErr && <div className="notice" style={{marginTop:8}}>{projectSaveErr}</div>}
         </div>
         <div className="card" style={{marginTop:12}}>
           <div className="h2">Notas</div>
