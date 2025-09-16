@@ -11,6 +11,10 @@ import './styles.css'
 export default function App(){
   const location = useLocation()
   const search = location.search
+  const searchParams = React.useMemo(() => new URLSearchParams(search), [search])
+  const investorSlug = (searchParams.get('investor') || '').trim()
+  const envInvestorId = (import.meta.env.VITE_PUBLIC_INVESTOR_ID || '').trim()
+  const isInvestorProfile = Boolean(investorSlug || envInvestorId)
 
   function withSearch(pathname){
     return { pathname, search }
@@ -50,12 +54,14 @@ export default function App(){
             >
               Updates
             </NavLink>
-            <NavLink
-              to={withSearch('/admin')}
-              className={({ isActive }) => (isActive ? 'active' : undefined)}
-            >
-              Admin
-            </NavLink>
+            {!isInvestorProfile && (
+              <NavLink
+                to={withSearch('/admin')}
+                className={({ isActive }) => (isActive ? 'active' : undefined)}
+              >
+                Admin
+              </NavLink>
+            )}
           </nav>
         </div>
       </header>
@@ -65,7 +71,7 @@ export default function App(){
           <Route path="/projects" element={<Projects />} />
           <Route path="/documents" element={<Documents />} />
           <Route path="/updates" element={<Updates />} />
-          <Route path="/admin" element={<Admin user={null} />} />
+          {!isInvestorProfile && <Route path="/admin" element={<Admin user={null} />} />}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
