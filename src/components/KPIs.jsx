@@ -114,8 +114,8 @@ export default function KPIs({ metrics = {}, visibleKeys }){
     <div className="grid">
       {items.map(it => (
         <div className="card kpi" key={it.key}>
-          <div className="num">{it.value}</div>
           <div className="label">{it.label}</div>
+          <div className="num">{it.value}</div>
         </div>
       ))}
     </div>
