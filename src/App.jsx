@@ -1,5 +1,5 @@
 import React from 'react'
-import { Routes, Route, NavLink } from 'react-router-dom'
+import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
 import Documents from './pages/Documents'
 import Projects from './pages/Projects'
@@ -9,6 +9,13 @@ import NotFound from './pages/NotFound'
 import './styles.css'
 
 export default function App(){
+  const location = useLocation()
+  const search = location.search
+
+  function withSearch(pathname){
+    return { pathname, search }
+  }
+
   return (
     <>
       <header className="header">
@@ -18,11 +25,11 @@ export default function App(){
             <span>Dealroom</span>
           </div>
           <nav className="nav">
-            <NavLink to="/" end className={({isActive}) => isActive ? 'active' : undefined}>Panel</NavLink>
-            <NavLink to="/projects" className={({isActive}) => isActive ? 'active' : undefined}>Proyectos</NavLink>
-            <NavLink to="/documents" className={({isActive}) => isActive ? 'active' : undefined}>Documentos</NavLink>
-            <NavLink to="/updates" className={({isActive}) => isActive ? 'active' : undefined}>Updates</NavLink>
-            <NavLink to="/admin" className={({isActive}) => isActive ? 'active' : undefined}>Admin</NavLink>
+            <NavLink to={withSearch('/')} end className={({isActive}) => isActive ? 'active' : undefined}>Panel</NavLink>
+            <NavLink to={withSearch('/projects')} className={({isActive}) => isActive ? 'active' : undefined}>Proyectos</NavLink>
+            <NavLink to={withSearch('/documents')} className={({isActive}) => isActive ? 'active' : undefined}>Documentos</NavLink>
+            <NavLink to={withSearch('/updates')} className={({isActive}) => isActive ? 'active' : undefined}>Updates</NavLink>
+            <NavLink to={withSearch('/admin')} className={({isActive}) => isActive ? 'active' : undefined}>Admin</NavLink>
           </nav>
         </div>
       </header>

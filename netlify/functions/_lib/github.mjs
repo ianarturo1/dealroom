@@ -42,6 +42,13 @@ async function putFile(repo, path, contentBase64, message, sha, branch){
   return gh(`/repos/${owner}/${name}/contents/${encodeURIComponent(path)}`, 'PUT', body)
 }
 
+async function deleteFile(repo, path, message, sha, branch){
+  const { owner, name } = repoParts(repo)
+  const body = { message, sha }
+  if (branch) body.branch = branch
+  return gh(`/repos/${owner}/${name}/contents/${encodeURIComponent(path)}`, 'DELETE', body)
+}
+
 async function listDir(repo, path, ref){
   const { owner, name } = repoParts(repo)
   const q = ref ? `?ref=${encodeURIComponent(ref)}` : ''
@@ -64,4 +71,4 @@ function contentTypeFor(filename){
   return map[ext] || 'application/octet-stream'
 }
 
-export { repoEnv, getFile, putFile, listDir, contentTypeFor }
+export { repoEnv, getFile, putFile, deleteFile, listDir, contentTypeFor }

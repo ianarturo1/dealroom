@@ -1,6 +1,11 @@
 import React from 'react'
+import { useLocation } from 'react-router-dom'
 
 export default function ProjectCard({ p }){
+  const location = useLocation()
+  const search = location.search
+  const documentsHref = `#/documents${search || ''}`
+
   return (
     <div className="card">
       <div className="row" style={{justifyContent:'space-between'}}>
@@ -19,7 +24,7 @@ export default function ProjectCard({ p }){
       {p.notes && <div className="notice" style={{marginTop:10}}>{p.notes}</div>}
       <div style={{display:'flex', gap:8, marginTop:12}}>
         {p.loi_template && <a className="btn secondary" href={p.loi_template} target="_blank" rel="noreferrer">Descargar LOI</a>}
-        <a className="btn" href="#/documents">Ver documentos</a>
+        <a className="btn" href={documentsHref}>Ver documentos</a>
       </div>
     </div>
   )

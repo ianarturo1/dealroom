@@ -21,12 +21,15 @@ export const api = {
     })
   },
   getInvestor(slug){ return req(`/.netlify/functions/get-investor${slug ? ('?slug='+encodeURIComponent(slug)) : ''}`) },
-  listDocs(params){ 
+  listDocs(params){
     const q = new URLSearchParams(params || {}).toString()
-    return req(`/.netlify/functions/list-docs${q ? ('?'+q) : ''}`) 
+    return req(`/.netlify/functions/list-docs${q ? ('?'+q) : ''}`)
   },
   async uploadDoc(info){
     return req('/.netlify/functions/upload-doc', { method:'POST', body: info })
+  },
+  async deleteDoc(info){
+    return req('/.netlify/functions/delete-doc', { method:'POST', body: info })
   },
   async updateStatus(payload){
     return req('/.netlify/functions/update-status', { method:'POST', body: payload })

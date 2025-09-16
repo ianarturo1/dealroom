@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import RoleGate from '../components/RoleGate'
 import { DEFAULT_INVESTOR_ID } from '../lib/config'
@@ -29,6 +29,17 @@ const PROJECT_NUMBER_FIELDS = [
   { key: 'co2_tons', label: 'CO₂ evitado (t/año)' }
 ]
 
+const DOC_CATEGORIES = [
+  'NDA',
+  'Propuestas',
+  'Modelos financieros',
+  'Contratos',
+  'LOIs',
+  'Sustento fiscal',
+  'Mitigación de riesgos',
+  'Procesos'
+]
+
 const createEmptyProject = () => ({
   id: '',
   name: '',
@@ -48,6 +59,8 @@ const parseNumber = (value) => {
   const num = Number(value)
   return Number.isNaN(num) ? null : num
 }
+
+const normalizeSlug = (value) => (value || '').trim().toLowerCase()
 
 export default function Admin({ user }){
   const defaultName = DEFAULT_INVESTOR_ID === 'femsa'
@@ -87,6 +100,15 @@ export default function Admin({ user }){
   const [projectSaveErr, setProjectSaveErr] = useState(null)
   const [projectSaving, setProjectSaving] = useState(false)
 
+  const [docSlugInput, setDocSlugInput] = useState(DEFAULT_INVESTOR_ID)
+  const [docSlug, setDocSlug] = useState(DEFAULT_INVESTOR_ID)
+  const [docCategory, setDocCategory] = useState(DOC_CATEGORIES[0])
+  const [docList, setDocList] = useState([])
+  const [docsLoading, setDocsLoading] = useState(false)
+  const [docsError, setDocsError] = useState(null)
+  const [docsNotice, setDocsNotice] = useState(null)
+  const [docsWorking, setDocsWorking] = useState(false)
+
   const toFormProject = (project) => ({
     id: project.id || '',
     name: project.name || '',
@@ -119,6 +141,25 @@ export default function Admin({ user }){
       })
     return () => { active = false }
   }, [])
+
+  const loadDocs = useCallback(async () => {
+    const slug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
+    setDocsLoading(true)
+    setDocsError(null)
+    try{
+      const res = await api.listDocs({ category: docCategory, slug })
+      setDocList(res.files || [])
+    }catch(error){
+      setDocList([])
+      setDocsError(error.message)
+    }finally{
+      setDocsLoading(false)
+    }
+  }, [docCategory, docSlug])
+
+  useEffect(() => {
+    loadDocs()
+  }, [loadDocs])
 
   const resetProjectFeedback = () => {
     setProjectSaveMsg(null)
@@ -214,7 +255,80 @@ export default function Admin({ user }){
     }
   }
 
+  const handleDocSlugSubmit = (e) => {
+    e.preventDefault()
+    setDocsNotice(null)
+    setDocsError(null)
+    const normalized = normalizeSlug(docSlugInput)
+    const finalSlug = normalized || DEFAULT_INVESTOR_ID
+    setDocSlugInput(finalSlug)
+    if (finalSlug === docSlug){
+      loadDocs()
+    }else{
+      setDocSlug(finalSlug)
+    }
+  }
+
+  const handleDocUpload = (e) => {
+    e.preventDefault()
+    setDocsError(null)
+    setDocsNotice(null)
+    const form = e.target
+    const file = form.file.files[0]
+    if (!file) return
+    const slug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
+    const reader = new FileReader()
+    reader.onload = async () => {
+      try{
+        const result = typeof reader.result === 'string' ? reader.result : ''
+        const base64 = result.includes(',') ? result.split(',')[1] : ''
+        if (!base64) throw new Error('No se pudo leer el archivo')
+        await api.uploadDoc({
+          path: `${docCategory}`,
+          filename: file.name,
+          message: `Upload ${file.name} desde Admin`,
+          contentBase64: base64,
+          slug
+        })
+        setDocsNotice('Archivo subido.')
+        form.reset()
+        await loadDocs()
+      }catch(error){
+        setDocsError(error.message)
+      }finally{
+        setDocsWorking(false)
+      }
+    }
+    reader.onerror = () => {
+      setDocsWorking(false)
+      setDocsError('No se pudo leer el archivo')
+    }
+    setDocsWorking(true)
+    reader.readAsDataURL(file)
+  }
+
+  const handleDocDelete = async (file) => {
+    if (!file || !file.path) return
+    if (typeof window !== 'undefined' && !window.confirm(`¿Eliminar ${file.name}?`)) return
+    setDocsError(null)
+    setDocsNotice(null)
+    try{
+      setDocsWorking(true)
+      await api.deleteDoc({
+        path: file.path,
+        message: `Delete ${file.name} desde Admin`
+      })
+      setDocsNotice('Documento eliminado.')
+      await loadDocs()
+    }catch(error){
+      setDocsError(error.message)
+    }finally{
+      setDocsWorking(false)
+    }
+  }
+
   const metrics = payload.metrics || {}
+  const effectiveDocSlug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
 
   const updateMetric = (key, updater) => {
     setPayload(prev => {
@@ -512,6 +626,99 @@ export default function Admin({ user }){
           </form>
           {msg && <div className="notice" style={{marginTop:8}}>{msg}</div>}
           {err && <div className="notice" style={{marginTop:8}}>{err}</div>}
+        </div>
+        <div className="card" style={{marginTop:12}}>
+          <div className="h2">Documentos por inversionista</div>
+          <form
+            onSubmit={handleDocSlugSubmit}
+            className="form-row"
+            style={{ marginTop: 8, alignItems: 'flex-end', gap: 12 }}
+          >
+            <div style={{ ...fieldStyle, minWidth: 200 }}>
+              <label htmlFor="docs-slug" style={labelStyle}>Slug del inversionista</label>
+              <input
+                id="docs-slug"
+                className="input"
+                value={docSlugInput}
+                onChange={e => setDocSlugInput(e.target.value)}
+                placeholder="slug"
+              />
+            </div>
+            <div style={{ ...fieldStyle, minWidth: 200 }}>
+              <label htmlFor="docs-category" style={labelStyle}>Categoría</label>
+              <select
+                id="docs-category"
+                className="select"
+                value={docCategory}
+                onChange={e => { setDocCategory(e.target.value); setDocsNotice(null); setDocsError(null) }}
+              >
+                {DOC_CATEGORIES.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+            <button className="btn" type="submit" disabled={docsLoading || docsWorking}>Ver carpeta</button>
+            <button
+              className="btn secondary"
+              type="button"
+              onClick={() => { setDocsNotice(null); setDocsError(null); loadDocs() }}
+              disabled={docsLoading || docsWorking}
+            >
+              Actualizar
+            </button>
+          </form>
+          <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>
+            Gestionando: <code>{docCategory}/{effectiveDocSlug}</code>
+          </div>
+          <form onSubmit={handleDocUpload} className="form-row" style={{ marginTop: 12 }}>
+            <input name="file" type="file" className="input" disabled={docsWorking} />
+            <button className="btn" type="submit" disabled={docsWorking}>Subir</button>
+            <span className="notice">Los archivos se guardan en GitHub.</span>
+          </form>
+          {docsError && <div className="notice" style={{marginTop:8}}>{docsError}</div>}
+          {docsNotice && <div className="notice" style={{marginTop:8}}>{docsNotice}</div>}
+          {docsWorking && !docsLoading && <div style={{marginTop:8, color:'var(--muted)'}}>Procesando...</div>}
+          {docsLoading && <div style={{marginTop:8, color:'var(--muted)'}}>Cargando documentos...</div>}
+          <table className="table" style={{ marginTop: 12 }}>
+            <thead>
+              <tr>
+                <th>Archivo</th>
+                <th>Tamaño</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {docList.map(file => (
+                <tr key={file.path}>
+                  <td>{file.name}</td>
+                  <td>{(file.size / 1024).toFixed(1)} KB</td>
+                  <td style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                    <a
+                      className="btn secondary"
+                      href={api.downloadDocPath(file.path)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Descargar
+                    </a>
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      onClick={() => handleDocDelete(file)}
+                      disabled={docsWorking}
+                    >
+                      Eliminar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!docList.length && !docsLoading && (
+                <tr>
+                  <td colSpan="3">No hay documentos en esta carpeta.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
         <div className="card" style={{marginTop:12}}>
           <div className="h2">Gestionar proyectos activos</div>
