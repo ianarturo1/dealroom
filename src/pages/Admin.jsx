@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { api } from '../lib/api'
 import RoleGate from '../components/RoleGate'
+import { DEFAULT_INVESTOR_ID } from '../lib/config'
 
 const STAGES = [
   "Primera reunión","NDA","Entrega de información","Generación de propuesta",
@@ -29,9 +30,12 @@ const parseNumber = (value) => {
 }
 
 export default function Admin({ user }){
+  const defaultName = DEFAULT_INVESTOR_ID === 'femsa'
+    ? 'FEMSA'
+    : DEFAULT_INVESTOR_ID.toUpperCase()
   const [payload, setPayload] = useState({
-    id: 'femsa',
-    name: 'FEMSA',
+    id: DEFAULT_INVESTOR_ID,
+    name: defaultName,
     status: 'LOI',
     deadlines: { 'LOI':'2025-10-15', 'Firma':'2025-11-30' },
     metrics: {
