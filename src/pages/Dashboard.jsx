@@ -18,7 +18,7 @@ export default function Dashboard(){
     api.getInvestor().then(setInvestor).catch(e => setErr(e.message))
   }, [])
 
-  const metrics = investor?.metrics || { decisionTime: '—' }
+  const metrics = investor?.metrics || {}
   const stage = investor?.status || STAGES[0]
   const stageIndex = STAGES.findIndex(s => s === stage)
   const nextSteps = stageIndex >= 0 ? STAGES.slice(stageIndex + 1) : []
@@ -49,7 +49,10 @@ export default function Dashboard(){
       </div>
 
       <div style={{marginTop:12}}>
-        <KPIs metrics={metrics} visibleKeys={['decisionTime']} />
+        <KPIs
+          metrics={metrics}
+          visibleKeys={['decisionTime','fiscalCapitalInvestment','projectProfitability','portfolio']}
+        />
       </div>
 
       <div className="card" style={{marginTop:12}}>
