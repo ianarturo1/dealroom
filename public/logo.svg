@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 96" role="img" aria-labelledby="title desc">
   <title id="title">Finsolar logo</title>
-  <desc id="desc">Lowercase word finsolar in purple.</desc>
+
   <defs>
     <style>
       .word{font-family:'Raleway', 'Lato', 'Segoe UI', sans-serif;font-weight:700;font-size:64px;fill:#7F4DAB;letter-spacing:0.5px}
