@@ -30,6 +30,11 @@
       "name": "prueba2",
       "email": "prueba2@fin.solar",
       "status": "NDA"
+    },
+    "calvillo": {
+      "name": "calvillo sa",
+      "email": "luis@fin.solar",
+      "status": "Primera reunión"
     }
   }
 }
