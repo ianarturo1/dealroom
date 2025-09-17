@@ -1,0 +1,23 @@
+{
+  "id": "calvillo sa",
+  "name": "Calvillo",
+  "status": "LOI",
+  "deadlines": {
+    "LOI": "2025-10-15",
+    "Firma": "2025-11-30"
+  },
+  "metrics": {
+    "decisionTime": 20,
+    "fiscalCapitalInvestment": 20000000,
+    "projectProfitability": {
+      "amount": 12500000,
+      "years": 15
+    },
+    "portfolio": {
+      "type": "solarFarms"
+    },
+    "investorsActive": 12,
+    "dealsAccelerated": 38,
+    "nps": 72
+  }
+}
