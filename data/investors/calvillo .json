@@ -1,20 +1,25 @@
 {
   "id": "calvillo ",
-  "name": "Calvillo",
-  "status": "LOI",
+  "name": "Calvillo ",
+  "status": "Due diligence fiscal/financiero/riesgos",
   "deadlines": {
     "LOI": "2025-10-15",
     "Firma": "2025-11-30"
   },
   "metrics": {
-    "decisionTime": 20,
+    "decisionTime": 35,
     "fiscalCapitalInvestment": 20000000,
     "projectProfitability": {
       "amount": 12500000,
-      "years": 15
+      "years": 7
     },
     "portfolio": {
-      "type": "solarFarms"
+      "type": "mix",
+      "mix": {
+        "solarFarms": 40,
+        "aaaCompanies": 35,
+        "ownSites": 25
+      }
     },
     "investorsActive": 12,
     "dealsAccelerated": 38,
