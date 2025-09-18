@@ -501,7 +501,7 @@ export default function Admin({ user }){
             <div style={{marginTop:8}}>
               {inv.deadlines.map((d, i) => (
                 <div key={i} className="form-row" style={{marginTop:4}}>
-                  <input className="input" placeholder="Clave" value={d.k} onChange={e => setDeadline(i, 'k', e.target.value)} />
+                  <input className="input" placeholder="Nombre de la etapa de proceso" value={d.k} onChange={e => setDeadline(i, 'k', e.target.value)} />
                   <input className="input" type="date" value={d.v} onChange={e => setDeadline(i, 'v', e.target.value)} />
                 </div>
               ))}
