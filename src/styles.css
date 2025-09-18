@@ -3,7 +3,7 @@
   --orange:#F49A00;
   --black:#161616;
   --white:#FFFFFF;
-  --bg:#000000;
+  --bg:#FFFFFF;
   --muted:#8b8b8b;
   --card:#ffffff;
   --border:#e9e9ef;
@@ -14,7 +14,7 @@ html,body,#root{height:100%}
 body{
   margin:0;
   font-family:'Lato',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,'Helvetica Neue',Arial,sans-serif;
-  color:var(--white);
+  color:var(--black);
   background:var(--bg);
 }
 
