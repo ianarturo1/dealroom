@@ -1,7 +1,28 @@
 {
   "id": "cdt",
-  "name": "CDT",
-  "email": "nicolascdt03@gmail.com",
-  "status": "Primera reunión",
-  "createdAt": "2025-09-18T22:25:53.102Z"
+  "name": "",
+  "status": "Entrega de información",
+  "deadlines": {
+    "LOI": "2025-10-15",
+    "Firma": "2025-11-30"
+  },
+  "metrics": {
+    "decisionTime": 40,
+    "fiscalCapitalInvestment": 5000000,
+    "projectProfitability": {
+      "amount": 2500000,
+      "years": 10
+    },
+    "portfolio": {
+      "type": "mix",
+      "mix": {
+        "solarFarms": 30,
+        "aaaCompanies": 60,
+        "ownSites": 50
+      }
+    },
+    "investorsActive": 12,
+    "dealsAccelerated": 38,
+    "nps": 72
+  }
 }
