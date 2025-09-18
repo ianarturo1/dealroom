@@ -3,7 +3,7 @@
   --orange:#F49A00;
   --black:#161616;
   --white:#FFFFFF;
-  --bg:#ff0000;
+  --bg:#000000;
   --muted:#8b8b8b;
   --card:#ffffff;
   --border:#e9e9ef;
@@ -14,7 +14,7 @@ html,body,#root{height:100%}
 body{
   margin:0;
   font-family:'Lato',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,'Helvetica Neue',Arial,sans-serif;
-  color:var(--black);
+  color:var(--white);
   background:var(--bg);
 }
 
@@ -24,6 +24,7 @@ a:hover{text-decoration:underline}
 .header{
   position:sticky; top:0; z-index:10;
   background:var(--white);
+  color:var(--black);
   border-bottom:1px solid var(--border);
 }
 
@@ -50,6 +51,7 @@ a:hover{text-decoration:underline}
 .card{
   background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px;
   box-shadow:0 1px 2px rgba(0,0,0,0.03);
+  color:var(--black);
 }
 
 .h1{font-family:'Raleway',sans-serif; font-size:28px; margin:8px 0 16px}
@@ -99,5 +101,5 @@ a:hover{text-decoration:underline}
 }
 .row{display:flex; gap:16px; align-items:center; flex-wrap:wrap}
 .hidden{display:none}
-.notice{background:#fff7e8; border:1px solid #ffd9a0; padding:10px 12px; border-radius:10px}
+.notice{background:#fff7e8; border:1px solid #ffd9a0; padding:10px 12px; border-radius:10px; color:var(--black)}
 .footer{color:var(--muted); font-size:12px; text-align:center; padding:24px}
