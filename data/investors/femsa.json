@@ -1,23 +1,24 @@
 {
   "id": "femsa",
-  "name": "",
-  "status": "Entrega de información",
+  "name": "Calvillo",
+  "status": "Presentación de propuesta",
   "deadlines": {
+    "LOI": "2025-10-15",
     "Firma": "2025-11-30"
   },
   "metrics": {
-    "decisionTime": 40,
-    "fiscalCapitalInvestment": 5000000,
+    "decisionTime": 39,
+    "fiscalCapitalInvestment": 20000000,
     "projectProfitability": {
-      "amount": 2500000,
-      "years": 10
+      "amount": 12500000,
+      "years": 7
     },
     "portfolio": {
       "type": "mix",
       "mix": {
-        "solarFarms": 30,
-        "aaaCompanies": 60,
-        "ownSites": 50
+        "solarFarms": 40,
+        "aaaCompanies": 35,
+        "ownSites": 25
       }
     },
     "investorsActive": 12,
