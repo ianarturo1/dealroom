@@ -1,9 +1,12 @@
 :root{
-  --purple:#7F4DAB;
-  --orange:#F49A00;
-  --black:#161616;
+  --brand:#7F4DAB;
+  --accent:#F49A00;
+  --bg:#F7F7FB;
+  --text:#1F2937;
+  --purple:var(--brand);
+  --orange:var(--accent);
+  --black:var(--text);
   --white:#FFFFFF;
-  --bg:#f7f7fb;
   --muted:#8b8b8b;
   --card:#ffffff;
   --border:#e9e9ef;

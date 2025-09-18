@@ -40,12 +40,13 @@ export default function Dashboard(){
   const nextSteps = stageIndex >= 0 ? STAGES.slice(stageIndex + 1) : []
   const deadlines = investor?.deadlines || {}
   const stageLabel = stage || '—'
+  const panelTitle = investor?.ui?.panelTitle || 'Panel'
 
   return (
     <div className="container">
       <div className="row">
         <div>
-          <div className="h1">Panel</div>
+          <div className="h1">{panelTitle}</div>
           <div style={{color:'#8b8b8b'}}>Visibilidad del roadmap y documentos.</div>
         </div>
       </div>

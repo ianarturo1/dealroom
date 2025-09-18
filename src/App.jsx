@@ -7,12 +7,57 @@ import Admin from './pages/Admin'
 import Updates from './pages/Updates'
 import NotFound from './pages/NotFound'
 import './styles.css'
+import { api } from './lib/api'
 import { useInvestorProfile } from './lib/investor'
+
+const DEFAULT_THEME = {
+  brand: '#7F4DAB',
+  accent: '#F49A00',
+  bg: '#F7F7FB',
+  text: '#1F2937'
+}
+
+function applyThemeVars(themeOverrides){
+  if (typeof document === 'undefined') return
+  const root = document.documentElement
+  const theme = Object.assign({}, DEFAULT_THEME, themeOverrides || {})
+  Object.entries(theme).forEach(([key, value]) => {
+    root.style.setProperty(`--${key}`, value)
+  })
+}
 
 export default function App(){
   const location = useLocation()
   const search = location.search
-  const { isInvestorProfile } = useInvestorProfile()
+  const { investorId, isInvestorProfile } = useInvestorProfile()
+  const [panelTitle, setPanelTitle] = React.useState('Panel')
+
+  React.useEffect(() => {
+    if (!investorId) return
+    let cancelled = false
+    applyThemeVars()
+    setPanelTitle('Panel')
+    api.getInvestor(investorId)
+      .then(data => {
+        if (cancelled) return
+        const theme = data?.ui?.theme
+        if (theme){
+          applyThemeVars(theme)
+        }
+        const title = data?.ui?.panelTitle
+        if (title){
+          setPanelTitle(title)
+        }
+      })
+      .catch(() => {
+        if (!cancelled){
+          applyThemeVars()
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [investorId])
 
   function withSearch(pathname){
     return { pathname, search }
@@ -32,7 +77,7 @@ export default function App(){
               end
               className={({ isActive }) => (isActive ? 'active' : undefined)}
             >
-              Panel
+              {panelTitle}
             </NavLink>
             <NavLink
               to={withSearch('/projects')}
