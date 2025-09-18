@@ -1,10 +1,11 @@
 {
   "id": "calvillo",
   "name": "Calvillo Capital",
-  "status": "LOI",
+  "status": "Revisión de contratos",
   "deadlines": {
     "LOI": "2025-10-15",
-    "Firma": "2025-11-30"
+    "Revisión de contratos": "2025-11-10",
+    "Firma de contratos": "2025-11-30"
   },
   "metrics": {
     "decisionTime": 36,
@@ -20,11 +21,6 @@
   },
   "ui": {
     "panelTitle": "Panel Calvillo",
-    "theme": {
-      "brand": "#0EA5E9",
-      "accent": "#0284C7",
-      "bg": "#F1FAFF",
-      "text": "#0F172A"
-    }
+    "theme": { "brand": "#0EA5E9", "accent": "#0284C7", "bg": "#F1FAFF", "text": "#0F172A" }
   }
 }
