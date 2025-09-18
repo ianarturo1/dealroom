@@ -3,7 +3,9 @@
   "name": "",
   "status": "Presentación de propuesta",
   "deadlines": {
-    "LOI": "2025-10-15"
+    "LOI": "2025-10-15",
+    "firma": "2025-09-20",
+    "platicar": "2025-09-26"
   },
   "metrics": {
     "decisionTime": 39,
