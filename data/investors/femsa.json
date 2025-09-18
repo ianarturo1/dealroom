@@ -1,23 +1,22 @@
 {
   "id": "femsa",
-  "name": "FINSOLAR",
-  "status": "Generación de propuesta",
+  "name": "",
+  "status": "Entrega de información",
   "deadlines": {
-    "LOI": "2025-10-15",
     "Firma": "2025-11-30"
   },
   "metrics": {
     "decisionTime": 40,
-    "fiscalCapitalInvestment": 25000000,
+    "fiscalCapitalInvestment": 5000000,
     "projectProfitability": {
-      "amount": 25000000,
+      "amount": 2500000,
       "years": 10
     },
     "portfolio": {
       "type": "mix",
       "mix": {
-        "solarFarms": 50,
-        "aaaCompanies": 50,
+        "solarFarms": 30,
+        "aaaCompanies": 60,
         "ownSites": 50
       }
     },
