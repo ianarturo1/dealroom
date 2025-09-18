@@ -398,6 +398,11 @@ export default function Admin({ user }){
     e.preventDefault()
     setMsg(null); setErr(null)
     try{
+      const normalizedId = normalizeSlug(payload.id)
+      if (!normalizedId){
+        throw new Error('El slug (id) es requerido')
+      }
+
       const metricsPayload = payload.metrics || {}
       const normalizedMetrics = {
         ...metricsPayload,
@@ -439,8 +444,18 @@ export default function Admin({ user }){
         normalizedMetrics.portfolio = { type: portfolioRaw.type }
       }
 
-      const payloadToSend = { ...payload, metrics: normalizedMetrics }
+      const normalizedName = typeof payload.name === 'string'
+        ? payload.name.trim()
+        : ''
+      const payloadToSend = {
+        ...payload,
+        id: normalizedId,
+        name: normalizedName,
+        metrics: normalizedMetrics
+      }
+
       await api.updateStatus(payloadToSend)
+      setPayload(payloadToSend)
       setMsg('Guardado y commiteado a GitHub.')
     }catch(error){ setErr(error.message) }
   }
