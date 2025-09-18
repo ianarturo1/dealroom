@@ -62,15 +62,23 @@ const parseNumber = (value) => {
 
 const normalizeSlug = (value) => (value || '').trim().toLowerCase()
 
+const deadlinesToRows = (deadlines) => {
+  if (!deadlines || typeof deadlines !== 'object') return [{ key: '', value: '' }]
+  const entries = Object.entries(deadlines)
+  if (!entries.length) return [{ key: '', value: '' }]
+  return entries.map(([key, value]) => ({ key, value: value || '' }))
+}
+
 export default function Admin({ user }){
   const defaultName = DEFAULT_INVESTOR_ID === 'femsa'
     ? 'FEMSA'
     : DEFAULT_INVESTOR_ID.toUpperCase()
+  const initialDeadlines = { 'LOI':'2025-10-15', 'Firma':'2025-11-30' }
   const [payload, setPayload] = useState({
     id: DEFAULT_INVESTOR_ID,
     name: defaultName,
     status: 'LOI',
-    deadlines: { 'LOI':'2025-10-15', 'Firma':'2025-11-30' },
+    deadlines: initialDeadlines,
     metrics: {
       decisionTime: 35,
       fiscalCapitalInvestment: 20000000,
@@ -86,6 +94,8 @@ export default function Admin({ user }){
   })
   const [msg, setMsg] = useState(null)
   const [err, setErr] = useState(null)
+  const [deadlineRows, setDeadlineRows] = useState(() => deadlinesToRows(initialDeadlines))
+  const [investorLoading, setInvestorLoading] = useState(false)
 
   const [inv, setInv] = useState({ email: '', companyName: '', slug: '', status: 'NDA', deadlines: [{ k: '', v: '' }, { k: '', v: '' }] })
   const [invMsg, setInvMsg] = useState(null)
@@ -160,6 +170,10 @@ export default function Admin({ user }){
   useEffect(() => {
     loadDocs()
   }, [loadDocs])
+
+  useEffect(() => {
+    setDeadlineRows(deadlinesToRows(payload.deadlines))
+  }, [payload.deadlines])
 
   const resetProjectFeedback = () => {
     setProjectSaveMsg(null)
@@ -328,7 +342,50 @@ export default function Admin({ user }){
   }
 
   const metrics = payload.metrics || {}
+  const canLoadInvestor = Boolean(normalizeSlug(payload.id))
   const effectiveDocSlug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
+
+  const handleDeadlineRowChange = (index, field, value) => {
+    setDeadlineRows(prev => prev.map((row, idx) => (
+      idx === index ? { ...row, [field]: value } : row
+    )))
+  }
+
+  const addDeadlineRow = () => {
+    setDeadlineRows(prev => [...prev, { key: '', value: '' }])
+  }
+
+  const removeDeadlineRow = (index) => {
+    setDeadlineRows(prev => {
+      if (prev.length <= 1) return [{ key: '', value: '' }]
+      return prev.filter((_, idx) => idx !== index)
+    })
+  }
+
+  const handleLoadInvestor = async () => {
+    const slug = normalizeSlug(payload.id)
+    if (!slug){
+      setErr('El slug (id) es requerido para cargar datos')
+      return
+    }
+    setMsg(null)
+    setErr(null)
+    setInvestorLoading(true)
+    try {
+      const data = await api.getInvestor(slug)
+      setPayload(prev => ({
+        ...prev,
+        ...data,
+        id: slug,
+        metrics: data.metrics || {},
+        deadlines: data.deadlines || {}
+      }))
+    } catch (error) {
+      setErr(`No se pudo cargar inversionista: ${error.message}`)
+    } finally {
+      setInvestorLoading(false)
+    }
+  }
 
   const updateMetric = (key, updater) => {
     setPayload(prev => {
@@ -447,11 +504,21 @@ export default function Admin({ user }){
       const normalizedName = typeof payload.name === 'string'
         ? payload.name.trim()
         : ''
+      const normalizedDeadlines = deadlineRows.reduce((acc, item) => {
+        const key = (item.key || '').trim()
+        const value = item.value || ''
+        if (key && value){
+          acc[key] = value
+        }
+        return acc
+      }, {})
+
       const payloadToSend = {
         ...payload,
         id: normalizedId,
         name: normalizedName,
-        metrics: normalizedMetrics
+        metrics: normalizedMetrics,
+        deadlines: normalizedDeadlines
       }
 
       await api.updateStatus(payloadToSend)
@@ -528,6 +595,14 @@ export default function Admin({ user }){
                 value={payload.id}
                 onChange={e => setPayload({ ...payload, id: e.target.value })}
               />
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={handleLoadInvestor}
+                disabled={investorLoading || !canLoadInvestor}
+              >
+                {investorLoading ? 'Cargando...' : 'Cargar datos'}
+              </button>
               <input
                 className="input"
                 placeholder="Nombre"
@@ -541,6 +616,51 @@ export default function Admin({ user }){
               >
                 {STAGES.map(s => <option key={s}>{s}</option>)}
               </select>
+            </div>
+
+            <div style={{ marginTop: 12, fontWeight: 700 }}>Deadlines</div>
+            <div style={{ marginTop: 8 }}>
+              {deadlineRows.map((item, index) => (
+                <div key={index} className="form-row" style={{ marginTop: 4, alignItems: 'flex-end' }}>
+                  <div style={fieldStyle}>
+                    <label htmlFor={`deadline-${index}-name`} style={labelStyle}>Etapa</label>
+                    <input
+                      id={`deadline-${index}-name`}
+                      className="input"
+                      placeholder="Nombre de la etapa"
+                      value={item.key}
+                      onChange={e => handleDeadlineRowChange(index, 'key', e.target.value)}
+                    />
+                  </div>
+                  <div style={fieldStyle}>
+                    <label htmlFor={`deadline-${index}-date`} style={labelStyle}>Fecha</label>
+                    <input
+                      id={`deadline-${index}-date`}
+                      className="input"
+                      type="date"
+                      value={item.value}
+                      onChange={e => handleDeadlineRowChange(index, 'value', e.target.value)}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      onClick={() => removeDeadlineRow(index)}
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="btn secondary"
+                style={{ marginTop: 8 }}
+                onClick={addDeadlineRow}
+              >
+                Agregar deadline
+              </button>
             </div>
 
             <div style={{ marginTop: 12, fontWeight: 700 }}>Métricas clave</div>
