@@ -40,6 +40,11 @@
       "name": "CDT",
       "email": "nicolascdt03@gmail.com",
       "status": "Primera reunión"
+    },
+    "finsolar": {
+      "name": "FINSOLAR",
+      "email": "nico@fin.solar",
+      "status": "NDA"
     }
   }
 }
