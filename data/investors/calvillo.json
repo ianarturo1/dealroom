@@ -1,7 +1,30 @@
 {
   "id": "calvillo",
-  "name": "calvillo sa",
-  "email": "luis@fin.solar",
-  "status": "Primera reunión",
-  "createdAt": "2025-09-17T14:34:18.818Z"
+  "name": "Calvillo Capital",
+  "status": "LOI",
+  "deadlines": {
+    "LOI": "2025-10-15",
+    "Firma": "2025-11-30"
+  },
+  "metrics": {
+    "decisionTime": 36,
+    "fiscalCapitalInvestment": 20000000,
+    "projectProfitability": { "amount": 12500000, "years": 7 },
+    "portfolio": {
+      "type": "mix",
+      "mix": { "solarFarms": 40, "aaaCompanies": 35, "ownSites": 25 }
+    },
+    "investorsActive": 12,
+    "dealsAccelerated": 38,
+    "nps": 72
+  },
+  "ui": {
+    "panelTitle": "Panel Calvillo",
+    "theme": {
+      "brand": "#0EA5E9",
+      "accent": "#0284C7",
+      "bg": "#F1FAFF",
+      "text": "#0F172A"
+    }
+  }
 }
