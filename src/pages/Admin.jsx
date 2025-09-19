@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import RoleGate from '../components/RoleGate'
 import { DEFAULT_INVESTOR_ID } from '../lib/config'
@@ -161,9 +161,9 @@ export default function Admin({ user }){
   const [docsNotice, setDocsNotice] = useState(null)
   const [docsWorking, setDocsWorking] = useState(false)
 
-  const docsCardRef = React.useRef(null)
-  const docsUploadInputRef = React.useRef(null)
-  const docsTableRef = React.useRef(null)
+  const docsCardRef = useRef(null)
+  const docsUploadInputRef = useRef(null)
+  const docsTableRef = useRef(null)
 
   const [investorDetailsMap, setInvestorDetailsMap] = useState({})
   const [investorDetailsLoading, setInvestorDetailsLoading] = useState(false)
@@ -181,7 +181,7 @@ export default function Admin({ user }){
   const [activityError, setActivityError] = useState(null)
   const [activityRefreshKey, setActivityRefreshKey] = useState(0)
 
-  const normalizedRoles = React.useMemo(() => {
+  const roleInfo = useMemo(() => {
     const roles = new Set()
     if (user && typeof user === 'object'){
       if (Array.isArray(user.roles)){
@@ -201,14 +201,18 @@ export default function Admin({ user }){
     if (import.meta?.env?.DEV && !user){
       roles.add('admin')
     }
-    return Array.from(roles)
+    const normalized = Array.from(roles)
+    return {
+      roles: normalized,
+      isAdmin: normalized.includes('admin'),
+      isRI: normalized.includes('ri')
+    }
   }, [user])
 
-  const isAdmin = normalizedRoles.includes('admin')
-  const isRI = normalizedRoles.includes('ri')
+  const { isAdmin, isRI } = roleInfo
   const canViewDashboard = isAdmin || isRI
 
-  const siteBaseUrl = React.useMemo(() => {
+  const siteBaseUrl = useMemo(() => {
     const envValue = typeof import.meta?.env?.VITE_SITE_URL === 'string'
       ? import.meta.env.VITE_SITE_URL.trim()
       : ''
@@ -221,16 +225,16 @@ export default function Admin({ user }){
   }, [])
 
   const finalStageLabel = STAGES[STAGES.length - 1] || ''
-  const numberFormatter = React.useMemo(() => new Intl.NumberFormat('es-MX'), [])
-  const percentFormatter = React.useMemo(
+  const numberFormatter = useMemo(() => new Intl.NumberFormat('es-MX'), [])
+  const percentFormatter = useMemo(
     () => new Intl.NumberFormat('es-MX', { maximumFractionDigits: 1 }),
     []
   )
-  const shortDateFormatter = React.useMemo(
+  const shortDateFormatter = useMemo(
     () => new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium' }),
     []
   )
-  const dateTimeFormatter = React.useMemo(
+  const dateTimeFormatter = useMemo(
     () => new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' }),
     []
   )
@@ -257,7 +261,7 @@ export default function Admin({ user }){
     loadInvestorList()
   }, [loadInvestorList])
 
-  const filteredInvestors = React.useMemo(() => {
+  const filteredInvestors = useMemo(() => {
     const term = investorSearch.trim().toLowerCase()
     if (!term) return investorList
     return investorList.filter(item => {
@@ -651,7 +655,7 @@ export default function Admin({ user }){
   const canLoadInvestor = Boolean(normalizedPayloadSlug)
   const effectiveDocSlug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
 
-  const investorNameBySlug = React.useMemo(() => {
+  const investorNameBySlug = useMemo(() => {
     const map = {}
     investorList.forEach(item => {
       map[item.slug] = item.name || item.slug
@@ -659,7 +663,7 @@ export default function Admin({ user }){
     return map
   }, [investorList])
 
-  const pipelineSummary = React.useMemo(() => {
+  const pipelineSummary = useMemo(() => {
     const total = investorList.length
     const normalizedStages = STAGES.map(stage => stage.toLowerCase())
     const stageCounts = STAGES.map(stage => {
@@ -682,7 +686,7 @@ export default function Admin({ user }){
     return { total, counts: stageCounts, finalCount, finalPercent }
   }, [investorList, finalStageLabel])
 
-  const upcomingDeadlines = React.useMemo(() => {
+  const upcomingDeadlines = useMemo(() => {
     if (deadlineThreshold < 0) return []
     const thresholdMs = deadlineThreshold * 24 * 60 * 60 * 1000
     const now = new Date()
@@ -710,7 +714,7 @@ export default function Admin({ user }){
     return items
   }, [investorDetailsMap, deadlineThreshold, investorNameBySlug])
 
-  const docHealthSummary = React.useMemo(() => {
+  const docHealthSummary = useMemo(() => {
     return DASHBOARD_DOC_CATEGORIES.map(category => {
       const categoryData = docInventories[category] || {}
       const missing = investorList.reduce((acc, investor) => {
@@ -746,7 +750,7 @@ export default function Admin({ user }){
     })
   }, [docInventories, investorList])
 
-  const activityDisplayItems = React.useMemo(() => {
+  const activityDisplayItems = useMemo(() => {
     return activityItems.map((event, index) => {
       const slug = event?.slug || ''
       const investorName = slug ? (investorNameBySlug[slug] || slug) : ''

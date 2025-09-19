@@ -118,6 +118,10 @@ async function loadDocEvents(){
 
 export async function handler(){
   try{
+    if (!process.env.GITHUB_TOKEN){
+      return ok({ events: [] })
+    }
+
     const [investorEvents, docEvents] = await Promise.all([
       loadInvestorEvents(),
       loadDocEvents()
