@@ -49,5 +49,8 @@ export const api = {
   },
   downloadDocPath(relPath){
     return `/.netlify/functions/get-doc?path=${encodeURIComponent(relPath)}`
+  },
+  async listActivity(){
+    return req('/.netlify/functions/list-activity')
   }
 }

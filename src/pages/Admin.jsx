@@ -159,6 +159,30 @@ export default function Admin({ user }){
   const [docsNotice, setDocsNotice] = useState(null)
   const [docsWorking, setDocsWorking] = useState(false)
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const raw = window.sessionStorage.getItem('adminDocsRedirect')
+    if (!raw) return
+    window.sessionStorage.removeItem('adminDocsRedirect')
+    try{
+      const data = JSON.parse(raw)
+      const category = DOC_CATEGORIES.includes(data?.category) ? data.category : DOC_CATEGORIES[0]
+      const slug = normalizeSlug(data?.slug) || DEFAULT_INVESTOR_ID
+      setDocCategory(category)
+      setDocSlugInput(slug)
+      setDocSlug(slug)
+      window.setTimeout(() => {
+        const input = document.getElementById('docs-slug')
+        if (input && typeof input.scrollIntoView === 'function'){
+          input.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          if (typeof input.focus === 'function') input.focus()
+        }
+      }, 80)
+    }catch(error){
+      console.error('No se pudo aplicar la redirección de documentos:', error)
+    }
+  }, [])
+
   const isAdmin = React.useMemo(() => {
     if (user && typeof user === 'object'){
       if (Array.isArray(user.roles)){
