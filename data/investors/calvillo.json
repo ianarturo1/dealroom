@@ -1,13 +1,13 @@
 {
   "id": "calvillo",
-  "name": "",
-  "status": "Presentación de propuesta",
+  "name": "FEMSA",
+  "status": "LOI",
   "deadlines": {
     "LOI": "2025-10-15",
     "Firma": "2025-11-30"
   },
   "metrics": {
-    "decisionTime": 39,
+    "decisionTime": 35,
     "fiscalCapitalInvestment": 20000000,
     "projectProfitability": {
       "amount": 12500000,
