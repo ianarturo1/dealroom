@@ -103,6 +103,14 @@ export default function Admin({ user }){
   const [invLoading, setInvLoading] = useState(false)
   const [progress, setProgress] = useState(0)
 
+  const [investorList, setInvestorList] = useState([])
+  const [investorSearch, setInvestorSearch] = useState('')
+  const [investorListLoading, setInvestorListLoading] = useState(false)
+  const [investorListError, setInvestorListError] = useState(null)
+  const [investorDeleteMsg, setInvestorDeleteMsg] = useState(null)
+  const [investorDeleteErr, setInvestorDeleteErr] = useState(null)
+  const [deletingInvestor, setDeletingInvestor] = useState(null)
+
   const [projectList, setProjectList] = useState([])
   const [projectsLoading, setProjectsLoading] = useState(true)
   const [projectLoadErr, setProjectLoadErr] = useState(null)
@@ -118,6 +126,70 @@ export default function Admin({ user }){
   const [docsError, setDocsError] = useState(null)
   const [docsNotice, setDocsNotice] = useState(null)
   const [docsWorking, setDocsWorking] = useState(false)
+
+  const isAdmin = React.useMemo(() => {
+    if (user && typeof user === 'object'){
+      if (Array.isArray(user.roles)){
+        if (user.roles.some(role => String(role).toLowerCase() === 'admin')) return true
+      }
+      if (typeof user.role === 'string' && user.role.toLowerCase() === 'admin') return true
+      if (user.isAdmin === true) return true
+    }
+    if (import.meta?.env?.DEV && !user) return true
+    return false
+  }, [user])
+
+  const loadInvestorList = useCallback(async () => {
+    if (!isAdmin) return
+    setInvestorListLoading(true)
+    setInvestorListError(null)
+    setInvestorDeleteMsg(null)
+    setInvestorDeleteErr(null)
+    try{
+      const res = await api.listInvestors()
+      const items = Array.isArray(res?.investors) ? res.investors : []
+      setInvestorList(items)
+    }catch(error){
+      setInvestorList([])
+      setInvestorListError(error.message)
+    }finally{
+      setInvestorListLoading(false)
+    }
+  }, [isAdmin])
+
+  useEffect(() => {
+    loadInvestorList()
+  }, [loadInvestorList])
+
+  const filteredInvestors = React.useMemo(() => {
+    const term = investorSearch.trim().toLowerCase()
+    if (!term) return investorList
+    return investorList.filter(item => {
+      const haystack = [item.slug, item.name, item.email, item.status]
+      return haystack.some(value => (value || '').toLowerCase().includes(term))
+    })
+  }, [investorList, investorSearch])
+  const filteredInvestorCount = filteredInvestors.length
+
+  const handleDeleteInvestor = useCallback(async (slug) => {
+    if (!isAdmin || !slug) return
+    if (typeof window !== 'undefined'){
+      const confirmed = window.confirm(`¿Eliminar al inversionista "${slug}"? Esta acción no se puede deshacer.`)
+      if (!confirmed) return
+    }
+    setInvestorDeleteErr(null)
+    setInvestorDeleteMsg(null)
+    setDeletingInvestor(slug)
+    try{
+      await api.deleteInvestor(slug)
+      setInvestorList(prev => prev.filter(item => item.slug !== slug))
+      setInvestorDeleteMsg('Inversionista eliminado.')
+    }catch(error){
+      setInvestorDeleteErr(error.message)
+    }finally{
+      setDeletingInvestor(null)
+    }
+  }, [isAdmin])
 
   const toFormProject = (project) => ({
     id: project.id || '',
@@ -585,6 +657,83 @@ export default function Admin({ user }){
           )}
           {invErr && <div className="notice" style={{marginTop:8}}>{invErr}</div>}
         </div>
+        {isAdmin && (
+          <div className="card" style={{marginBottom:12}}>
+            <div className="h2">Inversionistas activos</div>
+            <p style={{marginTop:0, marginBottom:12, color:'var(--muted)', fontSize:14}}>
+              Consulta los inversionistas dados de alta y dales de baja cuando sea necesario.
+            </p>
+            <div className="form-row" style={{marginBottom:12}}>
+              <input
+                className="input"
+                placeholder="Buscar por nombre, correo o slug"
+                value={investorSearch}
+                onChange={e => setInvestorSearch(e.target.value)}
+              />
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={loadInvestorList}
+                disabled={investorListLoading}
+              >
+                {investorListLoading ? 'Actualizando...' : 'Actualizar lista'}
+              </button>
+            </div>
+            {investorListError && <div className="notice" style={{marginBottom:12}}>{investorListError}</div>}
+            {investorDeleteErr && <div className="notice" style={{marginBottom:12}}>{investorDeleteErr}</div>}
+            {investorDeleteMsg && <div className="notice" style={{marginBottom:12}}>{investorDeleteMsg}</div>}
+            <div style={{fontSize:13, color:'var(--muted)', marginBottom:8}}>
+              {investorListLoading
+                ? 'Cargando inversionistas...'
+                : `${filteredInvestorCount} inversionista${filteredInvestorCount === 1 ? '' : 's'} coincidente${filteredInvestorCount === 1 ? '' : 's'}`}
+            </div>
+            <div style={{overflowX:'auto'}}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th style={{minWidth:140}}>Empresa</th>
+                    <th style={{minWidth:180}}>Correo</th>
+                    <th style={{minWidth:100}}>Slug</th>
+                    <th style={{minWidth:120}}>Estado</th>
+                    <th style={{minWidth:120}}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {investorListLoading && (
+                    <tr>
+                      <td colSpan={5} style={{paddingTop:12, paddingBottom:12}}>Cargando datos...</td>
+                    </tr>
+                  )}
+                  {!investorListLoading && filteredInvestors.map(item => (
+                    <tr key={item.slug}>
+                      <td>{item.name || '—'}</td>
+                      <td>{item.email || '—'}</td>
+                      <td>{item.slug}</td>
+                      <td>{item.status || '—'}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn secondary"
+                          onClick={() => handleDeleteInvestor(item.slug)}
+                          disabled={deletingInvestor === item.slug}
+                        >
+                          {deletingInvestor === item.slug ? 'Eliminando...' : 'Eliminar'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {!investorListLoading && filteredInvestors.length === 0 && (
+                    <tr>
+                      <td colSpan={5} style={{paddingTop:12, paddingBottom:12, color:'var(--muted)'}}>
+                        No se encontraron inversionistas con los criterios actuales.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
         <div className="card">
           <div className="h2">Actualizar estado de inversionista</div>
           <form onSubmit={onSubmit}>
