@@ -1,28 +1,26 @@
 {
   "id": "calvillo",
   "name": "calvillo",
-  "status": "LOI",
+  "status": "Due diligence fiscal/financiero/riesgos",
   "deadlines": {
     "LOI": "2025-10-15",
-    "Firma": "2025-11-30"
+    "Firma": "2025-11-30",
+    "Revision de Contratos": "2025-09-30"
   },
   "metrics": {
-    "decisionTime": 35,
-    "fiscalCapitalInvestment": 20000000,
+    "decisionTime": 40,
+    "fiscalCapitalInvestment": 25000000,
     "projectProfitability": {
-      "amount": 12500000,
-      "years": 7
+      "amount": 22500000,
+      "years": 10
     },
     "portfolio": {
-      "type": "mix",
-      "mix": {
-        "solarFarms": 40,
-        "aaaCompanies": 35,
-        "ownSites": 25
-      }
+      "type": "solarFarms"
     },
     "investorsActive": 12,
     "dealsAccelerated": 38,
     "nps": 72
-  }
+  },
+  "email": "nicolascdt03@gmail.com",
+  "createdAt": "2025-09-19T07:48:24.716Z"
 }
