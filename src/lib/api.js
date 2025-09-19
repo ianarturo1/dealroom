@@ -20,6 +20,13 @@ export const api = {
       body: { projects }
     })
   },
+  listInvestors(){ return req('/.netlify/functions/list-investors') },
+  deleteInvestor(slug){
+    return req('/.netlify/functions/delete-investor', {
+      method: 'POST',
+      body: { slug }
+    })
+  },
   getInvestor(slug){ return req(`/.netlify/functions/get-investor${slug ? ('?slug='+encodeURIComponent(slug)) : ''}`) },
   listDocs(params){
     const q = new URLSearchParams(params || {}).toString()
