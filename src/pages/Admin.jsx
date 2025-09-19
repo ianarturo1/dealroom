@@ -161,25 +161,54 @@ export default function Admin({ user }){
   const [docsNotice, setDocsNotice] = useState(null)
   const [docsWorking, setDocsWorking] = useState(false)
 
-  const docsCardRef = React.useRef(null)
-  const docsUploadInputRef = React.useRef(null)
-  const docsTableRef = React.useRef(null)
+// --- REDIRECCIÓN DESDE "Ver carpeta/Subir docs" (mantener) ---
+useEffect(() => {
+  if (typeof window === 'undefined') return;
+  const raw = window.sessionStorage.getItem('adminDocsRedirect');
+  if (!raw) return;
+  window.sessionStorage.removeItem('adminDocsRedirect');
+  try {
+    const data = JSON.parse(raw);
+    const category = DOC_CATEGORIES.includes(data?.category) ? data.category : DEFAULT_DOC_CATEGORY;
+    const slug = normalizeSlug(data?.slug) || DEFAULT_INVESTOR_ID;
 
-  const [investorDetailsMap, setInvestorDetailsMap] = useState({})
-  const [investorDetailsLoading, setInvestorDetailsLoading] = useState(false)
-  const [investorDetailsError, setInvestorDetailsError] = useState(null)
-  const [deadlineThreshold, setDeadlineThreshold] = useState(14)
+    setDocCategory(category);
+    setDocSlugInput(slug);
+    setDocSlug(slug);
 
-  const [docInventories, setDocInventories] = useState({})
-  const [docInventoriesReady, setDocInventoriesReady] = useState(false)
-  const [docHealthLoading, setDocHealthLoading] = useState(false)
-  const [docHealthError, setDocHealthError] = useState(null)
-  const [docRefreshKey, setDocRefreshKey] = useState(0)
+    window.setTimeout(() => {
+      const input = document.getElementById('docs-slug');
+      if (input && typeof input.scrollIntoView === 'function') {
+        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      if (input && typeof input.focus === 'function') input.focus();
+    }, 80);
+  } catch (error) {
+    console.error('No se pudo aplicar la redirección de documentos:', error);
+  }
+}, []);
 
-  const [activityItems, setActivityItems] = useState([])
-  const [activityLoading, setActivityLoading] = useState(false)
-  const [activityError, setActivityError] = useState(null)
-  const [activityRefreshKey, setActivityRefreshKey] = useState(0)
+// --- REFS Y ESTADOS (mantener de main) ---
+const docsCardRef = React.useRef(null);
+const docsUploadInputRef = React.useRef(null);
+const docsTableRef = React.useRef(null);
+
+const [investorDetailsMap, setInvestorDetailsMap] = useState({});
+const [investorDetailsLoading, setInvestorDetailsLoading] = useState(false);
+const [investorDetailsError, setInvestorDetailsError] = useState(null);
+const [deadlineThreshold, setDeadlineThreshold] = useState(14);
+
+const [docInventories, setDocInventories] = useState({});
+const [docInventoriesReady, setDocInventoriesReady] = useState(false);
+const [docHealthLoading, setDocHealthLoading] = useState(false);
+const [docHealthError, setDocHealthError] = useState(null);
+const [docRefreshKey, setDocRefreshKey] = useState(0);
+
+const [activityItems, setActivityItems] = useState([]);
+const [activityLoading, setActivityLoading] = useState(false);
+const [activityError, setActivityError] = useState(null);
+const [activityRefreshKey, setActivityRefreshKey] = useState(0);
+
 
   const isAdmin = React.useMemo(() => {
     if (user && typeof user === 'object'){
