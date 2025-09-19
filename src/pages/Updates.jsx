@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import { DEFAULT_INVESTOR_ID } from '../lib/config'
+import { useInvestorProfile } from '../lib/investor'
 
 const STAGES = [
   "Primera reunión","NDA","Entrega de información","Generación de propuesta",
@@ -16,6 +17,8 @@ const normalizeSlug = (value) => (value || '').trim().toLowerCase()
 
 export default function Updates(){
   const navigate = useNavigate()
+  const { isInvestorProfile } = useInvestorProfile()
+  const showAdminDashboard = !isInvestorProfile
   const [items, setItems] = useState([])
   const [investorList, setInvestorList] = useState([])
   const [investorListLoading, setInvestorListLoading] = useState(false)
@@ -57,6 +60,12 @@ export default function Updates(){
   )
 
   const loadInvestorList = useCallback(async () => {
+    if (!showAdminDashboard){
+      setInvestorList([])
+      setInvestorListError(null)
+      setInvestorListLoading(false)
+      return
+    }
     setInvestorListLoading(true)
     setInvestorListError(null)
     try{
@@ -69,13 +78,25 @@ export default function Updates(){
     }finally{
       setInvestorListLoading(false)
     }
-  }, [])
+  }, [showAdminDashboard])
 
   useEffect(() => {
+    if (!showAdminDashboard){
+      setInvestorList([])
+      setInvestorListError(null)
+      setInvestorListLoading(false)
+      return
+    }
     loadInvestorList()
-  }, [loadInvestorList])
+  }, [showAdminDashboard, loadInvestorList])
 
   useEffect(() => {
+    if (!showAdminDashboard){
+      setInvestorDetailsMap({})
+      setInvestorDetailsError(null)
+      setInvestorDetailsLoading(false)
+      return
+    }
     if (!investorList.length){
       setInvestorDetailsMap({})
       setInvestorDetailsError(null)
@@ -118,9 +139,16 @@ export default function Updates(){
       }
     })()
     return () => { active = false }
-  }, [investorList])
+  }, [investorList, showAdminDashboard])
 
   useEffect(() => {
+    if (!showAdminDashboard){
+      setDocInventories({})
+      setDocInventoriesReady(false)
+      setDocHealthError(null)
+      setDocHealthLoading(false)
+      return
+    }
     if (!investorList.length){
       setDocInventories({})
       setDocInventoriesReady(false)
@@ -167,9 +195,15 @@ export default function Updates(){
       }
     })()
     return () => { active = false }
-  }, [investorList, docRefreshKey])
+  }, [investorList, docRefreshKey, showAdminDashboard])
 
   useEffect(() => {
+    if (!showAdminDashboard){
+      setActivityItems([])
+      setActivityError(null)
+      setActivityLoading(false)
+      return
+    }
     let active = true
     setActivityLoading(true)
     setActivityError(null)
@@ -189,7 +223,7 @@ export default function Updates(){
         if (active) setActivityLoading(false)
       })
     return () => { active = false }
-  }, [activityRefreshKey])
+  }, [activityRefreshKey, showAdminDashboard])
 
   const investorNameBySlug = useMemo(() => {
     const map = {}
@@ -357,10 +391,11 @@ export default function Updates(){
     <div className="container">
       <div className="h1">Actualizaciones</div>
 
-      <div className="grid" style={{ marginBottom: 16 }}>
-        <div className="card" style={{ gridColumn: 'span 2', minWidth: 280 }}>
-          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <div className="h2" style={{ marginTop: 0 }}>Pipeline global</div>
+      {showAdminDashboard && (
+        <div className="grid" style={{ marginBottom: 16 }}>
+          <div className="card" style={{ gridColumn: 'span 2', minWidth: 280 }}>
+            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="h2" style={{ marginTop: 0 }}>Pipeline global</div>
             {investorListLoading && <span className="badge">Actualizando…</span>}
           </div>
           <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 12 }}>
@@ -564,7 +599,8 @@ export default function Updates(){
             </ul>
           )}
         </div>
-      </div>
+        </div>
+      )}
 
       <div className="grid">
         {items.map((u) => (
