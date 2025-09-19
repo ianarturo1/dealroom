@@ -1,5 +1,5 @@
 import { ok, text } from './_lib/utils.mjs'
-import { repoEnv, getFile, putFile, deleteFile } from './_lib/github.mjs'
+import { repoEnv, getFile, putFile, deleteFile, listDir } from './_lib/github.mjs'
 
 const INDEX_PATH = 'data/investor-index.json'
 
@@ -14,6 +14,38 @@ function parseIndex(contentBase64){
     return { json, raw }
   }catch(_){
     return { json: { investors: {}, domains: {} }, raw: '' }
+  }
+}
+
+async function deleteDocsDirectory(repo, slug, branch){
+  const basePath = `data/docs/${slug}`
+  await deleteDirectoryRecursive(repo, basePath, branch)
+}
+
+async function deleteDirectoryRecursive(repo, path, branch){
+  let entries
+  try{
+    entries = await listDir(repo, path, branch)
+  }catch(error){
+    const message = String(error?.message || '')
+    if (message.includes('GitHub 404')) return
+    throw error
+  }
+  if (!Array.isArray(entries)){
+    if (entries && entries.type === 'file'){
+      const filePath = entries.path || path
+      await deleteFile(repo, filePath, `Delete ${filePath} via Dealroom`, entries.sha, branch)
+    }
+    return
+  }
+  if (entries.length === 0) return
+  for (const entry of entries){
+    if (entry.type === 'dir'){
+      await deleteDirectoryRecursive(repo, entry.path || `${path}/${entry.name}`, branch)
+    }else if (entry.type === 'file'){
+      const filePath = entry.path || `${path}/${entry.name}`
+      await deleteFile(repo, filePath, `Delete ${filePath} via Dealroom`, entry.sha, branch)
+    }
   }
 }
 
@@ -64,6 +96,8 @@ export async function handler(event){
         delete indexJson.domains[domain]
       }
     }
+
+    await deleteDocsDirectory(repo, slug, branch)
 
     const updatedIndexContent = JSON.stringify(indexJson, null, 2)
     if (updatedIndexContent !== originalIndexContent){

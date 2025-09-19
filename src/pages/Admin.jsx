@@ -69,6 +69,34 @@ const deadlinesToRows = (deadlines) => {
   return entries.map(([key, value]) => ({ key, value: value || '' }))
 }
 
+const modalBackdropStyle = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(15, 23, 42, 0.55)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 16,
+  zIndex: 1000
+}
+
+const modalCardStyle = {
+  width: '100%',
+  maxWidth: 420,
+  background: '#fff',
+  borderRadius: 12,
+  padding: 20,
+  boxShadow: '0 20px 40px rgba(15, 23, 42, 0.25)'
+}
+
+const modalButtonRowStyle = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 8,
+  justifyContent: 'flex-end',
+  marginTop: 16
+}
+
 export default function Admin({ user }){
   const defaultName = DEFAULT_INVESTOR_ID === 'femsa'
     ? 'FEMSA'
@@ -110,6 +138,10 @@ export default function Admin({ user }){
   const [investorDeleteMsg, setInvestorDeleteMsg] = useState(null)
   const [investorDeleteErr, setInvestorDeleteErr] = useState(null)
   const [deletingInvestor, setDeletingInvestor] = useState(null)
+  const [panelModal, setPanelModal] = useState(null)
+  const [deleteModal, setDeleteModal] = useState(null)
+  const [deleteModalError, setDeleteModalError] = useState(null)
+  const [deleteModalLoading, setDeleteModalLoading] = useState(false)
 
   const [projectList, setProjectList] = useState([])
   const [projectsLoading, setProjectsLoading] = useState(true)
@@ -138,6 +170,18 @@ export default function Admin({ user }){
     if (import.meta?.env?.DEV && !user) return true
     return false
   }, [user])
+
+  const siteBaseUrl = React.useMemo(() => {
+    const envValue = typeof import.meta?.env?.VITE_SITE_URL === 'string'
+      ? import.meta.env.VITE_SITE_URL.trim()
+      : ''
+    if (envValue) return envValue.replace(/\/$/, '')
+    if (typeof window !== 'undefined' && window.location){
+      const origin = window.location.origin || ''
+      if (origin) return origin.replace(/\/$/, '')
+    }
+    return ''
+  }, [])
 
   const loadInvestorList = useCallback(async () => {
     if (!isAdmin) return
@@ -171,11 +215,11 @@ export default function Admin({ user }){
   }, [investorList, investorSearch])
   const filteredInvestorCount = filteredInvestors.length
 
-  const handleDeleteInvestor = useCallback(async (slug) => {
-    if (!isAdmin || !slug) return
-    if (typeof window !== 'undefined'){
+  const handleDeleteInvestor = useCallback(async (slug, options = {}) => {
+    if (!isAdmin || !slug) return false
+    if (!options.skipConfirm && typeof window !== 'undefined'){
       const confirmed = window.confirm(`¿Eliminar al inversionista "${slug}"? Esta acción no se puede deshacer.`)
-      if (!confirmed) return
+      if (!confirmed) return false
     }
     setInvestorDeleteErr(null)
     setInvestorDeleteMsg(null)
@@ -184,8 +228,10 @@ export default function Admin({ user }){
       await api.deleteInvestor(slug)
       setInvestorList(prev => prev.filter(item => item.slug !== slug))
       setInvestorDeleteMsg('Inversionista eliminado.')
+      return true
     }catch(error){
       setInvestorDeleteErr(error.message)
+      throw error
     }finally{
       setDeletingInvestor(null)
     }
@@ -414,7 +460,8 @@ export default function Admin({ user }){
   }
 
   const metrics = payload.metrics || {}
-  const canLoadInvestor = Boolean(normalizeSlug(payload.id))
+  const normalizedPayloadSlug = normalizeSlug(payload.id)
+  const canLoadInvestor = Boolean(normalizedPayloadSlug)
   const effectiveDocSlug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
 
   const handleDeadlineRowChange = (index, field, value) => {
@@ -456,6 +503,51 @@ export default function Admin({ user }){
       setErr(`No se pudo cargar inversionista: ${error.message}`)
     } finally {
       setInvestorLoading(false)
+    }
+  }
+
+  const handleOpenPanelModal = () => {
+    const slug = normalizeSlug(payload.id)
+    if (!slug){
+      setErr('El slug (id) es requerido para ver el panel público')
+      return
+    }
+    const base = siteBaseUrl ? siteBaseUrl.replace(/\/$/, '') : ''
+    const url = `${base}/#/?investor=${slug}`
+    setPanelModal({ slug, url })
+  }
+
+  const handleClosePanelModal = () => {
+    setPanelModal(null)
+  }
+
+  const handleOpenDeleteModal = () => {
+    const slug = normalizeSlug(payload.id)
+    if (!slug){
+      setErr('El slug (id) es requerido para eliminar al inversionista')
+      return
+    }
+    setDeleteModal({ slug })
+    setDeleteModalError(null)
+  }
+
+  const handleCloseDeleteModal = () => {
+    if (deleteModalLoading) return
+    setDeleteModal(null)
+    setDeleteModalError(null)
+  }
+
+  const confirmDeleteFromModal = async () => {
+    if (!deleteModal?.slug) return
+    setDeleteModalError(null)
+    setDeleteModalLoading(true)
+    try{
+      await handleDeleteInvestor(deleteModal.slug, { skipConfirm: true })
+      setDeleteModal(null)
+    }catch(error){
+      setDeleteModalError(error.message)
+    }finally{
+      setDeleteModalLoading(false)
     }
   }
 
@@ -744,14 +836,32 @@ export default function Admin({ user }){
                 value={payload.id}
                 onChange={e => setPayload({ ...payload, id: e.target.value })}
               />
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={handleLoadInvestor}
-                disabled={investorLoading || !canLoadInvestor}
-              >
-                {investorLoading ? 'Cargando...' : 'Cargar datos'}
-              </button>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={handleLoadInvestor}
+                  disabled={investorLoading || !canLoadInvestor}
+                >
+                  {investorLoading ? 'Cargando...' : 'Cargar datos'}
+                </button>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={handleOpenPanelModal}
+                  disabled={!canLoadInvestor}
+                >
+                  Ver panel
+                </button>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={handleOpenDeleteModal}
+                  disabled={!canLoadInvestor || deletingInvestor === normalizedPayloadSlug}
+                >
+                  {deletingInvestor === normalizedPayloadSlug ? 'Eliminando...' : 'Eliminar'}
+                </button>
+              </div>
               <input
                 className="input"
                 placeholder="Nombre"
@@ -1146,6 +1256,75 @@ export default function Admin({ user }){
           </ul>
         </div>
       </div>
+      {panelModal && (
+        <div style={modalBackdropStyle}>
+          <div style={modalCardStyle}>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>Panel público del inversionista</div>
+            <p style={{ marginTop: 8, marginBottom: 12, color: 'var(--muted)', fontSize: 14 }}>
+              Comparte este enlace con el inversionista <code>{panelModal.slug}</code>.
+            </p>
+            <input
+              className="input"
+              readOnly
+              value={panelModal.url}
+              style={{ marginTop: 4 }}
+              onFocus={e => e.target.select()}
+            />
+            <div style={modalButtonRowStyle}>
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={() => {
+                  if (typeof navigator !== 'undefined' && navigator.clipboard){
+                    navigator.clipboard.writeText(panelModal.url).catch(() => {})
+                  }
+                }}
+              >
+                Copiar enlace
+              </button>
+              <a
+                className="btn"
+                href={panelModal.url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Abrir panel
+              </a>
+              <button type="button" className="btn secondary" onClick={handleClosePanelModal}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deleteModal && (
+        <div style={modalBackdropStyle}>
+          <div style={modalCardStyle}>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>Eliminar inversionista</div>
+            <p style={{ marginTop: 8, marginBottom: 12, color: 'var(--muted)', fontSize: 14 }}>
+              Se eliminará <code>data/investors/{deleteModal.slug}.json</code> y, si existe, la carpeta <code>data/docs/{deleteModal.slug}/</code>.
+              Esta acción no se puede deshacer.
+            </p>
+            {deleteModalError && <div className="notice" style={{ marginTop: 8 }}>{deleteModalError}</div>}
+            <div style={modalButtonRowStyle}>
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={handleCloseDeleteModal}
+                disabled={deleteModalLoading}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={confirmDeleteFromModal}
+                disabled={deleteModalLoading}
+              >
+                {deleteModalLoading ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </RoleGate>
   )
 }
