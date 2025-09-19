@@ -6,27 +6,16 @@ export default function ProgressBar({ stages = [], current = '' }){
   return (
     <div>
       <div className="progress" aria-label="avance">
-        <div style={{width: pct+'%'}} />
+        <div className="progress-value" style={{width: pct+'%'}} />
       </div>
       <div
-        style={{
-          display:'grid',
-          gridTemplateColumns: stages.length ? `repeat(${stages.length}, minmax(0, 1fr))` : undefined,
-          fontSize:12,
-          color:'#8b8b8b',
-          marginTop:6,
-          columnGap:8,
-          rowGap:4
-        }}
+        className="progress-legend"
+        style={{gridTemplateColumns: stages.length ? `repeat(${stages.length}, minmax(0, 1fr))` : undefined}}
       >
         {stages.map((stageName, i) => (
           <span
             key={stageName + '-' + i}
-            style={{
-              textAlign: i === 0 ? 'left' : i === stages.length-1 ? 'right' : 'center',
-              fontWeight: stageName === current ? 700 : 400,
-              color: stageName === current ? '#161616' : undefined
-            }}
+            className={`progress-stage ${stageName === current ? 'is-active' : ''} ${i === 0 ? 'is-start' : i === stages.length-1 ? 'is-end' : ''}`.trim()}
           >
             {stageName}
           </span>

@@ -21,7 +21,7 @@ export default function App(){
   return (
     <>
       <header className="header">
-        <div className="container" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+        <div className="container header-inner">
           <div className="brand">
             <img src="/logo.svg" alt="Finsolar" />
             <span>Dealroom</span>

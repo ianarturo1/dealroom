@@ -46,7 +46,7 @@ export default function Dashboard(){
       <div className="row">
         <div>
           <div className="h1">Panel</div>
-          <div style={{color:'#8b8b8b'}}>Visibilidad del roadmap y documentos.</div>
+          <p className="page-subtitle">Visibilidad del roadmap y documentos.</p>
         </div>
       </div>
 
@@ -55,32 +55,32 @@ export default function Dashboard(){
       <div className="card">
         <div className="h2">Avance</div>
         <ProgressBar stages={STAGES} current={stage} />
-        <div style={{marginTop:10, fontSize:14}}>
+        <div className="progress-meta">
           <strong>Etapa actual:</strong> {stageLabel}
         </div>
-        <div style={{display:'flex', flexWrap:'wrap', gap:12, marginTop:8}}>
+        <div className="badge-group">
           {Object.entries(deadlines).map(([k,v]) => (
             <span key={k} className="badge">{k}: {v}</span>
           ))}
         </div>
       </div>
 
-      <div style={{marginTop:12}}>
+      <div className="section-spacer">
         <KPIs
           metrics={metrics}
           visibleKeys={['decisionTime','fiscalCapitalInvestment','projectProfitability','portfolio']}
         />
       </div>
 
-      <div className="card" style={{marginTop:12}}>
+      <div className="card section-spacer">
         <div className="h2">Siguientes pasos</div>
         {stage && stageIndex < 0 && (
-          <p style={{color:'#8b8b8b', marginBottom:0}}>
+          <p className="muted no-margin">
             No hay pasos siguientes configurados para la etapa actual.
           </p>
         )}
         {stageIndex >= 0 && nextSteps.length === 0 && (
-          <p style={{color:'#8b8b8b', marginBottom:0}}>
+          <p className="muted no-margin">
             Has completado todas las etapas del proceso.
           </p>
         )}
