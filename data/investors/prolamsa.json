@@ -1,7 +1,20 @@
 {
   "id": "prolamsa",
   "name": "Prolamsa",
-  "email": "jorge.g@prolamsa.com",
   "status": "Revisión de contratos",
-  "createdAt": "2025-09-20T21:16:00.467Z"
+  "deadlines": {
+    "Firma de Contratos": "2025-10-15"
+  },
+  "metrics": {
+    "decisionTime": null,
+    "fiscalCapitalInvestment": null,
+    "projectProfitability": null,
+    "portfolio": {
+      "type": "mix",
+      "mix": {}
+    },
+    "investorsActive": 12,
+    "dealsAccelerated": 38,
+    "nps": 72
+  }
 }
