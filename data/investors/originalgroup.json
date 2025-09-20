@@ -1,7 +1,24 @@
 {
   "id": "originalgroup",
-  "name": "Temptation Original Group",
-  "email": "rdelap@originalgroup.com",
+  "name": "OriginalGroup",
   "status": "Ajustes técnicos",
-  "createdAt": "2025-09-20T21:29:47.734Z"
+  "deadlines": {
+    "LOI": "2025-10-15",
+    "Firma": "2025-11-12"
+  },
+  "metrics": {
+    "decisionTime": 25,
+    "fiscalCapitalInvestment": 35000000,
+    "projectProfitability": {
+      "amount": 286000000,
+      "years": 21
+    },
+    "portfolio": {
+      "type": "mix",
+      "mix": {}
+    },
+    "investorsActive": 12,
+    "dealsAccelerated": 38,
+    "nps": 72
+  }
 }
