@@ -55,6 +55,11 @@
       "name": "Prolamsa",
       "email": "jorge.g@prolamsa.com",
       "status": "Revisión de contratos"
+    },
+    "originalgroup": {
+      "name": "Temptation Original Group",
+      "email": "rdelap@originalgroup.com",
+      "status": "Ajustes técnicos"
     }
   }
 }
