@@ -1,7 +1,15 @@
 {
   "id": "sukarne",
-  "name": "SuKarne",
-  "email": "ismael.medinam@sukarne.com",
+  "name": "sukarne",
   "status": "Presentación de propuesta",
-  "createdAt": "2025-09-20T23:23:17.032Z"
+  "deadlines": {},
+  "metrics": {
+    "decisionTime": null,
+    "fiscalCapitalInvestment": 10000000,
+    "projectProfitability": null,
+    "portfolio": null,
+    "investorsActive": 12,
+    "dealsAccelerated": 38,
+    "nps": 72
+  }
 }
