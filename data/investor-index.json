@@ -45,6 +45,11 @@
       "name": "FINSOLAR",
       "email": "nico@fin.solar",
       "status": "NDA"
+    },
+    "grupoherso": {
+      "name": "Grupo Herso",
+      "email": "galbarran@grupoherso.com.mx",
+      "status": "Entrega de información"
     }
   }
 }
