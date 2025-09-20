@@ -50,6 +50,11 @@
       "name": "Grupo Herso",
       "email": "galbarran@grupoherso.com.mx",
       "status": "Entrega de información"
+    },
+    "prolamsa": {
+      "name": "Prolamsa",
+      "email": "jorge.g@prolamsa.com",
+      "status": "Revisión de contratos"
     }
   }
 }
