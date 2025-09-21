@@ -80,6 +80,11 @@
       "name": "Fortacero 2",
       "email": "etrevino@fortacero.com",
       "status": "Generación de propuesta"
+    },
+    "gpc2": {
+      "name": "Grupo Corporativo Papelera II",
+      "email": "eduardo.s@gcp-tissue.com.mx",
+      "status": "Generación de propuesta"
     }
   }
 }
