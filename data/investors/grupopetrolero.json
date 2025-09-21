@@ -1,7 +1,15 @@
 {
   "id": "grupopetrolero",
-  "name": "Grupo Petrolero",
-  "email": "atena@cicmx.com",
+  "name": "grupopetrolero",
   "status": "Revisión de contratos",
-  "createdAt": "2025-09-21T22:39:39.945Z"
+  "deadlines": {},
+  "metrics": {
+    "decisionTime": null,
+    "fiscalCapitalInvestment": 200000000,
+    "projectProfitability": null,
+    "portfolio": null,
+    "investorsActive": 12,
+    "dealsAccelerated": 38,
+    "nps": 72
+  }
 }
