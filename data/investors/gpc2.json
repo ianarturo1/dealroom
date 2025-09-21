@@ -4,12 +4,17 @@
   "status": "Generación de propuesta",
   "deadlines": {},
   "metrics": {
-    "decisionTime": null,
+    "decisionTime": 40,
     "fiscalCapitalInvestment": 20000000,
-    "projectProfitability": null,
+    "projectProfitability": {
+      "amount": 15645223,
+      "years": 5
+    },
     "portfolio": null,
     "investorsActive": 12,
     "dealsAccelerated": 38,
     "nps": 72
-  }
+  },
+  "email": "demo3@fin.solar",
+  "createdAt": "2025-09-15T00:43:55.076Z"
 }
