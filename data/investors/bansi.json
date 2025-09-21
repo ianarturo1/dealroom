@@ -1,7 +1,15 @@
 {
   "id": "bansi",
-  "name": "Bansi",
-  "email": "jpablos@bansi.com.mx",
-  "status": "Presentación de propuesta",
-  "createdAt": "2025-09-21T01:41:53.099Z"
+  "name": "",
+  "status": "Primera reunión",
+  "deadlines": {},
+  "metrics": {
+    "decisionTime": null,
+    "fiscalCapitalInvestment": null,
+    "projectProfitability": null,
+    "portfolio": null,
+    "investorsActive": 12,
+    "dealsAccelerated": 38,
+    "nps": 72
+  }
 }
