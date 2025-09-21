@@ -100,6 +100,11 @@
       "name": "Bansi",
       "email": "jpablos@bansi.com.mx",
       "status": "Presentación de propuesta"
+    },
+    "sesajal": {
+      "name": "Sesajal",
+      "email": "luis.barriga@sesajal.com",
+      "status": "Entrega de información"
     }
   }
 }
