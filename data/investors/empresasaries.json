@@ -1,7 +1,20 @@
 {
   "id": "empresasaries",
   "name": "Empresas Aries",
-  "email": "ablanco@empresasaries.com.mx",
   "status": "Presentación de propuesta",
-  "createdAt": "2025-09-21T00:05:19.838Z"
+  "deadlines": {},
+  "metrics": {
+    "decisionTime": null,
+    "fiscalCapitalInvestment": 30000000,
+    "projectProfitability": {
+      "amount": 125000000,
+      "years": null
+    },
+    "portfolio": {
+      "type": "solarFarms"
+    },
+    "investorsActive": 12,
+    "dealsAccelerated": 38,
+    "nps": 72
+  }
 }
