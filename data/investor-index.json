@@ -110,6 +110,11 @@
       "name": "DENTSA",
       "email": "sarahi@gmail.com",
       "status": "Primera reunión"
+    },
+    "grupopetrolero": {
+      "name": "Grupo Petrolero",
+      "email": "atena@cicmx.com",
+      "status": "Revisión de contratos"
     }
   }
 }
