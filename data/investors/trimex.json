@@ -1,7 +1,15 @@
 {
   "id": "trimex",
-  "name": "Trimex",
-  "email": "rgomeze@gtrimex.mx",
+  "name": "trimex",
   "status": "Presentación de propuesta",
-  "createdAt": "2025-09-21T00:00:20.351Z"
+  "deadlines": {},
+  "metrics": {
+    "decisionTime": null,
+    "fiscalCapitalInvestment": 30000000,
+    "projectProfitability": null,
+    "portfolio": null,
+    "investorsActive": 12,
+    "dealsAccelerated": 38,
+    "nps": 72
+  }
 }
