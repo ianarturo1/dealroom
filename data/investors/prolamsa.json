@@ -1,18 +1,13 @@
 {
   "id": "prolamsa",
-  "name": "Prolamsa",
-  "status": "Revisión de contratos",
-  "deadlines": {
-    "Firma de Contratos": "2025-10-15"
-  },
+  "name": "prolamsa",
+  "status": "Primera reunión",
+  "deadlines": {},
   "metrics": {
     "decisionTime": null,
-    "fiscalCapitalInvestment": null,
+    "fiscalCapitalInvestment": 3000000,
     "projectProfitability": null,
-    "portfolio": {
-      "type": "mix",
-      "mix": {}
-    },
+    "portfolio": null,
     "investorsActive": 12,
     "dealsAccelerated": 38,
     "nps": 72
