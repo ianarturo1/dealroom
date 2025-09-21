@@ -1,7 +1,22 @@
 {
   "id": "dentsa",
   "name": "DENTSA",
-  "email": "sarahi@gmail.com",
   "status": "Primera reunión",
+  "deadlines": {
+    "NDA": "2025-09-24",
+    "Revision de Contratos": "2025-09-30"
+  },
+  "metrics": {
+    "decisionTime": 50,
+    "fiscalCapitalInvestment": 30000000,
+    "projectProfitability": {
+      "amount": 5000000,
+      "years": 7
+    },
+    "portfolio": {
+      "type": "solarFarms"
+    }
+  },
+  "email": "sarahi@gmail.com",
   "createdAt": "2025-09-21T21:48:48.271Z"
 }
