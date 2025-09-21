@@ -90,6 +90,11 @@
       "name": "Just About Foods",
       "email": "luis@justaboutfoods.com",
       "status": "Generación de propuesta"
+    },
+    "bans": {
+      "name": "Bansí",
+      "email": "jpablos@bansi.com.mx",
+      "status": "Presentación de propuesta"
     }
   }
 }
