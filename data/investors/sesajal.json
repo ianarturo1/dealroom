@@ -1,7 +1,15 @@
 {
   "id": "sesajal",
-  "name": "Sesajal",
-  "email": "luis.barriga@sesajal.com",
-  "status": "Entrega de información",
-  "createdAt": "2025-09-21T02:14:11.215Z"
+  "name": "Bansi",
+  "status": "Primera reunión",
+  "deadlines": {},
+  "metrics": {
+    "decisionTime": null,
+    "fiscalCapitalInvestment": 10000000,
+    "projectProfitability": null,
+    "portfolio": null,
+    "investorsActive": 12,
+    "dealsAccelerated": 38,
+    "nps": 72
+  }
 }
