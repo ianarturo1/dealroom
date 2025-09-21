@@ -75,6 +75,11 @@
       "name": "Empresas Aries",
       "email": "ablanco@empresasaries.com.mx",
       "status": "Presentación de propuesta"
+    },
+    "fortacero2": {
+      "name": "Fortacero 2",
+      "email": "etrevino@fortacero.com",
+      "status": "Generación de propuesta"
     }
   }
 }
