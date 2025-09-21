@@ -116,44 +116,25 @@ async function loadDocEvents(){
   return events
 }
 
-export async function handler() {
+export async function handler(){
   try {
     // Si no hay token, no intentamos llamar a GitHub (evita 500 en deploy preview)
-    if (!process.env.GITHUB_TOKEN) {
-      return ok({ events: [] });
+    if (!process.env.GITHUB_TOKEN){
+      return ok({ events: [] })
     }
 
-    const [investorEvents, docEvents] = await Promise.all([
-      loadInvestorEvents(),
-      loadDocEvents(),
-    ]);
-
-    // mezcla, ordena por fecha desc y limita
-    const events = [...investorEvents, ...docEvents]
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 25);
-
-    return ok({ events });
-  } catch (e) {
-    return err(e);
-  }
-}
-
-=======
-main
     const [investorEvents, docEvents] = await Promise.all([
       loadInvestorEvents(),
       loadDocEvents()
     ])
 
-    const allEvents = [...investorEvents, ...docEvents]
+    const events = [...investorEvents, ...docEvents]
       .filter(event => event && event.date)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 25)
 
-    return ok({ events: allEvents })
+    return ok({ events })
   }catch(error){
     return text(500, error.message)
   }
 }
-
