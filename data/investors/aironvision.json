@@ -1,7 +1,19 @@
 {
   "id": "aironvision",
   "name": "AIRON VISION",
-  "email": "fabi@gmail.com",
   "status": "Primera reunión",
+  "deadlines": {},
+  "metrics": {
+    "decisionTime": 50,
+    "fiscalCapitalInvestment": 30000000,
+    "projectProfitability": {
+      "amount": 150000,
+      "years": 11
+    },
+    "portfolio": {
+      "type": "aaaCompanies"
+    }
+  },
+  "email": "fabi@gmail.com",
   "createdAt": "2025-09-22T14:12:52.407Z"
 }
