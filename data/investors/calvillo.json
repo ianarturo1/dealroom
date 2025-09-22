@@ -1,25 +1,20 @@
 {
   "id": "calvillo",
   "name": "calvillo",
-  "status": "Entrega de información",
+  "status": "Generación de propuesta",
   "deadlines": {
     "LOI": "2025-10-15",
     "Firma": "2025-11-30"
   },
   "metrics": {
-    "decisionTime": 50,
+    "decisionTime": 45,
     "fiscalCapitalInvestment": 20000000,
     "projectProfitability": {
       "amount": 12500000,
-      "years": 7
+      "years": 11
     },
     "portfolio": {
-      "type": "mix",
-      "mix": {
-        "solarFarms": 40,
-        "aaaCompanies": 35,
-        "ownSites": 25
-      }
+      "type": "solarFarms"
     },
     "investorsActive": 12,
     "dealsAccelerated": 38,
