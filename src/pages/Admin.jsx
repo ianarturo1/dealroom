@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import RoleGate from '../components/RoleGate'
 import { DEFAULT_INVESTOR_ID } from '../lib/config'
+import { resolveDeadlineDocTarget } from '../lib/deadlines'
 
 const STAGES = [
   "Primera reunión","NDA","Entrega de información","Generación de propuesta",
@@ -713,7 +714,18 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
         const days = Math.ceil(diffMs / (24 * 60 * 60 * 1000))
         if (days < 0) return
         if (diffMs <= thresholdMs){
-          items.push({ slug, label, date: value, days, investorName })
+          const formattedDate = shortDateFormatter.format(date)
+          const docTarget = resolveDeadlineDocTarget(label)
+          items.push({
+            slug,
+            label,
+            date: value,
+            days,
+            investorName,
+            formattedDate,
+            dueText: days === 0 ? 'Vence hoy' : `Vence en ${days} día${days === 1 ? '' : 's'}`,
+            docTarget
+          })
         }
       })
     })
@@ -722,7 +734,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       return (a.investorName || '').localeCompare(b.investorName || '', 'es', { sensitivity: 'base' })
     })
     return items
-  }, [investorDetailsMap, deadlineThreshold, investorNameBySlug])
+  }, [investorDetailsMap, deadlineThreshold, investorNameBySlug, shortDateFormatter])
 
   const docHealthSummary = React.useMemo(() => {
     return DASHBOARD_DOC_CATEGORIES.map(category => {
@@ -1176,15 +1188,32 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
             ) : (
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
                 {upcomingDeadlines.map(item => {
-                  const dateValue = item.date ? new Date(item.date) : null
-                  const formattedDate = dateValue && !Number.isNaN(dateValue.getTime())
-                    ? shortDateFormatter.format(dateValue)
-                    : item.date
+                  const dateLabel = item.formattedDate || item.date || '—'
+                  const dueLabel = item.dueText || (item.days === 0
+                    ? 'Vence hoy'
+                    : `Vence en ${item.days} día${item.days === 1 ? '' : 's'}`)
                   return (
                     <li key={`${item.slug}-${item.label}`} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                      <div style={{ fontWeight: 600 }}>{item.investorName} · {item.label}</div>
-                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                        {item.days === 0 ? 'Vence hoy' : `Vence en ${item.days} día${item.days === 1 ? '' : 's'}`} ({formattedDate})
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{item.investorName}</div>
+                          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+                            {item.label} · {dueLabel} ({dateLabel})
+                          </div>
+                        </div>
+                        {item.docTarget && (
+                          <button
+                            type="button"
+                            className="btn secondary"
+                            onClick={() => navigateToDocsSection(
+                              item.docTarget.category,
+                              item.slug,
+                              item.docTarget.target || 'upload'
+                            )}
+                          >
+                            Ir a {item.docTarget.category}
+                          </button>
+                        )}
                       </div>
                     </li>
                   )
