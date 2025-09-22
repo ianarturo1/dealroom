@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import { DEFAULT_INVESTOR_ID } from '../lib/config'
+import { resolveDeadlineDocTarget, DEADLINE_DOC_CATEGORIES } from '../lib/deadlines'
 import { useInvestorProfile } from '../lib/investor'
 
 const STAGES = [
@@ -12,6 +13,11 @@ const STAGES = [
 ]
 
 const DASHBOARD_DOC_CATEGORIES = ['NDA', 'Propuestas', 'Contratos']
+const DOC_REDIRECT_CATEGORIES = Array.from(new Set([
+  ...DASHBOARD_DOC_CATEGORIES,
+  ...DEADLINE_DOC_CATEGORIES
+]))
+const DEFAULT_DOC_REDIRECT_CATEGORY = DOC_REDIRECT_CATEGORIES[0] || 'NDA'
 
 const normalizeSlug = (value) => (value || '').trim().toLowerCase()
 
@@ -273,7 +279,18 @@ export default function Updates(){
         const days = Math.ceil(diffMs / (24 * 60 * 60 * 1000))
         if (days < 0) return
         if (diffMs <= thresholdMs){
-          items.push({ slug, label, date: value, days, investorName })
+          const formattedDate = shortDateFormatter.format(date)
+          const docTarget = resolveDeadlineDocTarget(label)
+          items.push({
+            slug,
+            label,
+            date: value,
+            days,
+            investorName,
+            formattedDate,
+            dueText: days === 0 ? 'Vence hoy' : `Vence en ${days} día${days === 1 ? '' : 's'}`,
+            docTarget
+          })
         }
       })
     })
@@ -282,7 +299,7 @@ export default function Updates(){
       return (a.investorName || '').localeCompare(b.investorName || '', 'es', { sensitivity: 'base' })
     })
     return items
-  }, [investorDetailsMap, deadlineThreshold, investorNameBySlug])
+  }, [investorDetailsMap, deadlineThreshold, investorNameBySlug, shortDateFormatter])
 
   const docHealthSummary = useMemo(() => {
     return DASHBOARD_DOC_CATEGORIES.map(category => {
@@ -378,10 +395,13 @@ export default function Updates(){
   const handleRefreshActivity = () => setActivityRefreshKey(value => value + 1)
 
   const navigateToDocsSection = useCallback((category, slug, target) => {
-    const safeCategory = DASHBOARD_DOC_CATEGORIES.includes(category) ? category : DASHBOARD_DOC_CATEGORIES[0]
+    const safeCategory = DOC_REDIRECT_CATEGORIES.includes(category)
+      ? category
+      : DEFAULT_DOC_REDIRECT_CATEGORY
     const safeSlug = normalizeSlug(slug) || DEFAULT_INVESTOR_ID
+    const safeTarget = target || 'upload'
     if (typeof window !== 'undefined'){
-      const payload = { category: safeCategory, slug: safeSlug, target, ts: Date.now() }
+      const payload = { category: safeCategory, slug: safeSlug, target: safeTarget, ts: Date.now() }
       try{ window.sessionStorage.setItem('adminDocsRedirect', JSON.stringify(payload)) }catch(_error){}
     }
     navigate('/admin')
@@ -474,14 +494,37 @@ export default function Updates(){
             </div>
           ) : (
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
-              {upcomingDeadlines.map(item => (
-                <li key={`${item.slug}-${item.label}`} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                  <div style={{ fontWeight: 600 }}>{item.investorName}</div>
-                  <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-                    {item.label}: {shortDateFormatter.format(new Date(item.date))} · {item.days} día{item.days === 1 ? '' : 's'}
-                  </div>
-                </li>
-              ))}
+              {upcomingDeadlines.map(item => {
+                const dateLabel = item.formattedDate || item.date || '—'
+                const dueLabel = item.dueText || (item.days === 0
+                  ? 'Vence hoy'
+                  : `Vence en ${item.days} día${item.days === 1 ? '' : 's'}`)
+                return (
+                  <li key={`${item.slug}-${item.label}`} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{item.investorName}</div>
+                        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+                          {item.label} · {dueLabel} ({dateLabel})
+                        </div>
+                      </div>
+                      {item.docTarget && (
+                        <button
+                          type="button"
+                          className="btn secondary"
+                          onClick={() => navigateToDocsSection(
+                            item.docTarget.category,
+                            item.slug,
+                            item.docTarget.target || 'upload'
+                          )}
+                        >
+                          Ir a {item.docTarget.category}
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           )}
         </div>
