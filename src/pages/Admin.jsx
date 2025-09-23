@@ -1557,7 +1557,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                 />
               </div>
               <div style={fieldStyle}>
-                <label htmlFor="metric-fiscal" style={labelStyle}>Inversión de capital fiscal ($)</label>
+                <label htmlFor="metric-fiscal" style={labelStyle}>Inversión de capital fiscal (MXN)</label>
                 <input
                   id="metric-fiscal"
                   className="input"
@@ -1572,7 +1572,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
             <div className="form-row" style={{ marginTop: 8 }}>
               <div style={fieldStyle}>
-                <label htmlFor="metric-project-amount" style={labelStyle}>Utilidad de proyecto ($)</label>
+                <label htmlFor="metric-project-amount" style={labelStyle}>Utilidad de proyecto (MXN)</label>
                 <input
                   id="metric-project-amount"
                   className="input"
