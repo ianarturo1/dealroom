@@ -1,7 +1,23 @@
 {
   "id": "grupoherso",
   "name": "Grupo Herso",
-  "email": "galbarran@grupoherso.com.mx",
   "status": "Entrega de información",
-  "createdAt": "2025-09-20T20:29:55.973Z"
+  "deadlines": {
+    "LOI": "2025-10-15",
+    "Firma": "2025-10-30"
+  },
+  "metrics": {
+    "decisionTime": 16,
+    "fiscalCapitalInvestment": 10000000,
+    "projectProfitability": {
+      "amount": 55000000,
+      "years": 21
+    },
+    "portfolio": {
+      "type": "aaaCompanies"
+    },
+    "investorsActive": 12,
+    "dealsAccelerated": 38,
+    "nps": 72
+  }
 }
