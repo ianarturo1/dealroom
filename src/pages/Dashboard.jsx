@@ -3,13 +3,7 @@ import { api } from '../lib/api'
 import ProgressBar from '../components/ProgressBar'
 import KPIs from '../components/KPIs'
 import { useInvestorProfile } from '../lib/investor'
-
-const STAGES = [
-  "Primera reunión","NDA","Entrega de información","Generación de propuesta",
-  "Presentación de propuesta","Ajustes técnicos","LOI",
-  "Due diligence fiscal/financiero/riesgos","Revisión de contratos",
-  "Cronograma de inversión","Firma de contratos"
-]
+import { STAGES } from '../lib/pipeline'
 
 export default function Dashboard(){
   const [investor, setInvestor] = useState(null)

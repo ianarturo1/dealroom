@@ -4,13 +4,7 @@ import { api } from '../lib/api'
 import { DEFAULT_INVESTOR_ID } from '../lib/config'
 import { resolveDeadlineDocTarget, DEADLINE_DOC_CATEGORIES } from '../lib/deadlines'
 import { useInvestorProfile } from '../lib/investor'
-
-const STAGES = [
-  "Primera reunión","NDA","Entrega de información","Generación de propuesta",
-  "Presentación de propuesta","Ajustes técnicos","LOI",
-  "Due diligence fiscal/financiero/riesgos","Revisión de contratos",
-  "Cronograma de inversión","Firma de contratos"
-]
+import { STAGES } from '../lib/pipeline'
 
 const DASHBOARD_DOC_CATEGORIES = ['NDA', 'Propuestas', 'Contratos']
 const DOC_REDIRECT_CATEGORIES = Array.from(new Set([
