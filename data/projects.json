@@ -1,13 +1,1 @@
-[
-  {
-    "id": "proj-003",
-    "name": "DG Multisitio Telecom",
-    "client": "América Móvil – Piloto",
-    "location": "Nacional",
-    "model": "ExpandSolar – Mix",
-    "status": "Disponible",
-    "power_kwp": 3000,
-    "energy_mwh": 4700,
-    "co2_tons": 2300
-  }
-]
+[]
