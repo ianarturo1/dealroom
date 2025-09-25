@@ -5,6 +5,7 @@ import { DEFAULT_INVESTOR_ID } from '../lib/config'
 import { resolveDeadlineDocTarget } from '../lib/deadlines'
 import { DOCUMENT_SECTIONS_ORDER, DEFAULT_DOC_CATEGORY, DASHBOARD_DOC_CATEGORIES } from '../constants/documents'
 import { PIPELINE_STAGES, FINAL_PIPELINE_STAGE } from '../constants/pipeline'
+import { getDecisionBadge, getDecisionDays } from '@/utils/decision'
 
 const PORTFOLIO_OPTIONS = [
   { value: 'solarFarms', label: 'Granjas Solares' },
@@ -46,6 +47,12 @@ const parseNumber = (value) => {
 }
 
 const normalizeSlug = (value) => (value || '').trim().toLowerCase()
+
+const withoutDecisionTime = (metrics) => {
+  if (!metrics || typeof metrics !== 'object') return {}
+  const { decisionTime, ...rest } = metrics
+  return { ...rest }
+}
 
 const deadlinesToRows = (deadlines) => {
   if (!deadlines || typeof deadlines !== 'object') return [{ key: '', value: '' }]
@@ -93,7 +100,6 @@ export default function Admin({ user }){
     status: 'LOI',
     deadlines: initialDeadlines,
     metrics: {
-      decisionTime: 35,
       fiscalCapitalInvestment: 20000000,
       projectProfitability: { amount: 12500000, years: 7 },
       portfolio: {
@@ -644,6 +650,8 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   }
 
   const metrics = payload.metrics || {}
+  const decisionDays = getDecisionDays(payload)
+  const { className: decisionBadgeClass, label: decisionLabel } = getDecisionBadge(decisionDays)
   const normalizedPayloadSlug = normalizeSlug(payload.id)
   const canLoadInvestor = Boolean(normalizedPayloadSlug)
   const effectiveDocSlug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
@@ -867,7 +875,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
         ...prev,
         ...data,
         id: slug,
-        metrics: data.metrics || {},
+        metrics: withoutDecisionTime(data.metrics),
         deadlines: data.deadlines || {}
       }))
     } catch (error) {
@@ -996,9 +1004,9 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       }
 
       const metricsPayload = payload.metrics || {}
+      const sanitizedMetrics = withoutDecisionTime(metricsPayload)
       const normalizedMetrics = {
-        ...metricsPayload,
-        decisionTime: parseNumber(metricsPayload.decisionTime),
+        ...sanitizedMetrics,
         fiscalCapitalInvestment: parseNumber(metricsPayload.fiscalCapitalInvestment)
       }
 
@@ -1528,15 +1536,8 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
             <div className="form-row" style={{ marginTop: 8 }}>
               <div style={fieldStyle}>
-                <label htmlFor="metric-decisionTime" style={labelStyle}>Días a decisión</label>
-                <input
-                  id="metric-decisionTime"
-                  className="input"
-                  type="number"
-                  min="0"
-                  value={metrics.decisionTime ?? ''}
-                  onChange={e => updateMetric('decisionTime', e.target.value)}
-                />
+                <div style={labelStyle}>Días a decisión</div>
+                <span className={decisionBadgeClass}>{decisionLabel}</span>
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="metric-fiscal" style={labelStyle}>Inversión de capital fiscal (MXN)</label>

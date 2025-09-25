@@ -70,6 +70,13 @@ a:hover{text-decoration:underline}
   word-break:break-word;
   overflow-wrap:anywhere;
 }
+.decision-num{
+  font-size:24px;
+  line-height:1.3;
+}
+.decision-num--success{color:#107457;}
+.decision-num--warning{color:#a86600;}
+.decision-num--error{color:#b42318;}
 .kpi .label{
   color:var(--muted);
   font-size:14px;
