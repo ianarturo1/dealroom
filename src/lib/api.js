@@ -48,7 +48,14 @@ export const api = {
     return `/.netlify/functions/calendar?slug=${encodeURIComponent(slug)}`
   },
   downloadDocPath(relPath){
-    return `/.netlify/functions/get-doc?path=${encodeURIComponent(relPath)}`
+    const normalized = (relPath || '').replace(/^\/+/, '')
+    const parts = normalized.split('/').filter(Boolean)
+    const slug = parts.length > 1 ? parts[1] : ''
+    const params = new URLSearchParams()
+    if (normalized) params.set('path', normalized)
+    if (slug) params.set('investor', slug)
+    const qs = params.toString()
+    return `/.netlify/functions/get-doc${qs ? `?${qs}` : ''}`
   },
   async listActivity(){
     return req('/.netlify/functions/list-activity')
