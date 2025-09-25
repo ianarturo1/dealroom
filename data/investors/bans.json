@@ -1,7 +1,15 @@
 {
   "id": "bans",
   "name": "Bansí",
-  "email": "jpablos@bansi.com.mx",
   "status": "Presentación de propuesta",
+  "deadlines": {
+    "Firma de Contratos": "2025-09-30"
+  },
+  "metrics": {
+    "fiscalCapitalInvestment": null,
+    "projectProfitability": null,
+    "portfolio": null
+  },
+  "email": "jpablos@bansi.com.mx",
   "createdAt": "2025-09-21T01:41:21.529Z"
 }
