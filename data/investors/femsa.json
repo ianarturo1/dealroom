@@ -2,9 +2,7 @@
   "id": "femsa",
   "name": "FEMSA",
   "status": "LOI",
-  "deadlines": {
-    "LOI": "2025-10-15"
-  },
+  "deadlines": {},
   "metrics": {
     "fiscalCapitalInvestment": 20000000,
     "projectProfitability": {
