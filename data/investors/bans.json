@@ -2,7 +2,10 @@
   "id": "bans",
   "name": "Bansí",
   "status": "Presentación de propuesta",
-  "deadlines": {},
+  "deadlines": {
+    "LOI": "2025-09-27",
+    "Prpuesta": "2025-09-30"
+  },
   "metrics": {
     "fiscalCapitalInvestment": null,
     "projectProfitability": null,
