@@ -3,13 +3,7 @@ import { api } from '../lib/api'
 import ProgressBar from '../components/ProgressBar'
 import KPIs from '../components/KPIs'
 import { useInvestorProfile } from '../lib/investor'
-
-const STAGES = [
-  "Primera reunión","NDA","Entrega de información","Generación de propuesta",
-  "Presentación de propuesta","Ajustes técnicos","LOI",
-  "Due diligence fiscal/financiero/riesgos","Revisión de contratos",
-  "Cronograma de inversión","Firma de contratos"
-]
+import { PIPELINE_STAGES } from '../constants/pipeline'
 
 export default function Dashboard(){
   const [investor, setInvestor] = useState(null)
@@ -36,8 +30,8 @@ export default function Dashboard(){
 
   const metrics = investor?.metrics || {}
   const stage = investor?.status ?? ''
-  const stageIndex = stage ? STAGES.findIndex(s => s === stage) : -1
-  const nextSteps = stageIndex >= 0 ? STAGES.slice(stageIndex + 1) : []
+  const stageIndex = stage ? PIPELINE_STAGES.findIndex(s => s === stage) : -1
+  const nextSteps = stageIndex >= 0 ? PIPELINE_STAGES.slice(stageIndex + 1) : []
   const deadlines = investor?.deadlines || {}
   const stageLabel = stage || '—'
 
@@ -54,7 +48,7 @@ export default function Dashboard(){
 
       <div className="card">
         <div className="h2">Avance</div>
-        <ProgressBar stages={STAGES} current={stage} />
+        <ProgressBar stages={PIPELINE_STAGES} current={stage} />
         <div style={{marginTop:10, fontSize:14}}>
           <strong>Etapa actual:</strong> {stageLabel}
         </div>

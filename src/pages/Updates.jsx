@@ -4,15 +4,8 @@ import { api } from '../lib/api'
 import { DEFAULT_INVESTOR_ID } from '../lib/config'
 import { resolveDeadlineDocTarget, DEADLINE_DOC_CATEGORIES } from '../lib/deadlines'
 import { useInvestorProfile } from '../lib/investor'
-
-const STAGES = [
-  "Primera reunión","NDA","Entrega de información","Generación de propuesta",
-  "Presentación de propuesta","Ajustes técnicos","LOI",
-  "Due diligence fiscal/financiero/riesgos","Revisión de contratos",
-  "Cronograma de inversión","Firma de contratos"
-]
-
-const DASHBOARD_DOC_CATEGORIES = ['NDA', 'Propuestas', 'Contratos']
+import { PIPELINE_STAGES, FINAL_PIPELINE_STAGE } from '../constants/pipeline'
+import { DASHBOARD_DOC_CATEGORIES } from '../constants/documents'
 const DOC_REDIRECT_CATEGORIES = Array.from(new Set([
   ...DASHBOARD_DOC_CATEGORIES,
   ...DEADLINE_DOC_CATEGORIES
@@ -50,7 +43,7 @@ export default function Updates(){
       .catch(() => setItems([]))
   }, [])
 
-  const finalStageLabel = STAGES[STAGES.length - 1] || ''
+  const finalStageLabel = FINAL_PIPELINE_STAGE
   const numberFormatter = useMemo(() => new Intl.NumberFormat('es-MX'), [])
   const percentFormatter = useMemo(
     () => new Intl.NumberFormat('es-MX', { maximumFractionDigits: 1 }),
@@ -241,8 +234,8 @@ export default function Updates(){
 
   const pipelineSummary = useMemo(() => {
     const total = investorList.length
-    const normalizedStages = STAGES.map(stage => stage.toLowerCase())
-    const stageCounts = STAGES.map(stage => {
+    const normalizedStages = PIPELINE_STAGES.map(stage => stage.toLowerCase())
+    const stageCounts = PIPELINE_STAGES.map(stage => {
       const normalizedStage = stage.toLowerCase()
       const count = investorList.filter(item => (item.status || '').trim().toLowerCase() === normalizedStage).length
       const percent = total ? (count / total) * 100 : 0
