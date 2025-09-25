@@ -67,7 +67,6 @@ const formatPortfolio = (value) => {
 }
 
 const KPI_DEFINITIONS = [
-  { key:'decisionTime', label:'Días a decisión', format: (value) => value ?? '—' },
   {
     key: 'fiscalCapitalInvestment',
     label: 'Inversión de capital fiscal',

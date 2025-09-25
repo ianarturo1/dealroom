@@ -4,6 +4,7 @@ import ProgressBar from '../components/ProgressBar'
 import KPIs from '../components/KPIs'
 import { useInvestorProfile } from '../lib/investor'
 import { PIPELINE_STAGES } from '../constants/pipeline'
+import { getDecisionBadge, getDecisionDays } from '@/utils/decision'
 
 export default function Dashboard(){
   const [investor, setInvestor] = useState(null)
@@ -34,6 +35,9 @@ export default function Dashboard(){
   const nextSteps = stageIndex >= 0 ? PIPELINE_STAGES.slice(stageIndex + 1) : []
   const deadlines = investor?.deadlines || {}
   const stageLabel = stage || '—'
+  const decisionDays = getDecisionDays(investor)
+
+  const { className: decisionBadgeClass, label: decisionLabel } = getDecisionBadge(decisionDays)
 
   return (
     <div className="container">
@@ -52,6 +56,9 @@ export default function Dashboard(){
         <div style={{marginTop:10, fontSize:14}}>
           <strong>Etapa actual:</strong> {stageLabel}
         </div>
+        <div style={{marginTop:8}}>
+          <span className={decisionBadgeClass}>{decisionLabel}</span>
+        </div>
         <div style={{display:'flex', flexWrap:'wrap', gap:12, marginTop:8}}>
           {Object.entries(deadlines).map(([k,v]) => (
             <span key={k} className="badge">{k}: {v}</span>
@@ -62,7 +69,7 @@ export default function Dashboard(){
       <div style={{marginTop:12}}>
         <KPIs
           metrics={metrics}
-          visibleKeys={['decisionTime','fiscalCapitalInvestment','projectProfitability','portfolio']}
+          visibleKeys={['fiscalCapitalInvestment','projectProfitability','portfolio']}
         />
       </div>
 
