@@ -4,6 +4,7 @@ import ProgressBar from '../components/ProgressBar'
 import KPIs from '../components/KPIs'
 import { useInvestorProfile } from '../lib/investor'
 import { PIPELINE_STAGES } from '../constants/pipeline'
+import { getDecisionDays } from '@/utils/decision'
 
 export default function Dashboard(){
   const [investor, setInvestor] = useState(null)
@@ -34,6 +35,7 @@ export default function Dashboard(){
   const nextSteps = stageIndex >= 0 ? PIPELINE_STAGES.slice(stageIndex + 1) : []
   const deadlines = investor?.deadlines || {}
   const stageLabel = stage || '—'
+  const decisionDays = getDecisionDays(investor)
 
   return (
     <div className="container">
@@ -62,7 +64,8 @@ export default function Dashboard(){
       <div style={{marginTop:12}}>
         <KPIs
           metrics={metrics}
-          visibleKeys={['decisionTime','fiscalCapitalInvestment','projectProfitability','portfolio']}
+          visibleKeys={['fiscalCapitalInvestment','projectProfitability','portfolio']}
+          decisionDays={decisionDays}
         />
       </div>
 
