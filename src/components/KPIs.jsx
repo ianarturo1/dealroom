@@ -1,4 +1,5 @@
 import React from 'react'
+import { getDecisionBadge } from '@/utils/decision'
 
 const currencyFormatter = new Intl.NumberFormat('es-MX', {
   style: 'currency',
@@ -94,7 +95,7 @@ const KPI_DEFINITIONS = [
   { key:'nps', label:'NPS', format: (value) => value ?? '—' },
 ]
 
-export default function KPIs({ metrics = {}, visibleKeys }){
+export default function KPIs({ metrics = {}, visibleKeys, decisionDays }){
   const allowed = Array.isArray(visibleKeys) && visibleKeys.length
     ? new Set(visibleKeys)
     : null
@@ -109,14 +110,43 @@ export default function KPIs({ metrics = {}, visibleKeys }){
 
   if (!items.length) return null
 
-  return (
-    <div className="grid">
-      {items.map(it => (
-        <div className="card kpi" key={it.key}>
+  const { className: decisionBadgeClass, label: decisionBadgeLabel } = getDecisionBadge(decisionDays)
+  const decisionToneClass = React.useMemo(() => {
+    if (!decisionBadgeClass) return ''
+    if (decisionBadgeClass.includes('badge-error')) return 'decision-num--error'
+    if (decisionBadgeClass.includes('badge-warning')) return 'decision-num--warning'
+    if (decisionBadgeClass.includes('badge-success')) return 'decision-num--success'
+    return ''
+  }, [decisionBadgeClass])
+
+  const cards = []
+
+  items.forEach(it => {
+    if (it.key === 'portfolio'){
+      cards.push(
+        <div className="card kpi" key="portfolio">
           <div className="label">{it.label}</div>
           <div className="num">{it.value}</div>
         </div>
-      ))}
-    </div>
-  )
+      )
+      cards.push(
+        <div className="card kpi" key="decision-days">
+          <div className="label">Días para decidir</div>
+          {/* Importante: “Días de decisión” es PER INVERSOR. No existe un decisionTime global.
+              El cálculo depende exclusivamente de las fechas del inversor activo (slug actual). */}
+          <div className={`num decision-num ${decisionToneClass}`.trim()}>{decisionBadgeLabel}</div>
+        </div>
+      )
+      return
+    }
+
+    cards.push(
+      <div className="card kpi" key={it.key}>
+        <div className="label">{it.label}</div>
+        <div className="num">{it.value}</div>
+      </div>
+    )
+  })
+
+  return <div className="grid">{cards}</div>
 }

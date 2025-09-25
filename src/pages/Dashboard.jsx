@@ -4,7 +4,7 @@ import ProgressBar from '../components/ProgressBar'
 import KPIs from '../components/KPIs'
 import { useInvestorProfile } from '../lib/investor'
 import { PIPELINE_STAGES } from '../constants/pipeline'
-import { getDecisionBadge, getDecisionDays } from '@/utils/decision'
+import { getDecisionDays } from '@/utils/decision' // días de decisión PER INVERSOR (slug)
 
 export default function Dashboard(){
   const [investor, setInvestor] = useState(null)
@@ -15,29 +15,24 @@ export default function Dashboard(){
     let cancelled = false
     setErr(null)
     setInvestor(null)
+
     api.getInvestor(investorId)
-      .then(data => {
-        if (!cancelled) setInvestor(data)
-      })
-      .catch(error => {
-        if (!cancelled){
-          setErr(error.message)
-        }
-      })
-    return () => {
-      cancelled = true
-    }
+      .then(data => { if (!cancelled) setInvestor(data) })
+      .catch(error => { if (!cancelled) setErr(error?.message || String(error)) })
+
+    return () => { cancelled = true }
   }, [investorId])
 
+  // -------- Derivados --------
   const metrics = investor?.metrics || {}
   const stage = investor?.status ?? ''
   const stageIndex = stage ? PIPELINE_STAGES.findIndex(s => s === stage) : -1
   const nextSteps = stageIndex >= 0 ? PIPELINE_STAGES.slice(stageIndex + 1) : []
   const deadlines = investor?.deadlines || {}
   const stageLabel = stage || '—'
-  const decisionDays = getDecisionDays(investor)
 
-  const { className: decisionBadgeClass, label: decisionLabel } = getDecisionBadge(decisionDays)
+  // DÍAS DE DECISIÓN POR INVERSOR (se renderiza en KPIs → Portafolio)
+  const decisionDays = getDecisionDays(investor)
 
   return (
     <div className="container">
@@ -50,15 +45,15 @@ export default function Dashboard(){
 
       {err && <div className="notice">{err}</div>}
 
+      {/* Avance */}
       <div className="card">
         <div className="h2">Avance</div>
         <ProgressBar stages={PIPELINE_STAGES} current={stage} />
         <div style={{marginTop:10, fontSize:14}}>
           <strong>Etapa actual:</strong> {stageLabel}
         </div>
-        <div style={{marginTop:8}}>
-          <span className={decisionBadgeClass}>{decisionLabel}</span>
-        </div>
+
+        {/* Chips con deadlines */}
         <div style={{display:'flex', flexWrap:'wrap', gap:12, marginTop:8}}>
           {Object.entries(deadlines).map(([k,v]) => (
             <span key={k} className="badge">{k}: {v}</span>
@@ -66,25 +61,31 @@ export default function Dashboard(){
         </div>
       </div>
 
+      {/* KPIs (el badge de decisión se muestra en el card Portafolio dentro de KPIs) */}
       <div style={{marginTop:12}}>
         <KPIs
           metrics={metrics}
           visibleKeys={['fiscalCapitalInvestment','projectProfitability','portfolio']}
+          decisionDays={decisionDays}
         />
       </div>
 
+      {/* Siguientes pasos */}
       <div className="card" style={{marginTop:12}}>
         <div className="h2">Siguientes pasos</div>
+
         {stage && stageIndex < 0 && (
           <p style={{color:'#8b8b8b', marginBottom:0}}>
             No hay pasos siguientes configurados para la etapa actual.
           </p>
         )}
+
         {stageIndex >= 0 && nextSteps.length === 0 && (
           <p style={{color:'#8b8b8b', marginBottom:0}}>
             Has completado todas las etapas del proceso.
           </p>
         )}
+
         {nextSteps.length > 0 && (
           <ol>
             {nextSteps.map(step => (
