@@ -100,7 +100,7 @@ VITE_PUBLIC_INVESTOR_ID=femsa
 - Etapas fijas (editable en código):
   1. Primera reunión → 2. NDA → 3. Entrega de información → 4. Generación de propuesta →
   5. Presentación de propuesta → 6. Ajustes técnicos → 7. LOI →
-  8. Due diligence fiscal/financiero/riesgos → 9. Revisión de contratos →
+  8. Revisión de contratos → 9. Due diligence fiscal/financiero/riesgos →
   10. Cronograma de inversión → 11. Firma de contratos
 - Fechas límite por etapa se guardan en `data/investors/<slug>.json` (o en el repo de contenido vía función).
 - Botón **ICS** genera un calendario descargable (sin servicios externos).

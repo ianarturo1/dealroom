@@ -3,13 +3,8 @@ import { api } from '../lib/api'
 import RoleGate from '../components/RoleGate'
 import { DEFAULT_INVESTOR_ID } from '../lib/config'
 import { resolveDeadlineDocTarget } from '../lib/deadlines'
-
-const STAGES = [
-  "Primera reunión","NDA","Entrega de información","Generación de propuesta",
-  "Presentación de propuesta","Ajustes técnicos","LOI",
-  "Due diligence fiscal/financiero/riesgos","Revisión de contratos",
-  "Cronograma de inversión","Firma de contratos"
-]
+import { DOCUMENT_SECTIONS_ORDER, DEFAULT_DOC_CATEGORY, DASHBOARD_DOC_CATEGORIES } from '../constants/documents'
+import { PIPELINE_STAGES, FINAL_PIPELINE_STAGE } from '../constants/pipeline'
 
 const PORTFOLIO_OPTIONS = [
   { value: 'solarFarms', label: 'Granjas Solares' },
@@ -29,19 +24,6 @@ const PROJECT_NUMBER_FIELDS = [
   { key: 'energy_mwh', label: 'Energía anual (MWh)' },
   { key: 'co2_tons', label: 'CO₂ evitado (t/año)' }
 ]
-
-const DOC_CATEGORIES = [
-  'NDA',
-  'Propuestas',
-  'Modelos financieros',
-  'Contratos',
-  'LOIs',
-  'Sustento fiscal',
-  'Mitigación de riesgos',
-  'Procesos'
-]
-
-const DASHBOARD_DOC_CATEGORIES = ['NDA', 'Propuestas', 'Contratos']
 
 const createEmptyProject = () => ({
   id: '',
@@ -155,7 +137,7 @@ export default function Admin({ user }){
 
   const [docSlugInput, setDocSlugInput] = useState(DEFAULT_INVESTOR_ID)
   const [docSlug, setDocSlug] = useState(DEFAULT_INVESTOR_ID)
-  const [docCategory, setDocCategory] = useState(DOC_CATEGORIES[0])
+  const [docCategory, setDocCategory] = useState(DEFAULT_DOC_CATEGORY)
   const [docList, setDocList] = useState([])
   const [docsLoading, setDocsLoading] = useState(false)
   const [docsError, setDocsError] = useState(null)
@@ -170,7 +152,7 @@ useEffect(() => {
   window.sessionStorage.removeItem('adminDocsRedirect');
   try {
     const data = JSON.parse(raw);
-    const category = DOC_CATEGORIES.includes(data?.category) ? data.category : DEFAULT_DOC_CATEGORY;
+    const category = DOCUMENT_SECTIONS_ORDER.includes(data?.category) ? data.category : DEFAULT_DOC_CATEGORY;
     const slug = normalizeSlug(data?.slug) || DEFAULT_INVESTOR_ID;
 
     setDocCategory(category);
@@ -235,7 +217,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     return ''
   }, [])
 
-  const finalStageLabel = STAGES[STAGES.length - 1] || ''
+  const finalStageLabel = FINAL_PIPELINE_STAGE
   const numberFormatter = React.useMemo(() => new Intl.NumberFormat('es-MX'), [])
   const percentFormatter = React.useMemo(
     () => new Intl.NumberFormat('es-MX', { maximumFractionDigits: 1 }),
@@ -676,8 +658,8 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
   const pipelineSummary = React.useMemo(() => {
     const total = investorList.length
-    const normalizedStages = STAGES.map(stage => stage.toLowerCase())
-    const stageCounts = STAGES.map(stage => {
+    const normalizedStages = PIPELINE_STAGES.map(stage => stage.toLowerCase())
+    const stageCounts = PIPELINE_STAGES.map(stage => {
       const normalizedStage = stage.toLowerCase()
       const count = investorList.filter(item => (item.status || '').trim().toLowerCase() === normalizedStage).length
       const percent = total ? (count / total) * 100 : 0
@@ -829,7 +811,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   }
 
   const navigateToDocsSection = (category, slug, target = 'upload') => {
-    const normalizedCategory = DOC_CATEGORIES.includes(category) ? category : DOC_CATEGORIES[0]
+    const normalizedCategory = DOCUMENT_SECTIONS_ORDER.includes(category) ? category : DEFAULT_DOC_CATEGORY
     const normalizedSlug = normalizeSlug(slug) || DEFAULT_INVESTOR_ID
     setDocsNotice(null)
     setDocsError(null)
@@ -1346,7 +1328,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
               <input className="input" placeholder="Nombre de la empresa" value={inv.companyName} onChange={e => setInv({ ...inv, companyName: e.target.value })} required />
               <input className="input" placeholder="Slug deseado (opcional)" value={inv.slug} onChange={e => setInv({ ...inv, slug: e.target.value })} />
               <select className="select" value={inv.status} onChange={e => setInv({ ...inv, status: e.target.value })}>
-                {STAGES.map(s => <option key={s}>{s}</option>)}
+                {PIPELINE_STAGES.map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
             <div style={{marginTop:8}}>
@@ -1493,7 +1475,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                 value={payload.status}
                 onChange={e => setPayload({ ...payload, status: e.target.value })}
               >
-                {STAGES.map(s => <option key={s}>{s}</option>)}
+                {PIPELINE_STAGES.map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
 
@@ -1666,7 +1648,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                 value={docCategory}
                 onChange={e => { setDocCategory(e.target.value); setDocsNotice(null); setDocsError(null) }}
               >
-                {DOC_CATEGORIES.map(cat => (
+                {DOCUMENT_SECTIONS_ORDER.map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
               </select>
