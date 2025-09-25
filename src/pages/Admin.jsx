@@ -3,13 +3,7 @@ import { api } from '../lib/api'
 import RoleGate from '../components/RoleGate'
 import { DEFAULT_INVESTOR_ID } from '../lib/config'
 import { resolveDeadlineDocTarget } from '../lib/deadlines'
-
-const STAGES = [
-  "Primera reunión","NDA","Entrega de información","Generación de propuesta",
-  "Presentación de propuesta","Ajustes técnicos","LOI",
-  "Due diligence fiscal/financiero/riesgos","Revisión de contratos",
-  "Cronograma de inversión","Firma de contratos"
-]
+import { STAGES } from '../lib/pipeline'
 
 const PORTFOLIO_OPTIONS = [
   { value: 'solarFarms', label: 'Granjas Solares' },

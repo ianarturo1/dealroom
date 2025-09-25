@@ -1,5 +1,8 @@
 import { ok, text } from './_lib/utils.mjs'
 import { repoEnv, getFile, putFile } from './_lib/github.mjs'
+import { STAGES } from './_lib/pipeline.mjs'
+
+const ALLOWED_STATUS = new Set(STAGES)
 
 export async function handler(event){
   try{
@@ -14,7 +17,17 @@ export async function handler(event){
     if (!repo || !process.env.GITHUB_TOKEN){
       return text(500, 'CONTENT_REPO/GITHUB_TOKEN no configurados')
     }
+    const rawStatus = typeof body.status === 'string' ? body.status : undefined
+    const normalizedStatus = typeof rawStatus === 'string' ? rawStatus.trim() : undefined
+
+    if (normalizedStatus && !ALLOWED_STATUS.has(normalizedStatus)){
+      return text(400, 'Estado del pipeline no permitido')
+    }
+
     const payload = { ...body, id: normalizedId }
+    if (typeof rawStatus === 'string'){
+      payload.status = normalizedStatus || ''
+    }
     const path = `data/investors/${normalizedId}.json`
 
     let sha = undefined
