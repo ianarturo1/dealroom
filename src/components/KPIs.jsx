@@ -1,4 +1,5 @@
 import React from 'react'
+import { getDecisionBadge } from '@/utils/decision'
 
 const currencyFormatter = new Intl.NumberFormat('es-MX', {
   style: 'currency',
@@ -94,7 +95,7 @@ const KPI_DEFINITIONS = [
   { key:'nps', label:'NPS', format: (value) => value ?? '—' },
 ]
 
-export default function KPIs({ metrics = {}, visibleKeys }){
+export default function KPIs({ metrics = {}, visibleKeys, decisionDays }){
   const allowed = Array.isArray(visibleKeys) && visibleKeys.length
     ? new Set(visibleKeys)
     : null
@@ -109,14 +110,32 @@ export default function KPIs({ metrics = {}, visibleKeys }){
 
   if (!items.length) return null
 
+  const { className: decisionBadgeClass, label: decisionBadgeLabel } = getDecisionBadge(decisionDays)
+
   return (
     <div className="grid">
-      {items.map(it => (
-        <div className="card kpi" key={it.key}>
-          <div className="label">{it.label}</div>
-          <div className="num">{it.value}</div>
-        </div>
-      ))}
+      {items.map(it => {
+        if (it.key === 'portfolio'){
+          // Importante: “Días de decisión” es PER INVERSOR. No existe un decisionTime global.
+          // El cálculo depende exclusivamente de las fechas del inversor activo (slug actual).
+          return (
+            <div className="card kpi" key={it.key}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <div className="label">{it.label}</div>
+                <span className={decisionBadgeClass}>{decisionBadgeLabel}</span>
+              </div>
+              <div className="num">{it.value}</div>
+            </div>
+          )
+        }
+
+        return (
+          <div className="card kpi" key={it.key}>
+            <div className="label">{it.label}</div>
+            <div className="num">{it.value}</div>
+          </div>
+        )
+      })}
     </div>
   )
 }
