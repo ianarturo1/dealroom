@@ -31,6 +31,23 @@ export default function Dashboard(){
   const deadlines = investor?.deadlines || {}
   const stageLabel = stage || '—'
 
+  // Chip "Firma" (priorizar visualmente y evitar duplicado)
+  const firmaEntries = Object.entries(deadlines).filter(([key]) => {
+    if (typeof key !== 'string') return false
+    return /^firma($|\s)/i.test(key.trim())
+  })
+  const firmaValue = (() => {
+    for (const [, value] of firmaEntries){
+      if (typeof value === 'string'){
+        const trimmed = value.trim()
+        if (trimmed) return trimmed
+      } else if (value) {
+        return value
+      }
+    }
+    return null
+  })()
+
   // DÍAS DE DECISIÓN POR INVERSOR (se renderiza en KPIs → Portafolio)
   const decisionDays = getDecisionDays(investor)
 
@@ -53,11 +70,17 @@ export default function Dashboard(){
           <strong>Etapa actual:</strong> {stageLabel}
         </div>
 
-        {/* Chips con deadlines */}
+        {/* Chips con deadlines (Firma primero) */}
         <div style={{display:'flex', flexWrap:'wrap', gap:12, marginTop:8}}>
-          {Object.entries(deadlines).map(([k,v]) => (
-            <span key={k} className="badge">{k}: {v}</span>
-          ))}
+          {firmaValue && <span className="badge">Firma: {firmaValue}</span>}
+          {Object.entries(deadlines)
+            .filter(([key]) => {
+              if (typeof key !== 'string') return true
+              return !/^firma($|\s)/i.test(key.trim())
+            })
+            .map(([k, v]) => (
+              <span key={k} className="badge">{k}: {v}</span>
+            ))}
         </div>
       </div>
 

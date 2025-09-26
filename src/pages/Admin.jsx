@@ -46,6 +46,19 @@ const parseNumber = (value) => {
   return Number.isNaN(num) ? null : num
 }
 
+const normalizeDeadlineKey = (inputKey = '') => {
+  const trimmed = String(inputKey).trim()
+  if (!trimmed) return ''
+  const lower = trimmed.toLowerCase()
+  if (lower === 'firma' || lower.startsWith('firma ')) return 'Firma'
+  if (lower.includes('firma') && lower.includes('contrato')) return 'Firma'
+  return trimmed
+}
+
+const isISODateString = (value = '') => {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value).trim())
+}
+
 const normalizeSlug = (value) => (value || '').trim().toLowerCase()
 
 const withoutDecisionTime = (metrics) => {
@@ -1047,14 +1060,27 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       const normalizedName = typeof payload.name === 'string'
         ? payload.name.trim()
         : ''
+      const invalidDeadlines = []
       const normalizedDeadlines = deadlineRows.reduce((acc, item) => {
-        const key = (item.key || '').trim()
-        const value = item.value || ''
-        if (key && value){
-          acc[key] = value
+        const normalizedKey = normalizeDeadlineKey(item.key)
+        const rawValue = item.value ?? ''
+        const normalizedValue = typeof rawValue === 'string'
+          ? rawValue.trim()
+          : String(rawValue)
+
+        if (!normalizedKey || !normalizedValue) return acc
+        if (!isISODateString(normalizedValue)){
+          invalidDeadlines.push(normalizedKey)
+          return acc
         }
+
+        acc[normalizedKey] = normalizedValue
         return acc
       }, {})
+
+      if (invalidDeadlines.length){
+        throw new Error(`Fechas inválidas (usa AAAA-MM-DD): ${invalidDeadlines.join(', ')}`)
+      }
 
       const payloadToSend = {
         ...payload,
@@ -1082,7 +1108,22 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     setInvLoading(true); setProgress(10)
     try{
       const dl = {}
-      for (const d of inv.deadlines){ if (d.k && d.v) dl[d.k] = d.v }
+      const invalid = []
+      for (const d of inv.deadlines){
+        const key = normalizeDeadlineKey(d.k)
+        const rawValue = d.v ?? ''
+        const value = typeof rawValue === 'string' ? rawValue.trim() : String(rawValue)
+        if (!key || !value) continue
+        if (!isISODateString(value)){
+          invalid.push(key)
+          continue
+        }
+        dl[key] = value
+      }
+
+      if (invalid.length){
+        throw new Error(`Fechas inválidas (usa AAAA-MM-DD): ${invalid.join(', ')}`)
+      }
       const payload = { email: inv.email, companyName: inv.companyName, status: inv.status, deadlines: dl }
       if (inv.slug) payload.slug = inv.slug
       const res = await api.createInvestor(payload)
