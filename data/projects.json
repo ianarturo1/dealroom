@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "id": "celocan-celoplaya-qroo",
+    "name": "Granjas solares en Celocán y Celoplaya – Quintana Roo",
+    "client": "Por adjuntar",
+    "location": "Cancún y Playa del Carmen",
+    "model": "ExpandSolar",
+    "status": "Disponible",
+    "termMonths": 0,
+    "empresa": "",
+    "imageUrl": "",
+    "power_kwp": 1967,
+    "energy_mwh": 2763,
+    "co2_tons": 1208
+  }
+]
