@@ -2,9 +2,7 @@
   "id": "fortacero2",
   "name": "Fortacero 2",
   "status": "Generación de propuesta",
-  "deadlines": {
-    "Firma": "2025-09-30"
-  },
+  "deadlines": {},
   "metrics": {
     "fiscalCapitalInvestment": null,
     "projectProfitability": null,
