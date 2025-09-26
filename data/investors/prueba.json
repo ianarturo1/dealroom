@@ -1,10 +1,9 @@
 {
   "id": "prueba",
-  "name": "FEMSA",
-  "status": "LOI",
+  "name": "Prueba 1",
+  "status": "Presentación de propuesta",
   "deadlines": {
-    "LOI": "2025-10-15",
-    "Firma": "2025-11-30"
+    "Firma": "2025-09-30"
   },
   "metrics": {
     "fiscalCapitalInvestment": 20000000,
