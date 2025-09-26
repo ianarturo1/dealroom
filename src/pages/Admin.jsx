@@ -5,6 +5,7 @@ import { DEFAULT_INVESTOR_ID } from '../lib/config'
 import { resolveDeadlineDocTarget } from '../lib/deadlines'
 import { DOCUMENT_SECTIONS_ORDER, DEFAULT_DOC_CATEGORY, DASHBOARD_DOC_CATEGORIES } from '../constants/documents'
 import { PIPELINE_STAGES, FINAL_PIPELINE_STAGE } from '../constants/pipeline'
+import { getDecisionBadge, getDecisionDays } from '@/utils/decision'
 
 const PORTFOLIO_OPTIONS = [
   { value: 'solarFarms', label: 'Granjas Solares' },
@@ -45,7 +46,26 @@ const parseNumber = (value) => {
   return Number.isNaN(num) ? null : num
 }
 
+const normalizeDeadlineKey = (inputKey = '') => {
+  const trimmed = String(inputKey).trim()
+  if (!trimmed) return ''
+  const lower = trimmed.toLowerCase()
+  if (lower === 'firma' || lower.startsWith('firma ')) return 'Firma'
+  if (lower.includes('firma') && lower.includes('contrato')) return 'Firma'
+  return trimmed
+}
+
+const isISODateString = (value = '') => {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value).trim())
+}
+
 const normalizeSlug = (value) => (value || '').trim().toLowerCase()
+
+const withoutDecisionTime = (metrics) => {
+  if (!metrics || typeof metrics !== 'object') return {}
+  const { decisionTime, ...rest } = metrics
+  return { ...rest }
+}
 
 const deadlinesToRows = (deadlines) => {
   if (!deadlines || typeof deadlines !== 'object') return [{ key: '', value: '' }]
@@ -93,7 +113,6 @@ export default function Admin({ user }){
     status: 'LOI',
     deadlines: initialDeadlines,
     metrics: {
-      decisionTime: 35,
       fiscalCapitalInvestment: 20000000,
       projectProfitability: { amount: 12500000, years: 7 },
       portfolio: {
@@ -644,6 +663,8 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   }
 
   const metrics = payload.metrics || {}
+  const decisionDays = getDecisionDays(payload)
+  const { className: decisionBadgeClass, label: decisionLabel } = getDecisionBadge(decisionDays)
   const normalizedPayloadSlug = normalizeSlug(payload.id)
   const canLoadInvestor = Boolean(normalizedPayloadSlug)
   const effectiveDocSlug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
@@ -867,7 +888,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
         ...prev,
         ...data,
         id: slug,
-        metrics: data.metrics || {},
+        metrics: withoutDecisionTime(data.metrics),
         deadlines: data.deadlines || {}
       }))
     } catch (error) {
@@ -996,9 +1017,9 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       }
 
       const metricsPayload = payload.metrics || {}
+      const sanitizedMetrics = withoutDecisionTime(metricsPayload)
       const normalizedMetrics = {
-        ...metricsPayload,
-        decisionTime: parseNumber(metricsPayload.decisionTime),
+        ...sanitizedMetrics,
         fiscalCapitalInvestment: parseNumber(metricsPayload.fiscalCapitalInvestment)
       }
 
@@ -1039,14 +1060,27 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       const normalizedName = typeof payload.name === 'string'
         ? payload.name.trim()
         : ''
+      const invalidDeadlines = []
       const normalizedDeadlines = deadlineRows.reduce((acc, item) => {
-        const key = (item.key || '').trim()
-        const value = item.value || ''
-        if (key && value){
-          acc[key] = value
+        const normalizedKey = normalizeDeadlineKey(item.key)
+        const rawValue = item.value ?? ''
+        const normalizedValue = typeof rawValue === 'string'
+          ? rawValue.trim()
+          : String(rawValue)
+
+        if (!normalizedKey || !normalizedValue) return acc
+        if (!isISODateString(normalizedValue)){
+          invalidDeadlines.push(normalizedKey)
+          return acc
         }
+
+        acc[normalizedKey] = normalizedValue
         return acc
       }, {})
+
+      if (invalidDeadlines.length){
+        throw new Error(`Fechas inválidas (usa AAAA-MM-DD): ${invalidDeadlines.join(', ')}`)
+      }
 
       const payloadToSend = {
         ...payload,
@@ -1074,7 +1108,22 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     setInvLoading(true); setProgress(10)
     try{
       const dl = {}
-      for (const d of inv.deadlines){ if (d.k && d.v) dl[d.k] = d.v }
+      const invalid = []
+      for (const d of inv.deadlines){
+        const key = normalizeDeadlineKey(d.k)
+        const rawValue = d.v ?? ''
+        const value = typeof rawValue === 'string' ? rawValue.trim() : String(rawValue)
+        if (!key || !value) continue
+        if (!isISODateString(value)){
+          invalid.push(key)
+          continue
+        }
+        dl[key] = value
+      }
+
+      if (invalid.length){
+        throw new Error(`Fechas inválidas (usa AAAA-MM-DD): ${invalid.join(', ')}`)
+      }
       const payload = { email: inv.email, companyName: inv.companyName, status: inv.status, deadlines: dl }
       if (inv.slug) payload.slug = inv.slug
       const res = await api.createInvestor(payload)
@@ -1528,15 +1577,8 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
             <div className="form-row" style={{ marginTop: 8 }}>
               <div style={fieldStyle}>
-                <label htmlFor="metric-decisionTime" style={labelStyle}>Días a decisión</label>
-                <input
-                  id="metric-decisionTime"
-                  className="input"
-                  type="number"
-                  min="0"
-                  value={metrics.decisionTime ?? ''}
-                  onChange={e => updateMetric('decisionTime', e.target.value)}
-                />
+                <div style={labelStyle}>Días a decisión</div>
+                <span className={decisionBadgeClass}>{decisionLabel}</span>
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="metric-fiscal" style={labelStyle}>Inversión de capital fiscal (MXN)</label>

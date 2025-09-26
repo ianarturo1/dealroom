@@ -4,6 +4,7 @@ import ProgressBar from '../components/ProgressBar'
 import KPIs from '../components/KPIs'
 import { useInvestorProfile } from '../lib/investor'
 import { PIPELINE_STAGES } from '../constants/pipeline'
+import { getDecisionDays } from '@/utils/decision'
 
 export default function Dashboard(){
   const [investor, setInvestor] = useState(null)
@@ -33,7 +34,23 @@ export default function Dashboard(){
   const stageIndex = stage ? PIPELINE_STAGES.findIndex(s => s === stage) : -1
   const nextSteps = stageIndex >= 0 ? PIPELINE_STAGES.slice(stageIndex + 1) : []
   const deadlines = investor?.deadlines || {}
+  const firmaEntries = Object.entries(deadlines).filter(([key]) => {
+    if (typeof key !== 'string') return false
+    return /^firma($|\s)/i.test(key.trim())
+  })
+  const firmaValue = (() => {
+    for (const [, value] of firmaEntries){
+      if (typeof value === 'string'){
+        const trimmed = value.trim()
+        if (trimmed) return trimmed
+      }else if (value){
+        return value
+      }
+    }
+    return null
+  })()
   const stageLabel = stage || '—'
+  const decisionDays = getDecisionDays(investor)
 
   return (
     <div className="container">
@@ -53,16 +70,23 @@ export default function Dashboard(){
           <strong>Etapa actual:</strong> {stageLabel}
         </div>
         <div style={{display:'flex', flexWrap:'wrap', gap:12, marginTop:8}}>
-          {Object.entries(deadlines).map(([k,v]) => (
-            <span key={k} className="badge">{k}: {v}</span>
-          ))}
+          {firmaValue && <span className="badge">Firma: {firmaValue}</span>}
+          {Object.entries(deadlines)
+            .filter(([key]) => {
+              if (typeof key !== 'string') return true
+              return !/^firma($|\s)/i.test(key.trim())
+            })
+            .map(([k, v]) => (
+              <span key={k} className="badge">{k}: {v}</span>
+            ))}
         </div>
       </div>
 
       <div style={{marginTop:12}}>
         <KPIs
           metrics={metrics}
-          visibleKeys={['decisionTime','fiscalCapitalInvestment','projectProfitability','portfolio']}
+          visibleKeys={['fiscalCapitalInvestment','projectProfitability','portfolio']}
+          decisionDays={decisionDays}
         />
       </div>
 
