@@ -2,7 +2,7 @@
   {
     "id": "celocan-celoplaya-qroo",
     "name": "Granjas solares en Celocán y Celoplaya – Quintana Roo",
-    "client": "Por adjuntar",
+    "client": "TBD",
     "location": "Cancún y Playa del Carmen",
     "model": "ExpandSolar",
     "status": "Disponible",
@@ -12,5 +12,20 @@
     "power_kwp": 1967,
     "energy_mwh": 2763,
     "co2_tons": 1208
+  },
+  {
+    "id": "danone-multi-sitios",
+    "name": "Sistemas solares Danone – Múltiples ubicaciones",
+    "client": "Danone",
+    "location": "Aguascalientes, Pachuca, SLP, Torreón, Villahermosa, Zacatecas, Morelia, Toluca",
+    "model": "Variado por Sitio",
+    "status": "Disponible",
+    "termMonths": 60,
+    "empresa": "",
+    "imageUrl": "",
+    "power_kwp": 755,
+    "energy_mwh": 1184.34,
+    "co2_tons": 519,
+    "notes": "Conjunto de propuestas PPA a 5 años en 8 sitios. Promedio de ahorro >45%. Cero inversión por parte de Danone.\""
   }
 ]
