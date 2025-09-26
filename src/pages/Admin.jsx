@@ -36,6 +36,9 @@ const createEmptyProject = () => ({
   co2_tons: '',
   model: '',
   status: 'Disponible',
+  termMonths: 0,
+  empresa: '',
+  imageUrl: '',
   notes: '',
   loi_template: ''
 })
@@ -305,6 +308,15 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     }
   }, [isAdmin])
 
+  const normalizeTermMonths = (value) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return Math.max(0, Math.round(value))
+    }
+    const parsed = parseInt(String(value ?? '').trim(), 10)
+    if (!Number.isFinite(parsed)) return 0
+    return Math.max(0, parsed)
+  }
+
   const toFormProject = (project) => ({
     id: project.id || '',
     name: project.name || '',
@@ -315,6 +327,9 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     co2_tons: project.co2_tons ?? '',
     model: project.model || '',
     status: project.status || 'Disponible',
+    termMonths: normalizeTermMonths(project.termMonths),
+    empresa: typeof project.empresa === 'string' ? project.empresa : '',
+    imageUrl: typeof project.imageUrl === 'string' ? project.imageUrl : '',
     notes: project.notes || '',
     loi_template: project.loi_template || ''
   })
@@ -501,8 +516,17 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     setProjectSaveErr(null)
   }
 
-  const updateProjectField = (index, field, value) => {
+  const updateProjectField = (index, field, rawValue) => {
     resetProjectFeedback()
+    let value = rawValue
+    if (field === 'termMonths') {
+      const parsed = parseInt(String(rawValue ?? '').trim() || '0', 10)
+      value = Number.isFinite(parsed) ? Math.max(0, parsed) : 0
+    } else if (field === 'empresa') {
+      value = String(rawValue || '').trim()
+    } else if (field === 'imageUrl') {
+      value = String(rawValue || '').trim()
+    }
     setProjectList(prev => prev.map((item, idx) => idx === index ? { ...item, [field]: value } : item))
   }
 
@@ -543,6 +567,12 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       const model = (project.model || '').trim()
       if (!model) throw new Error(`Proyecto ${id} requiere modelo`)
       const status = (project.status || '').trim() || 'Disponible'
+      const termMonths = normalizeTermMonths(project.termMonths)
+      const empresa = typeof project.empresa === 'string' ? project.empresa.trim() : ''
+      const imageUrl = typeof project.imageUrl === 'string' ? project.imageUrl.trim() : ''
+      if (imageUrl && !/^https?:\/\//i.test(imageUrl)) {
+        throw new Error(`Proyecto ${id} tiene Imagen (URL) inválida`)
+      }
 
       const base = {
         id,
@@ -553,7 +583,10 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
         energy_mwh: toNumberOrThrow(project.energy_mwh, 'energía anual (MWh)', id),
         co2_tons: toNumberOrThrow(project.co2_tons, 'CO₂ evitado (t/año)', id),
         model,
-        status
+        status,
+        termMonths,
+        empresa,
+        imageUrl
       }
 
       const notes = (project.notes || '').trim()
@@ -1852,6 +1885,51 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                         />
                       </div>
                     ))}
+                  </div>
+                  <div className="form-row" style={{marginTop:8}}>
+                    <div style={fieldStyle}>
+                      <label htmlFor={`project-${index}-termMonths`} style={labelStyle}>Plazo (meses)</label>
+                      <input
+                        id={`project-${index}-termMonths`}
+                        className="input"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={project.termMonths ?? 0}
+                        onChange={e => updateProjectField(index, 'termMonths', e.target.value)}
+                      />
+                    </div>
+                    <div style={fieldStyle}>
+                      <label htmlFor={`project-${index}-empresa`} style={labelStyle}>Empresa</label>
+                      <input
+                        id={`project-${index}-empresa`}
+                        className="input"
+                        type="text"
+                        value={project.empresa ?? ''}
+                        onChange={e => updateProjectField(index, 'empresa', e.target.value)}
+                        placeholder="Razón social / filial"
+                      />
+                    </div>
+                    <div style={fieldStyle}>
+                      <label htmlFor={`project-${index}-imageUrl`} style={labelStyle}>Imagen (URL)</label>
+                      <input
+                        id={`project-${index}-imageUrl`}
+                        className="input"
+                        type="url"
+                        placeholder="https://..."
+                        value={project.imageUrl ?? ''}
+                        onChange={e => updateProjectField(index, 'imageUrl', e.target.value)}
+                      />
+                      {project.imageUrl && /^https?:\/\//i.test(project.imageUrl) && (
+                        <div style={{ marginTop: 8 }}>
+                          <img
+                            src={project.imageUrl}
+                            alt={project.name || project.id || 'Proyecto'}
+                            style={{ maxWidth: 160, borderRadius: 8 }}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="form-row" style={{marginTop:8}}>
                     <div style={{ ...fieldStyle, minWidth: 260 }}>
