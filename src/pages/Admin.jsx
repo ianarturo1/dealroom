@@ -26,6 +26,8 @@ const PROJECT_NUMBER_FIELDS = [
   { key: 'co2_tons', label: 'CO₂ evitado (t/año)' }
 ]
 
+const createUploadState = () => ({ file: null, uploading: false, error: null, success: null })
+
 const createEmptyProject = () => ({
   id: '',
   name: '',
@@ -36,6 +38,9 @@ const createEmptyProject = () => ({
   co2_tons: '',
   model: '',
   status: 'Disponible',
+  termMonths: 0,
+  empresa: '',
+  imageUrl: '',
   notes: '',
   loi_template: ''
 })
@@ -153,6 +158,7 @@ export default function Admin({ user }){
   const [projectSaveMsg, setProjectSaveMsg] = useState(null)
   const [projectSaveErr, setProjectSaveErr] = useState(null)
   const [projectSaving, setProjectSaving] = useState(false)
+  const [projectImageUploads, setProjectImageUploads] = useState({})
 
   const [docSlugInput, setDocSlugInput] = useState(DEFAULT_INVESTOR_ID)
   const [docSlug, setDocSlug] = useState(DEFAULT_INVESTOR_ID)
@@ -194,6 +200,7 @@ useEffect(() => {
 const docsCardRef = React.useRef(null);
 const docsUploadInputRef = React.useRef(null);
 const docsTableRef = React.useRef(null);
+const projectImageInputRefs = React.useRef({});
 
 const [investorDetailsMap, setInvestorDetailsMap] = useState({});
 const [investorDetailsLoading, setInvestorDetailsLoading] = useState(false);
@@ -305,6 +312,15 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     }
   }, [isAdmin])
 
+  const normalizeTermMonths = (value) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return Math.max(0, Math.round(value))
+    }
+    const parsed = parseInt(String(value ?? '').trim(), 10)
+    if (!Number.isFinite(parsed)) return 0
+    return Math.max(0, parsed)
+  }
+
   const toFormProject = (project) => ({
     id: project.id || '',
     name: project.name || '',
@@ -315,6 +331,9 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     co2_tons: project.co2_tons ?? '',
     model: project.model || '',
     status: project.status || 'Disponible',
+    termMonths: normalizeTermMonths(project.termMonths),
+    empresa: typeof project.empresa === 'string' ? project.empresa : '',
+    imageUrl: typeof project.imageUrl === 'string' ? project.imageUrl : '',
     notes: project.notes || '',
     loi_template: project.loi_template || ''
   })
@@ -337,6 +356,44 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       })
     return () => { active = false }
   }, [])
+
+  useEffect(() => {
+    setProjectImageUploads(prev => {
+      const previous = prev || {}
+      const next = {}
+      let changed = false
+      projectList.forEach((_, idx) => {
+        if (Object.prototype.hasOwnProperty.call(previous, idx)){
+          next[idx] = previous[idx]
+        }else{
+          next[idx] = createUploadState()
+          changed = true
+        }
+      })
+      const prevKeys = Object.keys(previous)
+      if (prevKeys.length !== projectList.length){
+        changed = true
+      }else{
+        for (const key of prevKeys){
+          if (!(key in next)){
+            changed = true
+            break
+          }
+        }
+      }
+      return changed ? next : previous
+    })
+  }, [projectList])
+
+  useEffect(() => {
+    const refs = projectImageInputRefs.current || {}
+    const validKeys = new Set(projectList.map((_, idx) => String(idx)))
+    Object.keys(refs).forEach(key => {
+      if (!validKeys.has(key)){
+        delete refs[key]
+      }
+    })
+  }, [projectList])
 
   const loadDocs = useCallback(async () => {
     const slug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
@@ -501,8 +558,106 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     setProjectSaveErr(null)
   }
 
-  const updateProjectField = (index, field, value) => {
+  const updateProjectImageUploadState = useCallback((index, updater) => {
+    setProjectImageUploads(prev => {
+      const previous = prev || {}
+      const current = previous[index] && typeof previous[index] === 'object'
+        ? previous[index]
+        : createUploadState()
+      const nextEntry = typeof updater === 'function'
+        ? updater(current)
+        : { ...current, ...updater }
+      if (
+        previous[index] &&
+        previous[index].file === nextEntry.file &&
+        previous[index].uploading === nextEntry.uploading &&
+        previous[index].error === nextEntry.error &&
+        previous[index].success === nextEntry.success
+      ){
+        return previous
+      }
+      return { ...previous, [index]: nextEntry }
+    })
+  }, [])
+
+  const handleProjectImageFileChange = (index, file) => {
+    updateProjectImageUploadState(index, state => ({
+      ...state,
+      file: file || null,
+      error: null,
+      success: null
+    }))
+  }
+
+  const handleProjectImageUpload = async (index) => {
     resetProjectFeedback()
+    const project = projectList[index]
+    if (!project) return
+
+    const uploadState = projectImageUploads[index] || createUploadState()
+    const file = uploadState.file
+    if (!file){
+      updateProjectImageUploadState(index, state => ({
+        ...state,
+        error: 'Selecciona una imagen antes de subir.',
+        success: null
+      }))
+      return
+    }
+
+    const projectId = (project.id || '').trim()
+    if (!projectId){
+      updateProjectImageUploadState(index, state => ({
+        ...state,
+        error: 'Completa el ID del proyecto antes de subir.',
+        success: null
+      }))
+      return
+    }
+
+    updateProjectImageUploadState(index, state => ({
+      ...state,
+      uploading: true,
+      error: null,
+      success: null
+    }))
+
+    try{
+      const { imageUrl } = await api.uploadProjectImage(projectId, file)
+      const trimmedUrl = typeof imageUrl === 'string' ? imageUrl.trim() : ''
+      if (trimmedUrl){
+        setProjectList(prev => prev.map((item, idx) => idx === index ? { ...item, imageUrl: trimmedUrl } : item))
+      }
+      updateProjectImageUploadState(index, state => ({
+        ...state,
+        uploading: false,
+        file: null,
+        success: trimmedUrl ? 'Imagen subida correctamente.' : null
+      }))
+      const input = projectImageInputRefs.current && projectImageInputRefs.current[index]
+      if (input){
+        input.value = ''
+      }
+    }catch(error){
+      updateProjectImageUploadState(index, state => ({
+        ...state,
+        uploading: false,
+        error: error.message || 'Error al subir la imagen.'
+      }))
+    }
+  }
+
+  const updateProjectField = (index, field, rawValue) => {
+    resetProjectFeedback()
+    let value = rawValue
+    if (field === 'termMonths') {
+      const parsed = parseInt(String(rawValue ?? '').trim() || '0', 10)
+      value = Number.isFinite(parsed) ? Math.max(0, parsed) : 0
+    } else if (field === 'empresa') {
+      value = String(rawValue || '').trim()
+    } else if (field === 'imageUrl') {
+      value = String(rawValue || '').trim()
+    }
     setProjectList(prev => prev.map((item, idx) => idx === index ? { ...item, [field]: value } : item))
   }
 
@@ -543,6 +698,12 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       const model = (project.model || '').trim()
       if (!model) throw new Error(`Proyecto ${id} requiere modelo`)
       const status = (project.status || '').trim() || 'Disponible'
+      const termMonths = normalizeTermMonths(project.termMonths)
+      const empresa = typeof project.empresa === 'string' ? project.empresa.trim() : ''
+      const imageUrl = typeof project.imageUrl === 'string' ? project.imageUrl.trim() : ''
+      if (imageUrl && !/^https?:\/\//i.test(imageUrl)) {
+        throw new Error(`Proyecto ${id} tiene Imagen (URL) inválida`)
+      }
 
       const base = {
         id,
@@ -553,7 +714,10 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
         energy_mwh: toNumberOrThrow(project.energy_mwh, 'energía anual (MWh)', id),
         co2_tons: toNumberOrThrow(project.co2_tons, 'CO₂ evitado (t/año)', id),
         model,
-        status
+        status,
+        termMonths,
+        empresa,
+        imageUrl
       }
 
       const notes = (project.notes || '').trim()
@@ -1766,118 +1930,195 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
             <div style={{marginTop:8, color:'var(--muted)'}}>Cargando proyectos...</div>
           ) : (
             <form onSubmit={onSaveProjects}>
-              {projectList.map((project, index) => (
-                <div key={project.id || index} style={projectBoxStyle}>
-                  <div className="row" style={{justifyContent:'space-between'}}>
-                    <div style={{fontWeight:700}}>{project.name || project.id || `Proyecto ${index + 1}`}</div>
-                    <button
-                      type="button"
-                      className="btn secondary"
-                      style={{padding:'6px 12px', fontSize:12}}
-                      onClick={() => removeProject(index)}
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                  <div className="form-row" style={{marginTop:8}}>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-id`} style={labelStyle}>ID</label>
-                      <input
-                        id={`project-${index}-id`}
-                        className="input"
-                        value={project.id}
-                        onChange={e => updateProjectField(index, 'id', e.target.value)}
-                      />
+              {projectList.map((project, index) => {
+                const uploadState = projectImageUploads[index] || createUploadState()
+                const isUploading = Boolean(uploadState.uploading)
+                return (
+                  <div key={project.id || index} style={projectBoxStyle}>
+                    <div className="row" style={{justifyContent:'space-between'}}>
+                      <div style={{fontWeight:700}}>{project.name || project.id || `Proyecto ${index + 1}`}</div>
+                      <button
+                        type="button"
+                        className="btn secondary"
+                        style={{padding:'6px 12px', fontSize:12}}
+                        onClick={() => removeProject(index)}
+                      >
+                        Eliminar
+                      </button>
                     </div>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-name`} style={labelStyle}>Nombre</label>
-                      <input
-                        id={`project-${index}-name`}
-                        className="input"
-                        value={project.name}
-                        onChange={e => updateProjectField(index, 'name', e.target.value)}
-                      />
-                    </div>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-client`} style={labelStyle}>Cliente</label>
-                      <input
-                        id={`project-${index}-client`}
-                        className="input"
-                        value={project.client}
-                        onChange={e => updateProjectField(index, 'client', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="form-row" style={{marginTop:8}}>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-location`} style={labelStyle}>Ubicación</label>
-                      <input
-                        id={`project-${index}-location`}
-                        className="input"
-                        value={project.location}
-                        onChange={e => updateProjectField(index, 'location', e.target.value)}
-                      />
-                    </div>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-model`} style={labelStyle}>Modelo</label>
-                      <input
-                        id={`project-${index}-model`}
-                        className="input"
-                        value={project.model}
-                        onChange={e => updateProjectField(index, 'model', e.target.value)}
-                      />
-                    </div>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-status`} style={labelStyle}>Estado</label>
-                      <input
-                        id={`project-${index}-status`}
-                        className="input"
-                        value={project.status}
-                        onChange={e => updateProjectField(index, 'status', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="form-row" style={{marginTop:8}}>
-                    {PROJECT_NUMBER_FIELDS.map(field => (
-                      <div key={field.key} style={fieldStyle}>
-                        <label htmlFor={`project-${index}-${field.key}`} style={labelStyle}>{field.label}</label>
+                    <div className="form-row" style={{marginTop:8}}>
+                      <div style={fieldStyle}>
+                        <label htmlFor={`project-${index}-id`} style={labelStyle}>ID</label>
                         <input
-                          id={`project-${index}-${field.key}`}
+                          id={`project-${index}-id`}
+                          className="input"
+                          value={project.id}
+                          onChange={e => updateProjectField(index, 'id', e.target.value)}
+                        />
+                      </div>
+                      <div style={fieldStyle}>
+                        <label htmlFor={`project-${index}-name`} style={labelStyle}>Nombre</label>
+                        <input
+                          id={`project-${index}-name`}
+                          className="input"
+                          value={project.name}
+                          onChange={e => updateProjectField(index, 'name', e.target.value)}
+                        />
+                      </div>
+                      <div style={fieldStyle}>
+                        <label htmlFor={`project-${index}-client`} style={labelStyle}>Cliente</label>
+                        <input
+                          id={`project-${index}-client`}
+                          className="input"
+                          value={project.client}
+                          onChange={e => updateProjectField(index, 'client', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="form-row" style={{marginTop:8}}>
+                      <div style={fieldStyle}>
+                        <label htmlFor={`project-${index}-location`} style={labelStyle}>Ubicación</label>
+                        <input
+                          id={`project-${index}-location`}
+                          className="input"
+                          value={project.location}
+                          onChange={e => updateProjectField(index, 'location', e.target.value)}
+                        />
+                      </div>
+                      <div style={fieldStyle}>
+                        <label htmlFor={`project-${index}-model`} style={labelStyle}>Modelo</label>
+                        <input
+                          id={`project-${index}-model`}
+                          className="input"
+                          value={project.model}
+                          onChange={e => updateProjectField(index, 'model', e.target.value)}
+                        />
+                      </div>
+                      <div style={fieldStyle}>
+                        <label htmlFor={`project-${index}-status`} style={labelStyle}>Estado</label>
+                        <input
+                          id={`project-${index}-status`}
+                          className="input"
+                          value={project.status}
+                          onChange={e => updateProjectField(index, 'status', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="form-row" style={{marginTop:8}}>
+                      {PROJECT_NUMBER_FIELDS.map(field => (
+                        <div key={field.key} style={fieldStyle}>
+                          <label htmlFor={`project-${index}-${field.key}`} style={labelStyle}>{field.label}</label>
+                          <input
+                            id={`project-${index}-${field.key}`}
+                            className="input"
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={project[field.key] ?? ''}
+                            onChange={e => updateProjectField(index, field.key, e.target.value)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="form-row" style={{marginTop:8}}>
+                      <div style={fieldStyle}>
+                        <label htmlFor={`project-${index}-termMonths`} style={labelStyle}>Plazo (meses)</label>
+                        <input
+                          id={`project-${index}-termMonths`}
                           className="input"
                           type="number"
                           min="0"
-                          step="any"
-                          value={project[field.key] ?? ''}
-                          onChange={e => updateProjectField(index, field.key, e.target.value)}
+                          step="1"
+                          value={project.termMonths ?? 0}
+                          onChange={e => updateProjectField(index, 'termMonths', e.target.value)}
                         />
                       </div>
-                    ))}
-                  </div>
-                  <div className="form-row" style={{marginTop:8}}>
-                    <div style={{ ...fieldStyle, minWidth: 260 }}>
-                      <label htmlFor={`project-${index}-notes`} style={labelStyle}>Notas</label>
-                      <textarea
-                        id={`project-${index}-notes`}
-                        className="input"
-                        style={noteAreaStyle}
-                        value={project.notes}
-                        onChange={e => updateProjectField(index, 'notes', e.target.value)}
-                      />
+                      <div style={fieldStyle}>
+                        <label htmlFor={`project-${index}-empresa`} style={labelStyle}>Empresa</label>
+                        <input
+                          id={`project-${index}-empresa`}
+                          className="input"
+                          type="text"
+                          value={project.empresa ?? ''}
+                          onChange={e => updateProjectField(index, 'empresa', e.target.value)}
+                          placeholder="Razón social / filial"
+                        />
+                      </div>
+                      <div style={fieldStyle}>
+                        <label htmlFor={`project-${index}-imageUrl`} style={labelStyle}>Imagen (URL)</label>
+                        <input
+                          id={`project-${index}-imageUrl`}
+                          className="input"
+                          type="url"
+                          placeholder="https://..."
+                          value={project.imageUrl ?? ''}
+                          onChange={e => updateProjectField(index, 'imageUrl', e.target.value)}
+                        />
+                        <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+                          <input
+                            ref={el => {
+                              if (el){
+                                projectImageInputRefs.current[index] = el
+                              }else{
+                                delete projectImageInputRefs.current[index]
+                              }
+                            }}
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            onChange={e => handleProjectImageFileChange(index, e.target.files && e.target.files[0])}
+                          />
+                          <button
+                            type="button"
+                            className="btn secondary"
+                            onClick={() => handleProjectImageUpload(index)}
+                            disabled={isUploading}
+                          >
+                            {isUploading ? 'Subiendo...' : 'Subir'}
+                          </button>
+                        </div>
+                        {uploadState.error && (
+                          <div style={{ marginTop: 4, fontSize: 12, color: '#b91c1c' }}>{uploadState.error}</div>
+                        )}
+                        {uploadState.success && (
+                          <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted, #475569)' }}>{uploadState.success}</div>
+                        )}
+                        {project.imageUrl && /^https?:\/\//i.test(project.imageUrl) && (
+                          <div style={{ marginTop: 8 }}>
+                            <img
+                              src={project.imageUrl}
+                              alt="Imagen del proyecto"
+                              style={{ maxWidth: 160, borderRadius: 8 }}
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-loi`} style={labelStyle}>Enlace a LOI</label>
-                      <input
-                        id={`project-${index}-loi`}
-                        className="input"
-                        type="url"
-                        placeholder="https://"
-                        value={project.loi_template}
-                        onChange={e => updateProjectField(index, 'loi_template', e.target.value)}
-                      />
+                    <div className="form-row" style={{marginTop:8}}>
+                      <div style={{ ...fieldStyle, minWidth: 260 }}>
+                        <label htmlFor={`project-${index}-notes`} style={labelStyle}>Notas</label>
+                        <textarea
+                          id={`project-${index}-notes`}
+                          className="input"
+                          style={noteAreaStyle}
+                          value={project.notes}
+                          onChange={e => updateProjectField(index, 'notes', e.target.value)}
+                        />
+                      </div>
+                      <div style={fieldStyle}>
+                        <label htmlFor={`project-${index}-loi`} style={labelStyle}>Enlace a LOI</label>
+                        <input
+                          id={`project-${index}-loi`}
+                          className="input"
+                          type="url"
+                          placeholder="https://"
+                          value={project.loi_template}
+                          onChange={e => updateProjectField(index, 'loi_template', e.target.value)}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
               {!projectList.length && (
                 <div style={{marginTop:12, color:'var(--muted)'}}>No hay proyectos cargados. Usa "Agregar proyecto".</div>
               )}

@@ -35,6 +35,36 @@ export const api = {
   async uploadDoc(info){
     return req('/.netlify/functions/upload-doc', { method:'POST', body: info })
   },
+  async uploadProjectImage(projectId, file){
+    if (!projectId) throw new Error('Falta projectId para la imagen')
+    if (!file || (typeof File !== 'undefined' && !(file instanceof File))){
+      throw new Error('Archivo de imagen inválido')
+    }
+
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const url = `/.netlify/functions/upload-project-image?projectId=${encodeURIComponent(projectId)}`
+    const res = await fetch(url, { method: 'POST', body: formData })
+    const contentType = res.headers.get('content-type') || ''
+
+    if (!res.ok){
+      if (contentType.includes('application/json')){
+        const json = await res.json()
+        const message = json && (json.error || json.message || json.msg)
+        throw new Error(message || JSON.stringify(json) || 'No se pudo subir la imagen')
+      }
+      const errText = await res.text()
+      throw new Error(errText || 'No se pudo subir la imagen')
+    }
+
+    const data = contentType.includes('application/json') ? await res.json() : null
+    if (!data || typeof data.imageUrl !== 'string' || !data.imageUrl){
+      throw new Error('Respuesta inválida al subir la imagen')
+    }
+
+    return data
+  },
   async deleteDoc(info){
     return req('/.netlify/functions/delete-doc', { method:'POST', body: info })
   },

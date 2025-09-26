@@ -7,6 +7,17 @@ const numberFields = [
   { key: 'co2_tons', label: 'CO₂ evitado (t/año)' }
 ]
 
+function parseTermMonths(value){
+  if (typeof value === 'number' && Number.isFinite(value)){
+    return Math.max(0, Math.round(value))
+  }
+  const raw = trimString(value)
+  if (!raw) return 0
+  const parsed = parseInt(raw, 10)
+  if (!Number.isFinite(parsed)) return 0
+  return Math.max(0, parsed)
+}
+
 function trimString(value){
   if (value === null || value === undefined) return ''
   return String(value).trim()
@@ -42,6 +53,12 @@ function normalizeProject(project, index){
   const model = trimString(working.model)
   if (!model) throw new Error(`Proyecto ${id} requiere modelo`)
   const status = trimString(working.status) || 'Disponible'
+  const termMonths = parseTermMonths(working.termMonths)
+  const empresa = trimString(working.empresa)
+  const imageUrl = trimString(working.imageUrl)
+  if (imageUrl && !/^https?:\/\//i.test(imageUrl)){
+    throw new Error(`Proyecto ${id} tiene Imagen (URL) inválida`)
+  }
 
   const normalized = {
     id,
@@ -49,7 +66,10 @@ function normalizeProject(project, index){
     client,
     location,
     model,
-    status
+    status,
+    termMonths,
+    empresa,
+    imageUrl
   }
 
   for (const field of numberFields){
