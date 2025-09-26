@@ -6,6 +6,7 @@ import { resolveDeadlineDocTarget } from '../lib/deadlines'
 import { DOCUMENT_SECTIONS_ORDER, DEFAULT_DOC_CATEGORY, DASHBOARD_DOC_CATEGORIES } from '../constants/documents'
 import { PIPELINE_STAGES, FINAL_PIPELINE_STAGE } from '../constants/pipeline'
 import { getDecisionBadge, getDecisionDays } from '@/utils/decision'
+import { normalizeDeadlineKey, isValidISODate } from '@/utils/deadlines'
 
 const PORTFOLIO_OPTIONS = [
   { value: 'solarFarms', label: 'Granjas Solares' },
@@ -49,19 +50,6 @@ const parseNumber = (value) => {
   return Number.isNaN(num) ? null : num
 }
 
-const normalizeDeadlineKey = (inputKey = '') => {
-  const trimmed = String(inputKey).trim()
-  if (!trimmed) return ''
-  const lower = trimmed.toLowerCase()
-  if (lower === 'firma' || lower.startsWith('firma ')) return 'Firma'
-  if (lower.includes('firma') && lower.includes('contrato')) return 'Firma'
-  return trimmed
-}
-
-const isISODateString = (value = '') => {
-  return /^\d{4}-\d{2}-\d{2}$/.test(String(value).trim())
-}
-
 const normalizeSlug = (value) => (value || '').trim().toLowerCase()
 
 const withoutDecisionTime = (metrics) => {
@@ -75,6 +63,43 @@ const deadlinesToRows = (deadlines) => {
   const entries = Object.entries(deadlines)
   if (!entries.length) return [{ key: '', value: '' }]
   return entries.map(([key, value]) => ({ key, value: value || '' }))
+}
+
+const buildNormalizedDeadlines = (rawDeadlines) => {
+  const invalidKeys = []
+  const result = {}
+
+  const pushIfOk = (key, val, label) => {
+    if (!key) return
+    const date = String(val || '').trim()
+    if (!date) return
+    if (!isValidISODate(date)) {
+      const labelToUse = key || (typeof label === 'string' ? label.trim() : '')
+      if (labelToUse) invalidKeys.push(labelToUse)
+      return
+    }
+    if (key === 'Firma' && result.Firma) {
+      result.Firma = date
+    } else {
+      result[key] = date
+    }
+  }
+
+  if (Array.isArray(rawDeadlines)) {
+    rawDeadlines.forEach((item = {}) => {
+      const rawKey = item.key ?? item.k ?? ''
+      const normalizedKey = normalizeDeadlineKey(rawKey)
+      const value = item.value ?? item.date ?? item.v ?? ''
+      pushIfOk(normalizedKey, value, rawKey)
+    })
+  } else if (rawDeadlines && typeof rawDeadlines === 'object') {
+    Object.entries(rawDeadlines).forEach(([rawKey, value]) => {
+      const normalizedKey = normalizeDeadlineKey(rawKey)
+      pushIfOk(normalizedKey, value, rawKey)
+    })
+  }
+
+  return { deadlines: result, invalidKeys }
 }
 
 const modalBackdropStyle = {
@@ -889,10 +914,77 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const handleRefreshDocInventories = () => setDocRefreshKey(value => value + 1)
   const handleRefreshActivity = () => setActivityRefreshKey(value => value + 1)
 
+  const notifyFirmaMerge = () => {
+    if (typeof window !== 'undefined') {
+      window.alert('Ya existe un deadline para "Firma". Se reemplazará con la última fecha capturada.')
+    }
+  }
+
   const handleDeadlineRowChange = (index, field, value) => {
     setDeadlineRows(prev => prev.map((row, idx) => (
       idx === index ? { ...row, [field]: value } : row
     )))
+  }
+
+  const handleDeadlineKeyBlur = (index, value) => {
+    const cleanedValue = typeof value === 'string' ? value.trim() : ''
+    const normalized = normalizeDeadlineKey(cleanedValue)
+    setDeadlineRows(prev => {
+      let updated = prev.map((row, idx) => (
+        idx === index ? { ...row, key: normalized } : row
+      ))
+
+      if (!normalized) {
+        return updated
+      }
+
+      if (normalized === 'Firma') {
+        const existingIndex = updated.findIndex((row, idx) => idx !== index && normalizeDeadlineKey(row.key) === 'Firma')
+        if (existingIndex !== -1) {
+          notifyFirmaMerge()
+          const mergedValue = updated[index].value || updated[existingIndex].value || ''
+          updated[index] = { ...updated[index], key: 'Firma', value: mergedValue }
+          const next = updated.filter((_, idx) => idx !== existingIndex)
+          return next.length ? next : [{ key: 'Firma', value: mergedValue }]
+        }
+        updated[index] = { ...updated[index], key: 'Firma' }
+      }
+
+      return updated
+    })
+  }
+
+  const handleInvDeadlineKeyBlur = (index, value) => {
+    const cleanedValue = typeof value === 'string' ? value.trim() : ''
+    const normalized = normalizeDeadlineKey(cleanedValue)
+    setInv(prev => {
+      let updated = prev.deadlines.map((row, idx) => (
+        idx === index ? { ...row, k: normalized } : row
+      ))
+
+      if (!normalized) {
+        return { ...prev, deadlines: updated }
+      }
+
+      if (normalized === 'Firma') {
+        const existingIndex = updated.findIndex((row, idx) => idx !== index && normalizeDeadlineKey(row.k) === 'Firma')
+        if (existingIndex !== -1) {
+          notifyFirmaMerge()
+          const mergedValue = updated[index].v || updated[existingIndex].v || ''
+          const next = updated.filter((_, idx) => idx !== existingIndex)
+          const deadlines = next.length ? next : [{ k: 'Firma', v: mergedValue }]
+          deadlines[Math.min(index, deadlines.length - 1)] = {
+            ...deadlines[Math.min(index, deadlines.length - 1)],
+            k: 'Firma',
+            v: mergedValue
+          }
+          return { ...prev, deadlines }
+        }
+        updated[index] = { ...updated[index], k: 'Firma' }
+      }
+
+      return { ...prev, deadlines: updated }
+    })
   }
 
   const addDeadlineRow = () => {
@@ -1093,23 +1185,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       const normalizedName = typeof payload.name === 'string'
         ? payload.name.trim()
         : ''
-      const invalidDeadlines = []
-      const normalizedDeadlines = deadlineRows.reduce((acc, item) => {
-        const normalizedKey = normalizeDeadlineKey(item.key)
-        const rawValue = item.value ?? ''
-        const normalizedValue = typeof rawValue === 'string'
-          ? rawValue.trim()
-          : String(rawValue)
-
-        if (!normalizedKey || !normalizedValue) return acc
-        if (!isISODateString(normalizedValue)){
-          invalidDeadlines.push(normalizedKey)
-          return acc
-        }
-
-        acc[normalizedKey] = normalizedValue
-        return acc
-      }, {})
+      const { deadlines: normalizedDeadlines, invalidKeys: invalidDeadlines } = buildNormalizedDeadlines(deadlineRows)
 
       if (invalidDeadlines.length){
         throw new Error(`Fechas inválidas (usa AAAA-MM-DD): ${invalidDeadlines.join(', ')}`)
@@ -1140,19 +1216,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     setInvMsg(null); setInvErr(null)
     setInvLoading(true); setProgress(10)
     try{
-      const dl = {}
-      const invalid = []
-      for (const d of inv.deadlines){
-        const key = normalizeDeadlineKey(d.k)
-        const rawValue = d.v ?? ''
-        const value = typeof rawValue === 'string' ? rawValue.trim() : String(rawValue)
-        if (!key || !value) continue
-        if (!isISODateString(value)){
-          invalid.push(key)
-          continue
-        }
-        dl[key] = value
-      }
+      const { deadlines: dl, invalidKeys: invalid } = buildNormalizedDeadlines(inv.deadlines)
 
       if (invalid.length){
         throw new Error(`Fechas inválidas (usa AAAA-MM-DD): ${invalid.join(', ')}`)
@@ -1416,7 +1480,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
             <div style={{marginTop:8}}>
               {inv.deadlines.map((d, i) => (
                 <div key={i} className="form-row" style={{marginTop:4}}>
-                  <input className="input" placeholder="Nombre de la etapa de proceso" value={d.k} onChange={e => setDeadline(i, 'k', e.target.value)} />
+                  <input className="input" placeholder="Nombre de la etapa de proceso" value={d.k} onChange={e => setDeadline(i, 'k', e.target.value)} onBlur={e => handleInvDeadlineKeyBlur(i, e.target.value)} />
                   <input className="input" type="date" value={d.v} onChange={e => setDeadline(i, 'v', e.target.value)} />
                 </div>
               ))}
@@ -1573,6 +1637,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                       placeholder="Nombre de la etapa"
                       value={item.key}
                       onChange={e => handleDeadlineRowChange(index, 'key', e.target.value)}
+                      onBlur={e => handleDeadlineKeyBlur(index, e.target.value)}
                     />
                   </div>
                   <div style={fieldStyle}>
