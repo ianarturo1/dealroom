@@ -1,7 +1,15 @@
 {
   "id": "fortacero2",
   "name": "Fortacero 2",
-  "email": "etrevino@fortacero.com",
   "status": "Generación de propuesta",
+  "deadlines": {
+    "Firma": "2025-09-30"
+  },
+  "metrics": {
+    "fiscalCapitalInvestment": null,
+    "projectProfitability": null,
+    "portfolio": null
+  },
+  "email": "etrevino@fortacero.com",
   "createdAt": "2025-09-21T00:17:30.219Z"
 }
