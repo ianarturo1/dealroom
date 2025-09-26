@@ -1341,9 +1341,38 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
             </div>
             <div style={{marginTop:8}}>
               {inv.deadlines.map((d, i) => (
-                <div key={i} className="form-row" style={{marginTop:4}}>
-                  <input className="input" placeholder="Nombre de la etapa de proceso" value={d.k} onChange={e => setDeadline(i, 'k', e.target.value)} />
-                  <input className="input" type="date" value={d.v} onChange={e => setDeadline(i, 'v', e.target.value)} />
+                <div key={i} className="form-row" style={{ marginTop: 4 }}>
+                  <div style={fieldStyle}>
+                    <label
+                      htmlFor={`deadline-stage-${i}`}
+                      style={labelStyle}
+                    >
+                      Etapa del proceso
+                    </label>
+                    <input
+                      id={`deadline-stage-${i}`}
+                      className="input"
+                      placeholder="Nombre de la etapa de proceso"
+                      value={d.k}
+                      onChange={e => setDeadline(i, 'k', e.target.value)}
+                    />
+                  </div>
+                  <div style={fieldStyle}>
+                    <label
+                      htmlFor={`deadline-date-${i}`}
+                      style={labelStyle}
+                    >
+                      Fecha límite
+                    </label>
+                    <input
+                      id={`deadline-date-${i}`}
+                      className="input"
+                      type="date"
+                      name={`fecha-limite-${i}`}
+                      value={d.v}
+                      onChange={e => setDeadline(i, 'v', e.target.value)}
+                    />
+                  </div>
                 </div>
               ))}
               <button type="button" className="btn" style={{marginTop:4}} onClick={() => setInv({ ...inv, deadlines: [...inv.deadlines, { k: '', v: '' }] })}>Agregar deadline</button>
