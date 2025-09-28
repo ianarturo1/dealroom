@@ -1,6 +1,8 @@
 import { json } from './_lib/utils.mjs'
 import { repoEnv, getFile, putFile } from './_lib/github.mjs'
 import { decodeIndexContent, buildIndexPayload, normalizeName } from './_lib/investor-index.mjs'
+import { getStageOrder } from '../lib/stages.mjs'
+import { validateDeadlines } from '../lib/validators.mjs'
 
 const normalizeSlug = (value) => {
   const base = (value || '').toString().trim()
@@ -105,6 +107,14 @@ export async function handler(event){
     delete extras.deadlines
     delete extras.metrics
     delete extras.ui
+
+    if (deadlines && Object.keys(deadlines).length){
+      const order = getStageOrder()
+      const validation = validateDeadlines(deadlines, order)
+      if (!validation.ok){
+        return json(400, { ok: false, error: validation.error, ...validation.details })
+      }
+    }
 
     const nowISO = new Date().toISOString()
     const investor = {
