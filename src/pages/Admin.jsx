@@ -7,6 +7,8 @@ import { DOCUMENT_SECTIONS_ORDER, DEFAULT_DOC_CATEGORY, DASHBOARD_DOC_CATEGORIES
 import { PIPELINE_STAGES, FINAL_PIPELINE_STAGE } from '../constants/pipeline'
 import { getDecisionBadge, getDecisionDays } from '@/utils/decision'
 import { normalizeDeadlineKey, isValidISODate } from '@/utils/deadlines'
+import { useToast } from '../lib/toast'
+import { modalBackdropStyle, modalCardStyle, modalButtonRowStyle } from '../components/modalStyles'
 
 const PORTFOLIO_OPTIONS = [
   { value: 'solarFarms', label: 'Granjas Solares' },
@@ -102,35 +104,8 @@ const buildNormalizedDeadlines = (rawDeadlines) => {
   return { deadlines: result, invalidKeys }
 }
 
-const modalBackdropStyle = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(15, 23, 42, 0.55)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: 16,
-  zIndex: 1000
-}
-
-const modalCardStyle = {
-  width: '100%',
-  maxWidth: 420,
-  background: '#fff',
-  borderRadius: 12,
-  padding: 20,
-  boxShadow: '0 20px 40px rgba(15, 23, 42, 0.25)'
-}
-
-const modalButtonRowStyle = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 8,
-  justifyContent: 'flex-end',
-  marginTop: 16
-}
-
 export default function Admin({ user }){
+  const showToast = useToast()
   const defaultName = DEFAULT_INVESTOR_ID === 'femsa'
     ? 'FEMSA'
     : DEFAULT_INVESTOR_ID.toUpperCase()
@@ -190,6 +165,8 @@ export default function Admin({ user }){
   const [docsError, setDocsError] = useState(null)
   const [docsNotice, setDocsNotice] = useState(null)
   const [docsWorking, setDocsWorking] = useState(false)
+  const [pendingDocUpload, setPendingDocUpload] = useState(null)
+  const [docRenamePrompt, setDocRenamePrompt] = useState(null)
 
 // --- REDIRECCIÓN DESDE "Ver carpeta/Subir docs" (mantener) ---
 useEffect(() => {
@@ -662,8 +639,56 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     }
   }
 
+  const performDocUpload = useCallback(async (uploadInfo, options = {}) => {
+    if (!uploadInfo) return null
+    setDocsError(null)
+    setDocsNotice(null)
+    setDocsWorking(true)
+    try{
+      const payload = {
+        path: `${uploadInfo.category}`,
+        filename: uploadInfo.filename,
+        contentBase64: uploadInfo.base64,
+        slug: uploadInfo.slug,
+        message: uploadInfo.message
+      }
+      if (options.strategy === 'rename'){
+        payload.strategy = 'rename'
+      }
+      const response = await api.uploadDoc(payload)
+      const successMsg = options.strategy === 'rename'
+        ? 'Archivo subido con sufijo automático.'
+        : 'Archivo subido.'
+      setDocsNotice(successMsg)
+      showToast(successMsg, { tone: 'success' })
+      uploadInfo.form?.reset()
+      setPendingDocUpload(null)
+      setDocRenamePrompt(null)
+      await loadDocs()
+      return response
+    }catch(error){
+      if (error?.status === 409 && error?.data?.error === 'FILE_EXISTS' && options.strategy !== 'rename'){
+        const fallbackPath = `${uploadInfo.category}/${uploadInfo.slug}/${uploadInfo.filename}`
+        setPendingDocUpload(uploadInfo)
+        setDocRenamePrompt({
+          path: error.data?.path || fallbackPath,
+          category: uploadInfo.category,
+          slug: uploadInfo.slug
+        })
+        return null
+      }
+      const message = error?.message || 'No se pudo subir el archivo'
+      setDocsError(message)
+      showToast(message, { tone: 'error', duration: 5000 })
+      return null
+    }finally{
+      setDocsWorking(false)
+    }
+  }, [loadDocs, showToast])
+
   const handleDocUpload = (e) => {
     e.preventDefault()
+    if (docsWorking) return
     setDocsError(null)
     setDocsNotice(null)
     const form = e.target
@@ -674,31 +699,45 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     reader.onload = async () => {
       try{
         const result = typeof reader.result === 'string' ? reader.result : ''
-        const base64 = result.includes(',') ? result.split(',')[1] : ''
+        const base64 = result.includes(',') ? result.split(',')[1] : result
         if (!base64) throw new Error('No se pudo leer el archivo')
-        await api.uploadDoc({
-          path: `${docCategory}`,
+        await performDocUpload({
+          category: docCategory,
           filename: file.name,
+          base64,
+          slug,
           message: `Upload ${file.name} desde Admin`,
-          contentBase64: base64,
-          slug
+          form
         })
-        setDocsNotice('Archivo subido.')
-        form.reset()
-        await loadDocs()
       }catch(error){
-        setDocsError(error.message)
-      }finally{
+        const message = error?.message || 'No se pudo leer el archivo'
+        setDocsError(message)
+        showToast(message, { tone: 'error', duration: 5000 })
         setDocsWorking(false)
       }
     }
     reader.onerror = () => {
+      const message = 'No se pudo leer el archivo'
       setDocsWorking(false)
-      setDocsError('No se pudo leer el archivo')
+      setDocsError(message)
+      showToast(message, { tone: 'error', duration: 5000 })
     }
     setDocsWorking(true)
     reader.readAsDataURL(file)
   }
+
+  const handleConfirmDocRename = useCallback(async () => {
+    if (!pendingDocUpload){
+      setDocRenamePrompt(null)
+      return
+    }
+    await performDocUpload(pendingDocUpload, { strategy: 'rename' })
+  }, [pendingDocUpload, performDocUpload])
+
+  const handleCancelDocRename = useCallback(() => {
+    setDocRenamePrompt(null)
+    setPendingDocUpload(null)
+  }, [])
 
   const handleDocDelete = async (file) => {
     if (!file || !file.path) return
@@ -1213,22 +1252,35 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
   const onCreate = async (e) => {
     e.preventDefault()
-    setInvMsg(null); setInvErr(null)
-    setInvLoading(true); setProgress(10)
+    setInvMsg(null)
+    setInvErr(null)
+    setInvLoading(true)
+    setProgress(15)
     try{
       const { deadlines: dl, invalidKeys: invalid } = buildNormalizedDeadlines(inv.deadlines)
 
       if (invalid.length){
         throw new Error(`Fechas inválidas (usa AAAA-MM-DD): ${invalid.join(', ')}`)
       }
+
       const payload = { email: inv.email, companyName: inv.companyName, status: inv.status, deadlines: dl }
       if (inv.slug) payload.slug = inv.slug
       const res = await api.createInvestor(payload)
       setProgress(100)
       setInvMsg(res.link)
+      showToast('Inversionista creado correctamente.', { tone: 'success' })
       try{ await navigator.clipboard.writeText(res.link) }catch{}
-    }catch(error){ setInvErr(`Error al crear inversionista: ${error.message}`); setProgress(0) }
-    finally{ setInvLoading(false) }
+    }catch(error){
+      setProgress(0)
+      if (error?.status === 409 && error?.data?.error === 'INVESTOR_EXISTS'){
+        const conflictSlug = error.data?.slug || normalizeSlug(inv.slug || inv.companyName || '') || 'desconocido'
+        showToast(`Este inversionista ya existe (slug: ${conflictSlug}).`, { tone: 'warning', duration: 5000 })
+      }else{
+        const message = error?.message || 'Error al crear inversionista'
+        setInvErr(`Error al crear inversionista: ${message}`)
+        showToast(message, { tone: 'error', duration: 5000 })
+      }
+    }finally{ setInvLoading(false) }
   }
 
   return (
@@ -1468,7 +1520,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
         )}
         <div className="card" style={{marginBottom:12}}>
           <div className="h2">Alta de Inversionista</div>
-          <form onSubmit={onCreate}>
+          <form onSubmit={onCreate} aria-busy={invLoading}>
             <div className="form-row">
               <input className="input" type="email" placeholder="Email corporativo" value={inv.email} onChange={e => setInv({ ...inv, email: e.target.value })} required />
               <input className="input" placeholder="Nombre de la empresa" value={inv.companyName} onChange={e => setInv({ ...inv, companyName: e.target.value })} required />
@@ -1486,7 +1538,9 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
               ))}
               <button type="button" className="btn" style={{marginTop:4}} onClick={() => setInv({ ...inv, deadlines: [...inv.deadlines, { k: '', v: '' }] })}>Agregar deadline</button>
             </div>
-            <button className="btn" type="submit" disabled={invLoading} style={{marginTop:8}}>Crear</button>
+            <button className="btn" type="submit" disabled={invLoading} style={{marginTop:8}}>
+              {invLoading ? 'Creando…' : 'Crear'}
+            </button>
           </form>
           {invLoading && <div className="progress" style={{marginTop:8}}><div style={{width: progress + '%'}} /></div>}
           {invMsg && (
@@ -1806,9 +1860,11 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
           <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>
             Gestionando: <code>{docCategory}/{effectiveDocSlug}</code>
           </div>
-          <form onSubmit={handleDocUpload} className="form-row" style={{ marginTop: 12 }}>
+          <form onSubmit={handleDocUpload} className="form-row" style={{ marginTop: 12 }} aria-busy={docsWorking}>
             <input name="file" type="file" className="input" disabled={docsWorking} ref={docsUploadInputRef} />
-            <button className="btn" type="submit" disabled={docsWorking}>Subir</button>
+            <button className="btn" type="submit" disabled={docsWorking}>
+              {docsWorking ? 'Subiendo…' : 'Subir'}
+            </button>
             <span className="notice">Los archivos se guardan en GitHub.</span>
           </form>
           {docsError && <div className="notice" style={{marginTop:8}}>{docsError}</div>}
@@ -1856,6 +1912,38 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
             </tbody>
           </table>
         </div>
+        {docRenamePrompt && (
+          <div style={modalBackdropStyle} role="dialog" aria-modal="true" aria-labelledby="doc-rename-title">
+            <div style={modalCardStyle}>
+              <div className="h2" id="doc-rename-title" style={{ marginTop: 0 }}>Archivo duplicado</div>
+              <p style={{ marginTop: 8, color: 'var(--muted)', fontSize: 14 }}>
+                Ya existe un archivo con ese nombre. ¿Quieres subirlo con un sufijo automático?
+              </p>
+              <p style={{ fontSize: 13 }}>
+                <code>{docRenamePrompt.path}</code>
+              </p>
+              <div style={modalButtonRowStyle}>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={handleCancelDocRename}
+                  disabled={docsWorking}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={handleConfirmDocRename}
+                  disabled={docsWorking}
+                  aria-busy={docsWorking}
+                >
+                  {docsWorking ? 'Subiendo…' : 'Renombrar y subir'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="card" style={{marginTop:12}}>
           <div className="h2">Gestionar proyectos activos</div>
           <p style={{ margin: 0, color: 'var(--muted)', fontSize: 14 }}>Actualiza la lista que aparece en la sección de Proyectos.</p>

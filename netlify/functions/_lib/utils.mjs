@@ -1,12 +1,16 @@
 import fs from 'fs/promises'
 import path from 'path'
 
-function ok(data, headers){
+function json(statusCode, data, headers){
   return {
-    statusCode: 200,
-    headers: Object.assign({'content-type':'application/json'}, headers || {}),
+    statusCode,
+    headers: Object.assign({ 'content-type': 'application/json' }, headers || {}),
     body: JSON.stringify(data)
   }
+}
+
+function ok(data, headers){
+  return json(200, data, headers)
 }
 
 function text(status, txt, headers){
@@ -19,4 +23,4 @@ async function readLocalJson(relPath){
   return JSON.parse(txt)
 }
 
-export { ok, text, readLocalJson }
+export { json, ok, text, readLocalJson }

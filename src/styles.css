@@ -109,4 +109,28 @@ a:hover{text-decoration:underline}
 .row{display:flex; gap:16px; align-items:center; flex-wrap:wrap}
 .hidden{display:none}
 .notice{background:#fff7e8; border:1px solid #ffd9a0; padding:10px 12px; border-radius:10px; color:var(--black)}
+.toast-container{
+  position:fixed;
+  right:16px;
+  bottom:16px;
+  display:grid;
+  gap:8px;
+  z-index:1100;
+  max-width:320px;
+}
+.toast{
+  padding:10px 14px;
+  border-radius:12px;
+  font-weight:700;
+  color:#fff;
+  background:var(--black);
+  box-shadow:0 12px 30px rgba(15, 23, 42, 0.25);
+  cursor:pointer;
+  transition:transform .15s ease, opacity .15s ease;
+}
+.toast:hover{transform:translateY(-1px); opacity:0.95}
+.toast-info{background:var(--purple)}
+.toast-success{background:#107457}
+.toast-error{background:#b42318}
+.toast-warning{background:#a86600}
 .footer{color:var(--muted); font-size:12px; text-align:center; padding:24px}
