@@ -48,6 +48,9 @@ export const api = {
   async updateStatus(payload){
     return req('/.netlify/functions/update-status', { method:'POST', body: payload })
   },
+  async updateInvestor(payload){
+    return req('/.netlify/functions/update-investor', { method: 'POST', body: payload })
+  },
   async createInvestor(payload){
     return req('/.netlify/functions/create-investor', { method:'POST', body: payload })
   },
