@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import { useInvestorProfile } from '../lib/investor'
 import { DOCUMENT_SECTIONS_ORDER } from '../constants/documents'
+import { useToast } from '../lib/toast'
+import { modalBackdropStyle, modalCardStyle, modalButtonRowStyle } from '../components/modalStyles'
 
 export default function Documents(){
   const [docsByCategory, setDocsByCategory] = useState({})
@@ -10,6 +12,9 @@ export default function Documents(){
   const [uploadingCategory, setUploadingCategory] = useState(null)
   const [hasLoaded, setHasLoaded] = useState(false)
   const { investorId } = useInvestorProfile()
+  const showToast = useToast()
+  const [pendingUpload, setPendingUpload] = useState(null)
+  const [renamePrompt, setRenamePrompt] = useState(null)
 
   const fetchDocs = useCallback(async (category) => {
     const res = await api.listDocs({ category, slug: investorId })
@@ -64,44 +69,103 @@ export default function Documents(){
     loadAll()
   }, [loadAll])
 
+  const performUpload = useCallback(async (uploadInfo, options = {}) => {
+    if (!uploadInfo) return null
+    setError(null)
+    setUploadingCategory(uploadInfo.category)
+    try{
+      const payload = {
+        path: `${uploadInfo.category}`,
+        filename: uploadInfo.filename,
+        contentBase64: uploadInfo.base64,
+        slug: uploadInfo.slug,
+        message: uploadInfo.message
+      }
+      if (options.strategy === 'rename'){
+        payload.strategy = 'rename'
+      }
+      const response = await api.uploadDoc(payload)
+      await refreshCategory(uploadInfo.category)
+      const successMsg = options.strategy === 'rename'
+        ? 'Documento subido con sufijo automático.'
+        : 'Documento subido.'
+      showToast(successMsg, { tone: 'success' })
+      uploadInfo.form?.reset?.()
+      setPendingUpload(null)
+      setRenamePrompt(null)
+      return response
+    }catch(err){
+      if (err?.status === 409 && err?.data?.error === 'FILE_EXISTS' && options.strategy !== 'rename'){
+        const fallbackPath = `${uploadInfo.category}/${uploadInfo.slug}/${uploadInfo.filename}`
+        setPendingUpload(uploadInfo)
+        setRenamePrompt({ path: err.data?.path || fallbackPath, category: uploadInfo.category })
+        return null
+      }
+      const message = err?.message || 'No se pudo subir el archivo'
+      setError(message)
+      showToast(message, { tone: 'error', duration: 5000 })
+      return null
+    }finally{
+      setUploadingCategory(null)
+    }
+  }, [refreshCategory, showToast])
+
   const handleUpload = useCallback((category) => (e) => {
     e.preventDefault()
     setError(null)
+    setPendingUpload(null)
+    setRenamePrompt(null)
     const form = e.target
     const fileInput = form.file
     const file = fileInput && fileInput.files ? fileInput.files[0] : null
     if (!file) return
     const reader = new FileReader()
-    setUploadingCategory(category)
     reader.onload = async () => {
       try{
         const result = typeof reader.result === 'string' ? reader.result : ''
-        const contentBase64 = result.includes(',') ? result.split(',')[1] : ''
-        if (!contentBase64) throw new Error('No se pudo leer el archivo')
-        await api.uploadDoc({
-          path: `${category}`,
+        const base64 = result.includes(',') ? result.split(',')[1] : result
+        if (!base64) throw new Error('No se pudo leer el archivo')
+        await performUpload({
+          category,
           filename: file.name,
+          base64,
+          slug: investorId,
           message: `Upload ${file.name} from Dealroom UI`,
-          contentBase64,
-          slug: investorId
+          form
         })
-        form.reset()
-        await refreshCategory(category)
-        alert('Archivo subido')
       }catch(err){
-        setError(err.message)
-      }finally{
+        const message = err?.message || 'No se pudo leer el archivo'
+        setError(message)
+        showToast(message, { tone: 'error', duration: 5000 })
         setUploadingCategory(null)
       }
     }
     reader.onerror = () => {
+      const message = 'No se pudo leer el archivo'
+      setError(message)
+      showToast(message, { tone: 'error', duration: 5000 })
       setUploadingCategory(null)
-      setError('No se pudo leer el archivo')
     }
     reader.readAsDataURL(file)
-  }, [investorId, refreshCategory])
+  }, [investorId, performUpload, showToast])
+
+  const handleConfirmRename = useCallback(async () => {
+    if (!pendingUpload){
+      setRenamePrompt(null)
+      return
+    }
+    await performUpload(pendingUpload, { strategy: 'rename' })
+  }, [pendingUpload, performUpload])
+
+  const handleCancelRename = useCallback(() => {
+    setPendingUpload(null)
+    setRenamePrompt(null)
+  }, [])
+
+  const renameBusy = renamePrompt ? uploadingCategory === renamePrompt.category : false
 
   return (
+    <>
     <div className="container">
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="h1">Biblioteca de documentos</div>
@@ -124,7 +188,12 @@ export default function Documents(){
             <section key={category}>
               <h2 className="h2" style={{ marginBottom: 8 }}>{category}</h2>
               <div className="card" style={{ padding: 0 }}>
-                <form onSubmit={handleUpload(category)} className="form-row" style={{ padding: 16, borderBottom: '1px solid #f0f0f0' }}>
+                <form
+                  onSubmit={handleUpload(category)}
+                  className="form-row"
+                  style={{ padding: 16, borderBottom: '1px solid #f0f0f0' }}
+                  aria-busy={isUploading}
+                >
                   <input name="file" type="file" className="input" disabled={isUploading} />
                   <button className="btn" type="submit" disabled={isUploading}>
                     {isUploading ? 'Subiendo…' : 'Subir'}
@@ -166,5 +235,38 @@ export default function Documents(){
         })}
       </div>
     </div>
+    {renamePrompt && (
+      <div style={modalBackdropStyle} role="dialog" aria-modal="true" aria-labelledby="doc-rename-modal">
+        <div style={modalCardStyle}>
+          <div className="h2" id="doc-rename-modal" style={{ marginTop: 0 }}>Archivo duplicado</div>
+          <p style={{ marginTop: 8, color: 'var(--muted)', fontSize: 14 }}>
+            Ya existe un archivo con ese nombre. ¿Quieres subirlo con un sufijo automático?
+          </p>
+          <p style={{ fontSize: 13 }}>
+            <code>{renamePrompt.path}</code>
+          </p>
+          <div style={modalButtonRowStyle}>
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={handleCancelRename}
+              disabled={renameBusy}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={handleConfirmRename}
+              disabled={renameBusy}
+              aria-busy={renameBusy}
+            >
+              {renameBusy ? 'Subiendo…' : 'Renombrar y subir'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }

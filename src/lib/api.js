@@ -3,13 +3,20 @@ async function req(path, {method='GET', body, headers} = {}){
     'Content-Type': 'application/json'
   }, headers || {})
   const res = await fetch(path, { method, headers: h, body: body ? JSON.stringify(body) : undefined })
-  if (!res.ok){
-    const msg = await res.text()
-    throw new Error(`${res.status} ${res.statusText}: ${msg}`)
-  }
   const ct = res.headers.get('content-type') || ''
-  if (ct.includes('application/json')) return res.json()
-  return res.text()
+  const isJson = ct.includes('application/json')
+  const payload = isJson ? await res.json().catch(() => null) : await res.text().catch(() => '')
+  if (!res.ok){
+    const message = isJson
+      ? (payload && typeof payload === 'object' ? (payload.message || payload.error || `${res.status} ${res.statusText}`) : `${res.status} ${res.statusText}`)
+      : (typeof payload === 'string' && payload ? payload : `${res.status} ${res.statusText}`)
+    const error = new Error(message)
+    error.status = res.status
+    error.statusText = res.statusText
+    error.data = payload
+    throw error
+  }
+  return isJson ? payload : payload
 }
 
 export const api = {

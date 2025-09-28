@@ -1,17 +1,18 @@
 import { ok, text, readLocalJson } from './_lib/utils.mjs'
+import { decodeIndexContent } from './_lib/investor-index.mjs'
 
 const collator = new Intl.Collator('es', { sensitivity: 'base' })
 
 export async function handler(){
   try{
     const data = await readLocalJson('data/investor-index.json')
-    const investorsMap = data && typeof data === 'object' ? data.investors || {} : {}
-    const investors = Object.entries(investorsMap)
-      .map(([slug, info]) => ({
-        slug,
-        name: info?.name || '',
-        email: info?.email || '',
-        status: info?.status || ''
+    const { entries } = decodeIndexContent(data)
+    const investors = entries
+      .map(item => ({
+        slug: item.slug,
+        name: item.name || '',
+        email: item.email || '',
+        status: item.status || ''
       }))
       .sort((a, b) => {
         const nameCompare = collator.compare(a.name || a.slug, b.name || b.slug)
