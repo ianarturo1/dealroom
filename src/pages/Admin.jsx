@@ -6,7 +6,9 @@ import { resolveDeadlineDocTarget } from '../lib/deadlines'
 import { DOCUMENT_SECTIONS_ORDER, DEFAULT_DOC_CATEGORY, DASHBOARD_DOC_CATEGORIES } from '../constants/documents'
 import { PIPELINE_STAGES, FINAL_PIPELINE_STAGE } from '../constants/pipeline'
 import { getDecisionBadge, getDecisionDays } from '@/utils/decision'
-import { normalizeDeadlineKey, isValidISODate } from '@/utils/deadlines'
+import { DeadlinesForm } from '@/components/deadlines/DeadlinesForm'
+import { validateRows, normalize } from '@/lib/deadlineValidators'
+import { STAGES } from '@/lib/stages'
 import { useToast } from '../lib/toast'
 import { modalBackdropStyle, modalCardStyle, modalButtonRowStyle } from '../components/modalStyles'
 
@@ -60,48 +62,54 @@ const withoutDecisionTime = (metrics) => {
   return { ...rest }
 }
 
-const deadlinesToRows = (deadlines) => {
-  if (!deadlines || typeof deadlines !== 'object') return [{ key: '', value: '' }]
-  const entries = Object.entries(deadlines)
-  if (!entries.length) return [{ key: '', value: '' }]
-  return entries.map(([key, value]) => ({ key, value: value || '' }))
-}
+const EMPTY_DEADLINE_ROW = { stage: '', date: '' }
 
-const buildNormalizedDeadlines = (rawDeadlines) => {
-  const invalidKeys = []
-  const result = {}
+const stageLookup = STAGES.reduce((acc, stage) => {
+  acc[normalize(stage)] = stage
+  return acc
+}, {})
 
-  const pushIfOk = (key, val, label) => {
-    if (!key) return
-    const date = String(val || '').trim()
-    if (!date) return
-    if (!isValidISODate(date)) {
-      const labelToUse = key || (typeof label === 'string' ? label.trim() : '')
-      if (labelToUse) invalidKeys.push(labelToUse)
-      return
-    }
-    if (key === 'Firma' && result.Firma) {
-      result.Firma = date
+const toDeadlineRows = (rawDeadlines) => {
+  if (!rawDeadlines) return [{ ...EMPTY_DEADLINE_ROW }]
+
+  const recognized = new Map()
+  const extras = []
+
+  const push = (stageValue, dateValue) => {
+    const rawStage = typeof stageValue === 'string' ? stageValue.trim() : ''
+    const rawDate = typeof dateValue === 'string' ? dateValue.trim() : ''
+    if (!rawStage && !rawDate) return
+    const canonical = stageLookup[normalize(rawStage)]
+    if (canonical) {
+      recognized.set(canonical, { stage: canonical, date: rawDate })
     } else {
-      result[key] = date
+      extras.push({ stage: rawStage, date: rawDate })
     }
   }
 
   if (Array.isArray(rawDeadlines)) {
     rawDeadlines.forEach((item = {}) => {
-      const rawKey = item.key ?? item.k ?? ''
-      const normalizedKey = normalizeDeadlineKey(rawKey)
-      const value = item.value ?? item.date ?? item.v ?? ''
-      pushIfOk(normalizedKey, value, rawKey)
+      if (!item || typeof item !== 'object') return
+      const stageValue = item.stage ?? item.key ?? item.k ?? ''
+      const dateValue = item.date ?? item.value ?? item.v ?? ''
+      push(stageValue, dateValue)
     })
-  } else if (rawDeadlines && typeof rawDeadlines === 'object') {
-    Object.entries(rawDeadlines).forEach(([rawKey, value]) => {
-      const normalizedKey = normalizeDeadlineKey(rawKey)
-      pushIfOk(normalizedKey, value, rawKey)
+  } else if (typeof rawDeadlines === 'object') {
+    Object.entries(rawDeadlines).forEach(([stageValue, dateValue]) => {
+      push(stageValue, dateValue)
     })
+  } else {
+    return [{ ...EMPTY_DEADLINE_ROW }]
   }
 
-  return { deadlines: result, invalidKeys }
+  const rows = []
+  STAGES.forEach(stage => {
+    if (recognized.has(stage)) {
+      rows.push(recognized.get(stage))
+    }
+  })
+  extras.forEach(item => rows.push(item))
+  return rows.length ? rows : [{ ...EMPTY_DEADLINE_ROW }]
 }
 
 export default function Admin({ user }){
@@ -110,6 +118,7 @@ export default function Admin({ user }){
     ? 'FEMSA'
     : DEFAULT_INVESTOR_ID.toUpperCase()
   const initialDeadlines = { 'LOI':'2025-10-15', 'Firma':'2025-11-30' }
+  const initialDeadlineRows = toDeadlineRows(initialDeadlines)
   const [payload, setPayload] = useState({
     id: DEFAULT_INVESTOR_ID,
     name: defaultName,
@@ -129,10 +138,18 @@ export default function Admin({ user }){
   })
   const [msg, setMsg] = useState(null)
   const [err, setErr] = useState(null)
-  const [deadlineRows, setDeadlineRows] = useState(() => deadlinesToRows(initialDeadlines))
+  const [deadlineRows, setDeadlineRows] = useState(initialDeadlineRows)
+  const [deadlineValidation, setDeadlineValidation] = useState(() => validateRows(initialDeadlineRows))
+  const [deadlineFormKey, setDeadlineFormKey] = useState(0)
+  const [deadlineSaving, setDeadlineSaving] = useState(false)
+  const [deadlineSaveMsg, setDeadlineSaveMsg] = useState(null)
+  const [deadlineSaveErr, setDeadlineSaveErr] = useState(null)
   const [investorLoading, setInvestorLoading] = useState(false)
 
-  const [inv, setInv] = useState({ email: '', companyName: '', slug: '', status: 'NDA', deadlines: [{ k: '', v: '' }, { k: '', v: '' }] })
+  const [inv, setInv] = useState({ email: '', companyName: '', slug: '', status: 'NDA' })
+  const [newDeadlineRows, setNewDeadlineRows] = useState([{ ...EMPTY_DEADLINE_ROW }])
+  const [newDeadlineValidation, setNewDeadlineValidation] = useState(() => validateRows([{ ...EMPTY_DEADLINE_ROW }]))
+  const [newDeadlineFormKey, setNewDeadlineFormKey] = useState(0)
   const [invMsg, setInvMsg] = useState(null)
   const [invErr, setInvErr] = useState(null)
   const [invLoading, setInvLoading] = useState(false)
@@ -510,7 +527,12 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   }, [isAdmin, activityRefreshKey])
 
   useEffect(() => {
-    setDeadlineRows(deadlinesToRows(payload.deadlines))
+    const rows = toDeadlineRows(payload.deadlines)
+    setDeadlineRows(rows)
+    setDeadlineValidation(validateRows(rows))
+    setDeadlineFormKey(value => value + 1)
+    setDeadlineSaveMsg(null)
+    setDeadlineSaveErr(null)
   }, [payload.deadlines])
 
   const resetProjectFeedback = () => {
@@ -953,88 +975,63 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const handleRefreshDocInventories = () => setDocRefreshKey(value => value + 1)
   const handleRefreshActivity = () => setActivityRefreshKey(value => value + 1)
 
-  const notifyFirmaMerge = () => {
-    if (typeof window !== 'undefined') {
-      window.alert('Ya existe un deadline para "Firma". Se reemplazará con la última fecha capturada.')
+  const handleDeadlineRowsChange = (rows) => {
+    setDeadlineRows(rows)
+    setDeadlineSaveMsg(null)
+    setDeadlineSaveErr(null)
+  }
+
+  const handleDeadlineValidationChange = (validation) => {
+    setDeadlineValidation(validation)
+  }
+
+  const handleNewDeadlineRowsChange = (rows) => {
+    setNewDeadlineRows(rows)
+    setInvErr(null)
+    setInvMsg(null)
+  }
+
+  const handleNewDeadlineValidationChange = (validation) => {
+    setNewDeadlineValidation(validation)
+  }
+
+  const handleDeadlineSubmit = async (rows) => {
+    const slug = normalizeSlug(payload.id)
+    if (!slug){
+      setDeadlineSaveErr('Define el slug del inversionista antes de guardar deadlines.')
+      return
     }
-  }
 
-  const handleDeadlineRowChange = (index, field, value) => {
-    setDeadlineRows(prev => prev.map((row, idx) => (
-      idx === index ? { ...row, [field]: value } : row
-    )))
-  }
+    const validation = validateRows(rows)
+    if (!validation.ok){
+      setDeadlineValidation(validation)
+      setDeadlineSaveErr(validation.message || 'Deadlines inválidos')
+      return
+    }
 
-  const handleDeadlineKeyBlur = (index, value) => {
-    const cleanedValue = typeof value === 'string' ? value.trim() : ''
-    const normalized = normalizeDeadlineKey(cleanedValue)
-    setDeadlineRows(prev => {
-      let updated = prev.map((row, idx) => (
-        idx === index ? { ...row, key: normalized } : row
-      ))
-
-      if (!normalized) {
-        return updated
+    setDeadlineSaving(true)
+    setDeadlineSaveErr(null)
+    setDeadlineSaveMsg(null)
+    try{
+      const payloadBody = { slug, deadlines: validation.deadlines }
+      const res = await fetch('/.netlify/functions/update-investor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payloadBody)
+      })
+      if (!res.ok){
+        const text = await res.text().catch(() => '')
+        throw new Error(text || 'Error al guardar deadlines')
       }
-
-      if (normalized === 'Firma') {
-        const existingIndex = updated.findIndex((row, idx) => idx !== index && normalizeDeadlineKey(row.key) === 'Firma')
-        if (existingIndex !== -1) {
-          notifyFirmaMerge()
-          const mergedValue = updated[index].value || updated[existingIndex].value || ''
-          updated[index] = { ...updated[index], key: 'Firma', value: mergedValue }
-          const next = updated.filter((_, idx) => idx !== existingIndex)
-          return next.length ? next : [{ key: 'Firma', value: mergedValue }]
-        }
-        updated[index] = { ...updated[index], key: 'Firma' }
-      }
-
-      return updated
-    })
-  }
-
-  const handleInvDeadlineKeyBlur = (index, value) => {
-    const cleanedValue = typeof value === 'string' ? value.trim() : ''
-    const normalized = normalizeDeadlineKey(cleanedValue)
-    setInv(prev => {
-      let updated = prev.deadlines.map((row, idx) => (
-        idx === index ? { ...row, k: normalized } : row
-      ))
-
-      if (!normalized) {
-        return { ...prev, deadlines: updated }
-      }
-
-      if (normalized === 'Firma') {
-        const existingIndex = updated.findIndex((row, idx) => idx !== index && normalizeDeadlineKey(row.k) === 'Firma')
-        if (existingIndex !== -1) {
-          notifyFirmaMerge()
-          const mergedValue = updated[index].v || updated[existingIndex].v || ''
-          const next = updated.filter((_, idx) => idx !== existingIndex)
-          const deadlines = next.length ? next : [{ k: 'Firma', v: mergedValue }]
-          deadlines[Math.min(index, deadlines.length - 1)] = {
-            ...deadlines[Math.min(index, deadlines.length - 1)],
-            k: 'Firma',
-            v: mergedValue
-          }
-          return { ...prev, deadlines }
-        }
-        updated[index] = { ...updated[index], k: 'Firma' }
-      }
-
-      return { ...prev, deadlines: updated }
-    })
-  }
-
-  const addDeadlineRow = () => {
-    setDeadlineRows(prev => [...prev, { key: '', value: '' }])
-  }
-
-  const removeDeadlineRow = (index) => {
-    setDeadlineRows(prev => {
-      if (prev.length <= 1) return [{ key: '', value: '' }]
-      return prev.filter((_, idx) => idx !== index)
-    })
+      setDeadlineSaveMsg('Deadlines guardados correctamente.')
+      setPayload(prev => ({ ...prev, deadlines: validation.deadlines }))
+      setDeadlineRows(toDeadlineRows(validation.deadlines))
+      setDeadlineValidation(validation)
+    }catch(error){
+      setDeadlineSaveErr(error.message || 'No se pudo guardar deadlines')
+    }finally{
+      setDeadlineSaving(false)
+    }
   }
 
   const handleLoadInvestor = async () => {
@@ -1224,10 +1221,9 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       const normalizedName = typeof payload.name === 'string'
         ? payload.name.trim()
         : ''
-      const { deadlines: normalizedDeadlines, invalidKeys: invalidDeadlines } = buildNormalizedDeadlines(deadlineRows)
-
-      if (invalidDeadlines.length){
-        throw new Error(`Fechas inválidas (usa AAAA-MM-DD): ${invalidDeadlines.join(', ')}`)
+      const deadlinesValidation = validateRows(deadlineRows)
+      if (!deadlinesValidation.ok){
+        throw new Error(deadlinesValidation.message || 'Deadlines inválidos')
       }
 
       const payloadToSend = {
@@ -1235,19 +1231,15 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
         id: normalizedId,
         name: normalizedName,
         metrics: normalizedMetrics,
-        deadlines: normalizedDeadlines
+        deadlines: deadlinesValidation.deadlines
       }
 
       await api.updateStatus(payloadToSend)
       setPayload(payloadToSend)
+      setDeadlineRows(toDeadlineRows(deadlinesValidation.deadlines))
+      setDeadlineValidation(deadlinesValidation)
       setMsg('Guardado y commiteado a GitHub.')
     }catch(error){ setErr(error.message) }
-  }
-
-  const setDeadline = (i, field, value) => {
-    const arr = [...inv.deadlines]
-    arr[i] = { ...arr[i], [field]: value }
-    setInv({ ...inv, deadlines: arr })
   }
 
   const onCreate = async (e) => {
@@ -1257,19 +1249,21 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     setInvLoading(true)
     setProgress(15)
     try{
-      const { deadlines: dl, invalidKeys: invalid } = buildNormalizedDeadlines(inv.deadlines)
-
-      if (invalid.length){
-        throw new Error(`Fechas inválidas (usa AAAA-MM-DD): ${invalid.join(', ')}`)
+      const deadlinesValidation = validateRows(newDeadlineRows)
+      if (!deadlinesValidation.ok){
+        throw new Error(deadlinesValidation.message || 'Deadlines inválidos')
       }
 
-      const payload = { email: inv.email, companyName: inv.companyName, status: inv.status, deadlines: dl }
+      const payload = { email: inv.email, companyName: inv.companyName, status: inv.status, deadlines: deadlinesValidation.deadlines }
       if (inv.slug) payload.slug = inv.slug
       const res = await api.createInvestor(payload)
       setProgress(100)
       setInvMsg(res.link)
       showToast('Inversionista creado correctamente.', { tone: 'success' })
       try{ await navigator.clipboard.writeText(res.link) }catch{}
+      setNewDeadlineRows([{ ...EMPTY_DEADLINE_ROW }])
+      setNewDeadlineValidation(validateRows([{ ...EMPTY_DEADLINE_ROW }]))
+      setNewDeadlineFormKey(value => value + 1)
     }catch(error){
       setProgress(0)
       if (error?.status === 409 && error?.data?.error === 'INVESTOR_EXISTS'){
@@ -1530,15 +1524,15 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
               </select>
             </div>
             <div style={{marginTop:8}}>
-              {inv.deadlines.map((d, i) => (
-                <div key={i} className="form-row" style={{marginTop:4}}>
-                  <input className="input" placeholder="Nombre de la etapa de proceso" value={d.k} onChange={e => setDeadline(i, 'k', e.target.value)} onBlur={e => handleInvDeadlineKeyBlur(i, e.target.value)} />
-                  <input className="input" type="date" value={d.v} onChange={e => setDeadline(i, 'v', e.target.value)} />
-                </div>
-              ))}
-              <button type="button" className="btn" style={{marginTop:4}} onClick={() => setInv({ ...inv, deadlines: [...inv.deadlines, { k: '', v: '' }] })}>Agregar deadline</button>
+              <DeadlinesForm
+                key={newDeadlineFormKey}
+                initial={newDeadlineRows}
+                onChange={handleNewDeadlineRowsChange}
+                onValidationChange={handleNewDeadlineValidationChange}
+                showSubmitButton={false}
+              />
             </div>
-            <button className="btn" type="submit" disabled={invLoading} style={{marginTop:8}}>
+            <button className="btn" type="submit" disabled={invLoading || !newDeadlineValidation.ok} style={{marginTop:8}}>
               {invLoading ? 'Creando…' : 'Crear'}
             </button>
           </form>
@@ -1680,49 +1674,22 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
             </div>
 
             <div style={{ marginTop: 12, fontWeight: 700 }}>Deadlines</div>
-            <div style={{ marginTop: 8 }}>
-              {deadlineRows.map((item, index) => (
-                <div key={index} className="form-row" style={{ marginTop: 4, alignItems: 'flex-end' }}>
-                  <div style={fieldStyle}>
-                    <label htmlFor={`deadline-${index}-name`} style={labelStyle}>Etapa</label>
-                    <input
-                      id={`deadline-${index}-name`}
-                      className="input"
-                      placeholder="Nombre de la etapa"
-                      value={item.key}
-                      onChange={e => handleDeadlineRowChange(index, 'key', e.target.value)}
-                      onBlur={e => handleDeadlineKeyBlur(index, e.target.value)}
-                    />
-                  </div>
-                  <div style={fieldStyle}>
-                    <label htmlFor={`deadline-${index}-date`} style={labelStyle}>Fecha</label>
-                    <input
-                      id={`deadline-${index}-date`}
-                      className="input"
-                      type="date"
-                      value={item.value}
-                      onChange={e => handleDeadlineRowChange(index, 'value', e.target.value)}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                    <button
-                      type="button"
-                      className="btn secondary"
-                      onClick={() => removeDeadlineRow(index)}
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                </div>
-              ))}
-              <button
-                type="button"
-                className="btn secondary"
-                style={{ marginTop: 8 }}
-                onClick={addDeadlineRow}
-              >
-                Agregar deadline
-              </button>
+            <div style={{ marginTop: 8, display: 'grid', gap: 8 }}>
+              <DeadlinesForm
+                key={deadlineFormKey}
+                initial={deadlineRows}
+                onChange={handleDeadlineRowsChange}
+                onValidationChange={handleDeadlineValidationChange}
+                onSubmit={handleDeadlineSubmit}
+                submitting={deadlineSaving}
+                submitLabel="Guardar deadlines"
+              />
+              {deadlineSaveMsg && (
+                <div className="notice" style={{ background: '#edf9f0', borderColor: '#c6f0d5', color: '#107457' }}>{deadlineSaveMsg}</div>
+              )}
+              {deadlineSaveErr && (
+                <div className="notice" style={{ background: '#fdecea', borderColor: '#f7c4c1', color: '#b42318' }}>{deadlineSaveErr}</div>
+              )}
             </div>
 
             <div style={{ marginTop: 12, fontWeight: 700 }}>Métricas clave</div>
@@ -1812,7 +1779,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
               </div>
             )}
 
-            <button className="btn" type="submit" style={{ marginTop: 12 }}>Guardar</button>
+            <button className="btn" type="submit" style={{ marginTop: 12 }} disabled={!deadlineValidation.ok}>Guardar</button>
           </form>
           {msg && <div className="notice" style={{marginTop:8}}>{msg}</div>}
           {err && <div className="notice" style={{marginTop:8}}>{err}</div>}
