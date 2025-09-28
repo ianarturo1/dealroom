@@ -4,8 +4,7 @@
   "status": "LOI",
   "deadlines": {
     "LOI": "2025-10-15",
-    "Firma": "2025-11-30",
-    "Primera reunión": "2025-12-25"
+    "Firma": "2025-11-30"
   },
   "metrics": {
     "fiscalCapitalInvestment": 20000000,
