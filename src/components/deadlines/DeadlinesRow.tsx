@@ -1,27 +1,32 @@
-import { useId } from "react";
-import { STAGES } from "@/lib/stages";
+import { useId } from "react"
+import { STAGES } from "@/lib/stages"
 
 type Props = {
-  value: { stage?: string; date?: string };
-  onChange: (v: { stage?: string; date?: string }) => void;
-  stageOptions?: string[]; // para ocultar etapas ya usadas
-  error?: string | null;
-};
+  value?: { stage?: string; date?: string }
+  onChange: (v: { stage?: string; date?: string }) => void
+  stageOptions?: string[]
+  error?: string | null
+}
 
 export function DeadlinesRow({ value, onChange, stageOptions, error }: Props) {
-  const listId = useId();
-  const { stage = "", date = "" } = value || {};
-  const options = stageOptions && stageOptions.length ? stageOptions : STAGES;
+  const generatedId = typeof useId === "function" ? useId() : undefined
+  const listId = generatedId || "stageOptions"
+  const stageInputId = generatedId ? `${generatedId}-stage` : undefined
+  const dateInputId = generatedId ? `${generatedId}-date` : undefined
+  const safeValue = value ?? {}
+  const { stage = "", date = "" } = safeValue
+  const options = Array.isArray(stageOptions) && stageOptions.length ? stageOptions : STAGES
 
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div style={{ display: "grid", gap: 12, gridTemplateColumns: "1fr 1fr" }}>
       <div>
-        <label className="block text-sm mb-1">Etapa</label>
+        <label className="label" htmlFor={stageInputId}>Etapa</label>
         <input
+          id={stageInputId}
           list={listId}
-          className="w-full border rounded p-2"
+          className="input"
           value={stage}
-          onChange={e => onChange({ ...value, stage: e.target.value })}
+          onChange={e => onChange({ ...safeValue, stage: e.target.value })}
           placeholder="Empieza a escribir…"
         />
         <datalist id={listId}>
@@ -30,16 +35,21 @@ export function DeadlinesRow({ value, onChange, stageOptions, error }: Props) {
       </div>
 
       <div>
-        <label className="block text-sm mb-1">Fecha</label>
+        <label className="label" htmlFor={dateInputId}>Fecha</label>
         <input
+          id={dateInputId}
           type="date"
-          className="w-full border rounded p-2"
+          className="input"
           value={date}
-          onChange={e => onChange({ ...value, date: e.target.value })}
+          onChange={e => onChange({ ...safeValue, date: e.target.value })}
         />
       </div>
 
-      {error && <div className="col-span-2 text-red-600 text-sm mt-1">{error}</div>}
+      {error && (
+        <div style={{ gridColumn: "1 / span 2", color: "#b91c1c", fontSize: 13 }}>
+          {error}
+        </div>
+      )}
     </div>
-  );
+  )
 }

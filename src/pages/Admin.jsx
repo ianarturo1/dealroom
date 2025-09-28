@@ -1,16 +1,19 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { api } from '../lib/api'
-import RoleGate from '../components/RoleGate'
-import { DEFAULT_INVESTOR_ID } from '../lib/config'
-import { resolveDeadlineDocTarget } from '../lib/deadlines'
-import { DOCUMENT_SECTIONS_ORDER, DEFAULT_DOC_CATEGORY, DASHBOARD_DOC_CATEGORIES } from '../constants/documents'
-import { PIPELINE_STAGES, FINAL_PIPELINE_STAGE } from '../constants/pipeline'
+import { api } from '@/lib/api'
+import RoleGate from '@/components/RoleGate'
+import { DEFAULT_INVESTOR_ID } from '@/lib/config'
+import { resolveDeadlineDocTarget } from '@/lib/deadlines'
+import { DOCUMENT_SECTIONS_ORDER, DEFAULT_DOC_CATEGORY, DASHBOARD_DOC_CATEGORIES } from '@/constants/documents'
+import { PIPELINE_STAGES, FINAL_PIPELINE_STAGE } from '@/constants/pipeline'
 import { getDecisionBadge, getDecisionDays } from '@/utils/decision'
 import { DeadlinesForm } from '@/components/deadlines/DeadlinesForm'
 import { validateRows } from '@/lib/deadlineValidators'
 import { STAGES } from '@/lib/stages'
-import { useToast } from '../lib/toast'
-import { modalBackdropStyle, modalCardStyle, modalButtonRowStyle } from '../components/modalStyles'
+import { useToast } from '@/lib/toast'
+import { modalBackdropStyle, modalCardStyle, modalButtonRowStyle } from '@/components/modalStyles'
+import { Card } from '@/components/ui/Card'
+import { Field } from '@/components/ui/Field'
+import { Section } from '@/components/ui/Section'
 
 const PORTFOLIO_OPTIONS = [
   { value: 'solarFarms', label: 'Granjas Solares' },
@@ -23,12 +26,6 @@ const MIX_FIELDS = [
   { key: 'solarFarms', label: 'Granjas Solares' },
   { key: 'aaaCompanies', label: 'Empresas AAA' },
   { key: 'ownSites', label: 'Sitios Propios' }
-]
-
-const PROJECT_NUMBER_FIELDS = [
-  { key: 'power_kwp', label: 'Potencia (kWp)' },
-  { key: 'energy_mwh', label: 'Energía anual (MWh)' },
-  { key: 'co2_tons', label: 'CO₂ evitado (t/año)' }
 ]
 
 const createEmptyProject = () => ({
@@ -342,1717 +339,791 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       .finally(() => {
         if (active) setProjectsLoading(false)
       })
-    return () => { active = false }
-  }, [])
-
-  const loadDocs = useCallback(async () => {
-    const slug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
-    setDocsLoading(true)
-    setDocsError(null)
-    try{
-      const res = await api.listDocs({ category: docCategory, slug })
-      setDocList(res.files || [])
-    }catch(error){
-      setDocList([])
-      setDocsError(error.message)
-    }finally{
-      setDocsLoading(false)
-    }
-  }, [docCategory, docSlug])
-
-  useEffect(() => {
-    loadDocs()
-  }, [loadDocs])
-
-  useEffect(() => {
-    if (!isAdmin){
-      setInvestorDetailsMap({})
-      setInvestorDetailsError(null)
-      setInvestorDetailsLoading(false)
-      return
-    }
-    if (!investorList.length){
-      setInvestorDetailsMap({})
-      setInvestorDetailsError(null)
-      setInvestorDetailsLoading(false)
-      return
-    }
-    let active = true
-    setInvestorDetailsLoading(true)
-    setInvestorDetailsError(null)
-    ;(async () => {
-      try{
-        const entries = await Promise.all(investorList.map(async (item) => {
-          try{
-            const data = await api.getInvestor(item.slug)
-            return [item.slug, data]
-          }catch(error){
-            return [item.slug, { __error: error.message }]
-          }
-        }))
-        if (!active) return
-        const nextMap = {}
-        const errors = []
-        for (const [slug, data] of entries){
-          if (data && !data.__error){
-            nextMap[slug] = data
-          }else if (data && data.__error){
-            errors.push(`${slug}: ${data.__error}`)
-          }
-        }
-        setInvestorDetailsMap(nextMap)
-        if (errors.length){
-          setInvestorDetailsError(`Datos incompletos para ${errors.length} inversionista${errors.length === 1 ? '' : 's'}.`)
-        }
-      }catch(error){
-        if (!active) return
-        setInvestorDetailsMap({})
-        setInvestorDetailsError(error.message)
-      }finally{
-        if (active) setInvestorDetailsLoading(false)
-      }
-    })()
-    return () => { active = false }
-  }, [isAdmin, investorList])
-
-  useEffect(() => {
-    if (!isAdmin){
-      setDocInventories({})
-      setDocInventoriesReady(false)
-      setDocHealthError(null)
-      setDocHealthLoading(false)
-      return
-    }
-    if (!investorList.length){
-      setDocInventories({})
-      setDocInventoriesReady(false)
-      setDocHealthError(null)
-      setDocHealthLoading(false)
-      return
-    }
-    let active = true
-    setDocHealthLoading(true)
-    setDocHealthError(null)
-    ;(async () => {
-      const next = {}
-      try{
-        for (const category of DASHBOARD_DOC_CATEGORIES){
-          if (!active) return
-          const categoryData = {}
-          for (const investor of investorList){
-            if (!active) return
-            try{
-              const res = await api.listDocs({ category, slug: investor.slug })
-              const files = Array.isArray(res?.files) ? res.files : []
-              categoryData[investor.slug] = { files, error: null }
-            }catch(error){
-              const message = error.message || 'Error desconocido'
-              categoryData[investor.slug] = { files: [], error: message }
-              const lower = message.toLowerCase()
-              if (lower.includes('github_token') || lower.includes('no configurado') || lower.includes('500 ')){
-                throw error
-              }
-            }
-          }
-          next[category] = categoryData
-        }
-        if (!active) return
-        setDocInventories(next)
-        setDocInventoriesReady(true)
-      }catch(error){
-        if (!active) return
-        setDocInventories({})
-        setDocInventoriesReady(false)
-        setDocHealthError(error.message)
-      }finally{
-        if (active) setDocHealthLoading(false)
-      }
-    })()
-    return () => { active = false }
-  }, [isAdmin, investorList, docRefreshKey])
-
-  useEffect(() => {
-    if (!isAdmin){
-      setActivityItems([])
-      setActivityError(null)
-      setActivityLoading(false)
-      return
-    }
-    let active = true
-    setActivityLoading(true)
-    setActivityError(null)
-    api.listActivity()
-      .then(res => {
-        if (!active) return
-        const events = Array.isArray(res?.events) ? res.events.slice() : []
-        events.sort((a, b) => new Date(b?.date || 0).getTime() - new Date(a?.date || 0).getTime())
-        setActivityItems(events)
-      })
-      .catch(error => {
-        if (!active) return
-        setActivityError(error.message)
-        setActivityItems([])
-      })
-      .finally(() => {
-        if (active) setActivityLoading(false)
-      })
-    return () => { active = false }
-  }, [isAdmin, activityRefreshKey])
-
-  useEffect(() => {
-    setDeadlineRows(deadlinesToRows(payload.deadlines))
-    setDeadlineFormKey(value => value + 1)
-  }, [payload.deadlines])
-
-  const resetProjectFeedback = () => {
-    setProjectSaveMsg(null)
-    setProjectSaveErr(null)
-  }
-
-  const updateProjectField = (index, field, rawValue) => {
-    resetProjectFeedback()
-    let value = rawValue
-    if (field === 'termMonths') {
-      const parsed = parseInt(String(rawValue ?? '').trim() || '0', 10)
-      value = Number.isFinite(parsed) ? Math.max(0, parsed) : 0
-    } else if (field === 'empresa') {
-      value = String(rawValue || '').trim()
-    } else if (field === 'imageUrl') {
-      value = String(rawValue || '').trim()
-    }
-    setProjectList(prev => prev.map((item, idx) => idx === index ? { ...item, [field]: value } : item))
-  }
-
-  const addProject = () => {
-    resetProjectFeedback()
-    setProjectList(prev => [...prev, createEmptyProject()])
-  }
-
-  const removeProject = (index) => {
-    resetProjectFeedback()
-    if (typeof window !== 'undefined' && !window.confirm('¿Eliminar este proyecto?')) return
-    setProjectList(prev => prev.filter((_, idx) => idx !== index))
-  }
-
-  const toNumberOrThrow = (value, label, id) => {
-    const raw = (value === null || value === undefined) ? '' : String(value).trim()
-    if (!raw){
-      throw new Error(`Proyecto ${id} requiere ${label}`)
-    }
-    const num = Number(raw)
-    if (!Number.isFinite(num)){
-      throw new Error(`Proyecto ${id} tiene ${label} inválido`)
-    }
-    return num
-  }
-
-  const sanitizeProjects = () => {
-    const seen = new Set()
-    const sanitized = projectList.map((project, index) => {
-      const id = (project.id || '').trim()
-      if (!id) throw new Error(`El proyecto ${index + 1} requiere un ID`)
-      const name = (project.name || '').trim()
-      if (!name) throw new Error(`Proyecto ${id} requiere nombre`)
-      const client = (project.client || '').trim()
-      if (!client) throw new Error(`Proyecto ${id} requiere cliente`)
-      const location = (project.location || '').trim()
-      if (!location) throw new Error(`Proyecto ${id} requiere ubicación`)
-      const model = (project.model || '').trim()
-      if (!model) throw new Error(`Proyecto ${id} requiere modelo`)
-      const status = (project.status || '').trim() || 'Disponible'
-      const termMonths = normalizeTermMonths(project.termMonths)
-      const empresa = typeof project.empresa === 'string' ? project.empresa.trim() : ''
-      const imageUrl = typeof project.imageUrl === 'string' ? project.imageUrl.trim() : ''
-      if (imageUrl && !/^https?:\/\//i.test(imageUrl)) {
-        throw new Error(`Proyecto ${id} tiene Imagen (URL) inválida`)
-      }
-
-      const base = {
-        id,
-        name,
-        client,
-        location,
-        power_kwp: toNumberOrThrow(project.power_kwp, 'potencia (kWp)', id),
-        energy_mwh: toNumberOrThrow(project.energy_mwh, 'energía anual (MWh)', id),
-        co2_tons: toNumberOrThrow(project.co2_tons, 'CO₂ evitado (t/año)', id),
-        model,
-        status,
-        termMonths,
-        empresa,
-        imageUrl
-      }
-
-      const notes = (project.notes || '').trim()
-      if (notes) base.notes = notes
-      const loiTemplate = (project.loi_template || '').trim()
-      if (loiTemplate) base.loi_template = loiTemplate
-
-      return base
-    })
-
-    for (const project of sanitized){
-      if (seen.has(project.id)){
-        throw new Error(`ID duplicado: ${project.id}`)
-      }
-      seen.add(project.id)
-    }
-
-    return sanitized
-  }
-
-  const onSaveProjects = async (e) => {
-    e.preventDefault()
-    resetProjectFeedback()
-    setProjectSaving(true)
-    try{
-      const sanitized = sanitizeProjects()
-      await api.saveProjects(sanitized)
-      setProjectList(sanitized.map(toFormProject))
-      setProjectSaveMsg('Proyectos guardados y commiteados a GitHub.')
-    }catch(error){
-      setProjectSaveErr(error.message)
-    }finally{
-      setProjectSaving(false)
-    }
-  }
-
-  const handleDocSlugSubmit = (e) => {
-    e.preventDefault()
-    setDocsNotice(null)
-    setDocsError(null)
-    const normalized = normalizeSlug(docSlugInput)
-    const finalSlug = normalized || DEFAULT_INVESTOR_ID
-    setDocSlugInput(finalSlug)
-    if (finalSlug === docSlug){
-      loadDocs()
-    }else{
-      setDocSlug(finalSlug)
-    }
-  }
-
-  const performDocUpload = useCallback(async (uploadInfo, options = {}) => {
-    if (!uploadInfo) return null
-    setDocsError(null)
-    setDocsNotice(null)
-    setDocsWorking(true)
-    try{
-      const payload = {
-        path: `${uploadInfo.category}`,
-        filename: uploadInfo.filename,
-        contentBase64: uploadInfo.base64,
-        slug: uploadInfo.slug,
-        message: uploadInfo.message
-      }
-      if (options.strategy === 'rename'){
-        payload.strategy = 'rename'
-      }
-      const response = await api.uploadDoc(payload)
-      const successMsg = options.strategy === 'rename'
-        ? 'Archivo subido con sufijo automático.'
-        : 'Archivo subido.'
-      setDocsNotice(successMsg)
-      showToast(successMsg, { tone: 'success' })
-      uploadInfo.form?.reset()
-      setPendingDocUpload(null)
-      setDocRenamePrompt(null)
-      await loadDocs()
-      return response
-    }catch(error){
-      if (error?.status === 409 && error?.data?.error === 'FILE_EXISTS' && options.strategy !== 'rename'){
-        const fallbackPath = `${uploadInfo.category}/${uploadInfo.slug}/${uploadInfo.filename}`
-        setPendingDocUpload(uploadInfo)
-        setDocRenamePrompt({
-          path: error.data?.path || fallbackPath,
-          category: uploadInfo.category,
-          slug: uploadInfo.slug
-        })
-        return null
-      }
-      const message = error?.message || 'No se pudo subir el archivo'
-      setDocsError(message)
-      showToast(message, { tone: 'error', duration: 5000 })
-      return null
-    }finally{
-      setDocsWorking(false)
-    }
-  }, [loadDocs, showToast])
-
-  const handleDocUpload = (e) => {
-    e.preventDefault()
-    if (docsWorking) return
-    setDocsError(null)
-    setDocsNotice(null)
-    const form = e.target
-    const file = form.file.files[0]
-    if (!file) return
-    const slug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
-    const reader = new FileReader()
-    reader.onload = async () => {
-      try{
-        const result = typeof reader.result === 'string' ? reader.result : ''
-        const base64 = result.includes(',') ? result.split(',')[1] : result
-        if (!base64) throw new Error('No se pudo leer el archivo')
-        await performDocUpload({
-          category: docCategory,
-          filename: file.name,
-          base64,
-          slug,
-          message: `Upload ${file.name} desde Admin`,
-          form
-        })
-      }catch(error){
-        const message = error?.message || 'No se pudo leer el archivo'
-        setDocsError(message)
-        showToast(message, { tone: 'error', duration: 5000 })
-        setDocsWorking(false)
-      }
-    }
-    reader.onerror = () => {
-      const message = 'No se pudo leer el archivo'
-      setDocsWorking(false)
-      setDocsError(message)
-      showToast(message, { tone: 'error', duration: 5000 })
-    }
-    setDocsWorking(true)
-    reader.readAsDataURL(file)
-  }
-
-  const handleConfirmDocRename = useCallback(async () => {
-    if (!pendingDocUpload){
-      setDocRenamePrompt(null)
-      return
-    }
-    await performDocUpload(pendingDocUpload, { strategy: 'rename' })
-  }, [pendingDocUpload, performDocUpload])
-
-  const handleCancelDocRename = useCallback(() => {
-    setDocRenamePrompt(null)
-    setPendingDocUpload(null)
-  }, [])
-
-  const handleDocDelete = async (file) => {
-    if (!file || !file.path) return
-    if (typeof window !== 'undefined' && !window.confirm(`¿Eliminar ${file.name}?`)) return
-    setDocsError(null)
-    setDocsNotice(null)
-    try{
-      setDocsWorking(true)
-      await api.deleteDoc({
-        path: file.path,
-        message: `Delete ${file.name} desde Admin`
-      })
-      setDocsNotice('Documento eliminado.')
-      await loadDocs()
-    }catch(error){
-      setDocsError(error.message)
-    }finally{
-      setDocsWorking(false)
-    }
-  }
-
-  const metrics = payload.metrics || {}
-  const decisionDays = getDecisionDays(payload)
-  const { className: decisionBadgeClass, label: decisionLabel } = getDecisionBadge(decisionDays)
-  const normalizedPayloadSlug = normalizeSlug(payload.id)
-  const canLoadInvestor = Boolean(normalizedPayloadSlug)
-  const effectiveDocSlug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
-
-  const investorNameBySlug = React.useMemo(() => {
-    const map = {}
-    investorList.forEach(item => {
-      map[item.slug] = item.name || item.slug
-    })
-    return map
-  }, [investorList])
-
-  const pipelineSummary = React.useMemo(() => {
-    const total = investorList.length
-    const normalizedStages = PIPELINE_STAGES.map(stage => stage.toLowerCase())
-    const stageCounts = PIPELINE_STAGES.map(stage => {
-      const normalizedStage = stage.toLowerCase()
-      const count = investorList.filter(item => (item.status || '').trim().toLowerCase() === normalizedStage).length
-      const percent = total ? (count / total) * 100 : 0
-      return { stage, count, percent }
-    })
-    const othersCount = investorList.reduce((acc, item) => {
-      const normalizedStatus = (item.status || '').trim().toLowerCase()
-      if (!normalizedStatus) return acc
-      return normalizedStages.includes(normalizedStatus) ? acc : acc + 1
-    }, 0)
-    if (othersCount > 0){
-      stageCounts.push({ stage: 'Otros', count: othersCount, percent: total ? (othersCount / total) * 100 : 0 })
-    }
-    const finalNormalized = finalStageLabel.toLowerCase()
-    const finalCount = investorList.filter(item => (item.status || '').trim().toLowerCase() === finalNormalized).length
-    const finalPercent = total ? (finalCount / total) * 100 : 0
-    return { total, counts: stageCounts, finalCount, finalPercent }
-  }, [investorList, finalStageLabel])
-
-  const upcomingDeadlines = React.useMemo(() => {
-    if (deadlineThreshold < 0) return []
-    const thresholdMs = deadlineThreshold * 24 * 60 * 60 * 1000
-    const now = new Date()
-    const items = []
-    Object.entries(investorDetailsMap).forEach(([slug, detail]) => {
-      const deadlines = detail?.deadlines || {}
-      const investorName = detail?.name || investorNameBySlug[slug] || slug
-      Object.entries(deadlines).forEach(([label, value]) => {
-        if (!value) return
-        if (!/loi/i.test(label) && !/firma/i.test(label)) return
-        const date = new Date(value)
-        if (Number.isNaN(date.getTime())) return
-        const diffMs = date.getTime() - now.getTime()
-        const days = Math.ceil(diffMs / (24 * 60 * 60 * 1000))
-        if (days < 0) return
-        if (diffMs <= thresholdMs){
-          const formattedDate = shortDateFormatter.format(date)
-          const docTarget = resolveDeadlineDocTarget(label)
-          items.push({
-            slug,
-            label,
-            date: value,
-            days,
-            investorName,
-            formattedDate,
-            dueText: days === 0 ? 'Vence hoy' : `Vence en ${days} día${days === 1 ? '' : 's'}`,
-            docTarget
-          })
-        }
-      })
-    })
-    items.sort((a, b) => {
-      if (a.days !== b.days) return a.days - b.days
-      return (a.investorName || '').localeCompare(b.investorName || '', 'es', { sensitivity: 'base' })
-    })
-    return items
-  }, [investorDetailsMap, deadlineThreshold, investorNameBySlug, shortDateFormatter])
-
-  const docHealthSummary = React.useMemo(() => {
-    return DASHBOARD_DOC_CATEGORIES.map(category => {
-      const categoryData = docInventories[category] || {}
-      const missing = investorList.reduce((acc, investor) => {
-        const entry = categoryData[investor.slug]
-        const files = Array.isArray(entry?.files) ? entry.files : []
-        if (!files.length){
-          acc.push({
-            slug: investor.slug,
-            name: investor.name || investor.slug,
-            error: entry?.error || null
-          })
-        }
-        return acc
-      }, [])
-      let folderTarget = null
-      for (const investor of investorList){
-        const entry = categoryData[investor.slug]
-        const files = Array.isArray(entry?.files) ? entry.files : []
-        if (files.length){
-          folderTarget = { slug: investor.slug, file: files[0] }
-          break
-        }
-      }
-      const fallbackSlug = missing.length ? missing[0].slug : (investorList[0]?.slug || DEFAULT_INVESTOR_ID)
-      return {
-        category,
-        missing,
-        hasAll: investorList.length > 0 && missing.length === 0,
-        folderTarget,
-        fallbackSlug,
-        total: investorList.length
-      }
-    })
-  }, [docInventories, investorList])
-
-  const activityDisplayItems = React.useMemo(() => {
-    return activityItems.map((event, index) => {
-      const slug = event?.slug || ''
-      const investorName = slug ? (investorNameBySlug[slug] || slug) : ''
-      let icon = '•'
-      let title = event?.message || 'Actividad'
-      let detail = ''
-      switch(event?.type){
-        case 'investor-created':
-          icon = '🆕'
-          title = investorName ? `Alta de inversionista ${investorName}` : 'Alta de inversionista'
-          break
-        case 'investor-deleted':
-          icon = '🗑️'
-          title = investorName ? `Baja de inversionista ${investorName}` : 'Baja de inversionista'
-          break
-        case 'investor-updated':
-          icon = '✏️'
-          title = investorName ? `Actualización de ${investorName}` : 'Actualización de inversionista'
-          break
-        case 'doc-uploaded':
-          icon = '📄'
-          title = `Documento subido (${event.category || 'Docs'})`
-          detail = [event.filename, investorName].filter(Boolean).join(' · ')
-          break
-        case 'doc-deleted':
-          icon = '🗑️'
-          title = `Documento eliminado (${event.category || 'Docs'})`
-          detail = [event.filename, investorName].filter(Boolean).join(' · ')
-          break
-        default:
-          title = event?.message || title
-      }
-      const dateValue = event?.date ? new Date(event.date) : null
-      const dateLabel = dateValue && !Number.isNaN(dateValue.getTime())
-        ? dateTimeFormatter.format(dateValue)
-        : (event?.date || '—')
-      return {
-        key: `${event?.sha || index}-${event?.path || index}`,
-        icon,
-        title,
-        detail,
-        dateLabel
-      }
-    })
-  }, [activityItems, investorNameBySlug, dateTimeFormatter])
-
-  const handleDeadlineThresholdChange = (e) => {
-    const value = Number(e.target.value)
-    if (Number.isNaN(value)){
-      setDeadlineThreshold(0)
-    }else{
-      setDeadlineThreshold(Math.max(0, value))
-    }
-  }
-
-  const navigateToDocsSection = (category, slug, target = 'upload') => {
-    const normalizedCategory = DOCUMENT_SECTIONS_ORDER.includes(category) ? category : DEFAULT_DOC_CATEGORY
-    const normalizedSlug = normalizeSlug(slug) || DEFAULT_INVESTOR_ID
-    setDocsNotice(null)
-    setDocsError(null)
-    setDocCategory(normalizedCategory)
-    setDocSlugInput(normalizedSlug)
-    setDocSlug(normalizedSlug)
-    if (typeof window !== 'undefined'){
-      window.setTimeout(() => {
-        if (docsCardRef.current){
-          docsCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        }
-        if (target === 'upload' && docsUploadInputRef.current){
-          docsUploadInputRef.current.focus()
-        }else if (target === 'folder' && docsTableRef.current){
-          docsTableRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        }
-      }, 60)
-    }
-  }
-
-  const handleRefreshDocInventories = () => setDocRefreshKey(value => value + 1)
-  const handleRefreshActivity = () => setActivityRefreshKey(value => value + 1)
-
-  const handleLoadInvestor = async () => {
-    const slug = normalizeSlug(payload.id)
-    if (!slug){
-      setErr('El slug (id) es requerido para cargar datos')
-      return
-    }
-    setMsg(null)
-    setErr(null)
-    setDeadlinesMsg(null)
-    setDeadlinesErr(null)
-    setInvestorLoading(true)
-    try {
-      const data = await api.getInvestor(slug)
-      setPayload(prev => ({
-        ...prev,
-        ...data,
-        id: slug,
-        metrics: withoutDecisionTime(data.metrics),
-        deadlines: data.deadlines || {}
-      }))
-    } catch (error) {
-      setErr(`No se pudo cargar inversionista: ${error.message}`)
-    } finally {
-      setInvestorLoading(false)
-    }
-  }
-
-  const handleOpenPanelModal = () => {
-    const slug = normalizeSlug(payload.id)
-    if (!slug){
-      setErr('El slug (id) es requerido para ver el panel público')
-      return
-    }
-    const base = siteBaseUrl ? siteBaseUrl.replace(/\/$/, '') : ''
-    const url = `${base}/#/?investor=${slug}`
-    setPanelModal({ slug, url })
-  }
-
-  const handleClosePanelModal = () => {
-    setPanelModal(null)
-  }
-
-  const handleOpenDeleteModal = () => {
-    const slug = normalizeSlug(payload.id)
-    if (!slug){
-      setErr('El slug (id) es requerido para eliminar al inversionista')
-      return
-    }
-    setDeleteModal({ slug })
-    setDeleteModalError(null)
-  }
-
-  const handleCloseDeleteModal = () => {
-    if (deleteModalLoading) return
-    setDeleteModal(null)
-    setDeleteModalError(null)
-  }
-
-  const confirmDeleteFromModal = async () => {
-    if (!deleteModal?.slug) return
-    setDeleteModalError(null)
-    setDeleteModalLoading(true)
-    try{
-      await handleDeleteInvestor(deleteModal.slug, { skipConfirm: true })
-      setDeleteModal(null)
-    }catch(error){
-      setDeleteModalError(error.message)
-    }finally{
-      setDeleteModalLoading(false)
-    }
-  }
-
-  const updateMetric = (key, updater) => {
-    setPayload(prev => {
-      const prevMetrics = prev.metrics || {}
-      const nextValue = typeof updater === 'function'
-        ? updater(prevMetrics[key])
-        : updater
-      return { ...prev, metrics: { ...prevMetrics, [key]: nextValue } }
-    })
-  }
-
-  const handlePortfolioTypeChange = (type) => {
-    updateMetric('portfolio', current => {
-      const next = { type }
-      if (type === 'mix'){
-        const prevMix = current && current.type === 'mix' && current.mix ? current.mix : {}
-        next.mix = {
-          solarFarms: prevMix.solarFarms ?? '',
-          aaaCompanies: prevMix.aaaCompanies ?? '',
-          ownSites: prevMix.ownSites ?? ''
-        }
-      }
-      return next
-    })
-  }
-
-  const handleMixChange = (field, value) => {
-    updateMetric('portfolio', current => {
-      const base = current && current.type === 'mix'
-        ? current
-        : { type: 'mix', mix: { solarFarms: '', aaaCompanies: '', ownSites: '' } }
-      return {
-        ...base,
-        mix: {
-          ...(base.mix || {}),
-          [field]: value
-        }
-      }
-    })
-  }
-
-  const portfolio = metrics.portfolio || {}
-  const isPortfolioMix = portfolio.type === 'mix'
-  const mixValues = isPortfolioMix
-    ? {
-        solarFarms: portfolio.mix?.solarFarms ?? '',
-        aaaCompanies: portfolio.mix?.aaaCompanies ?? '',
-        ownSites: portfolio.mix?.ownSites ?? ''
-      }
-    : { solarFarms: '', aaaCompanies: '', ownSites: '' }
-  const mixTotal = isPortfolioMix
-    ? MIX_FIELDS.reduce((sum, field) => {
-        const raw = mixValues[field.key]
-        const num = Number(raw)
-        return sum + (Number.isNaN(num) ? 0 : num)
-      }, 0)
-    : 0
-  const projectProfitability = metrics.projectProfitability || {}
-
-  const labelStyle = { fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 4 }
-  const fieldStyle = { display: 'flex', flexDirection: 'column', flex: 1, minWidth: 200 }
-  const mixFieldStyle = { display: 'flex', flexDirection: 'column', flex: 1, minWidth: 160 }
-  const projectBoxStyle = { border: '1px solid var(--border)', borderRadius: 12, padding: 12, marginTop: 12, background: '#f7f7fb' }
-  const noteAreaStyle = { minHeight: 96, resize: 'vertical' }
-
-  const onSubmit = async (e) => {
-    e.preventDefault()
-    setMsg(null); setErr(null)
-    setDeadlinesMsg(null)
-    setDeadlinesErr(null)
-    try{
-      const normalizedId = normalizeSlug(payload.id)
-      if (!normalizedId){
-        throw new Error('El slug (id) es requerido')
-      }
-
-      const metricsPayload = payload.metrics || {}
-      const sanitizedMetrics = withoutDecisionTime(metricsPayload)
-      const normalizedMetrics = {
-        ...sanitizedMetrics,
-        fiscalCapitalInvestment: parseNumber(metricsPayload.fiscalCapitalInvestment)
-      }
-
-      if (metricsPayload.investorsActive !== undefined){
-        normalizedMetrics.investorsActive = parseNumber(metricsPayload.investorsActive)
-      }
-      if (metricsPayload.dealsAccelerated !== undefined){
-        normalizedMetrics.dealsAccelerated = parseNumber(metricsPayload.dealsAccelerated)
-      }
-      if (metricsPayload.nps !== undefined){
-        normalizedMetrics.nps = parseNumber(metricsPayload.nps)
-      }
-
-      const profitRaw = metricsPayload.projectProfitability || {}
-      const profitAmount = parseNumber(profitRaw.amount)
-      const profitYears = parseNumber(profitRaw.years)
-      normalizedMetrics.projectProfitability = (profitAmount === null && profitYears === null)
-        ? null
-        : { amount: profitAmount, years: profitYears }
-
-      const portfolioRaw = metricsPayload.portfolio
-      if (!portfolioRaw || !portfolioRaw.type){
-        normalizedMetrics.portfolio = null
-      }else if (portfolioRaw.type === 'mix'){
-        const mixRaw = portfolioRaw.mix || {}
-        const normalizedMix = MIX_FIELDS.reduce((acc, field) => {
-          const parsed = parseNumber(mixRaw[field.key])
-          if (parsed !== null){
-            acc[field.key] = parsed
-          }
-          return acc
-        }, {})
-        normalizedMetrics.portfolio = { type: 'mix', mix: normalizedMix }
-      }else{
-        normalizedMetrics.portfolio = { type: portfolioRaw.type }
-      }
-
-      const normalizedName = typeof payload.name === 'string'
-        ? payload.name.trim()
-        : ''
-      const deadlineValidation = validateRows(deadlineRows)
-      if (!deadlineValidation.ok){
-        throw new Error(deadlineValidation.message)
-      }
-      const normalizedDeadlines = deadlineValidation.deadlines
-
-      const payloadToSend = {
-        ...payload,
-        id: normalizedId,
-        name: normalizedName,
-        metrics: normalizedMetrics,
-        deadlines: normalizedDeadlines
-      }
-
-      await api.updateStatus(payloadToSend)
-      setPayload(payloadToSend)
-      setMsg('Guardado y commiteado a GitHub.')
-    }catch(error){ setErr(error.message) }
-  }
-
-  const handleDeadlinesChange = (rows) => {
-    setDeadlineRows(ensureDeadlineRows(rows))
-    setDeadlinesMsg(null)
-    setDeadlinesErr(null)
-  }
-
-  const handleDeadlinesSubmit = async (rows) => {
-    setDeadlinesMsg(null)
-    setDeadlinesErr(null)
-    const validation = validateRows(rows)
-    if (!validation.ok){
-      setDeadlinesErr(validation.message)
-      return
-    }
-    const normalizedId = normalizeSlug(payload.id)
-    if (!normalizedId){
-      setDeadlinesErr('El slug (id) es requerido')
-      return
-    }
-
-    setDeadlinesSaving(true)
-    try {
-      const deadlines = validation.deadlines
-      const response = await fetch('/.netlify/functions/update-investor', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug: normalizedId, deadlines })
-      })
-      if (!response.ok){
-        const text = await response.text()
-        throw new Error(text || 'No se pudo guardar deadlines')
-      }
-      setPayload(prev => ({ ...prev, id: normalizedId, deadlines }))
-      setDeadlineRows(deadlinesToRows(deadlines))
-      setDeadlineFormKey(value => value + 1)
-      setDeadlinesMsg('Deadlines guardados correctamente.')
-    } catch (error) {
-      setDeadlinesErr(error.message)
-    } finally {
-      setDeadlinesSaving(false)
-    }
-  }
-
-  const onCreate = async (e) => {
-    e.preventDefault()
-    setInvMsg(null)
-    setInvErr(null)
-    setInvLoading(true)
-    setProgress(15)
-    try{
-      const createValidation = validateRows(inv.deadlines)
-
-      if (!createValidation.ok){
-        throw new Error(createValidation.message)
-      }
-
-      const dl = createValidation.deadlines
-
-      const payload = { email: inv.email, companyName: inv.companyName, status: inv.status, deadlines: dl }
-      if (inv.slug) payload.slug = inv.slug
-      const res = await api.createInvestor(payload)
-      setProgress(100)
-      setInvMsg(res.link)
-      showToast('Inversionista creado correctamente.', { tone: 'success' })
-      try{ await navigator.clipboard.writeText(res.link) }catch{}
-      setInv(prev => ({ ...prev, deadlines: deadlinesToRows(dl) }))
-      setInvDeadlinesKey(value => value + 1)
-    }catch(error){
-      setProgress(0)
-      if (error?.status === 409 && error?.data?.error === 'INVESTOR_EXISTS'){
-        const conflictSlug = error.data?.slug || normalizeSlug(inv.slug || inv.companyName || '') || 'desconocido'
-        showToast(`Este inversionista ya existe (slug: ${conflictSlug}).`, { tone: 'warning', duration: 5000 })
-      }else{
-        const message = error?.message || 'Error al crear inversionista'
-        setInvErr(`Error al crear inversionista: ${message}`)
-        showToast(message, { tone: 'error', duration: 5000 })
-      }
-    }finally{ setInvLoading(false) }
-  }
-
-  return (
+    return (
     <RoleGate user={user} allow={['admin','ri']}>
-      <div className="container">
-        <div className="h1">Admin / Relaciones con Inversionistas</div>
-        {isAdmin && (
-          <div className="grid" style={{ marginBottom: 16 }}>
-          <div className="card" style={{ gridColumn: 'span 2', minWidth: 280 }}>
-            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="h2" style={{ marginTop: 0 }}>Pipeline global</div>
-              {investorListLoading && <span className="badge">Actualizando…</span>}
+      <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+        <div
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+            background: 'linear-gradient(180deg,#fff,rgba(255,255,255,.85))',
+            backdropFilter: 'blur(6px)',
+            borderBottom: '1px solid rgba(0,0,0,.06)'
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 1100,
+              margin: '0 auto',
+              padding: '14px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              justifyContent: 'space-between',
+              flexWrap: 'wrap'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div className="h1" style={{ color: 'var(--brand)' }}>Panel de administración</div>
+              <span className="kpi">Dealroom Finsolar</span>
             </div>
-            <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 12 }}>
-              Total inversionistas: {numberFormatter.format(pipelineSummary.total || 0)}
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700 }}>Avance hacia {finalStageLabel || 'cierre'}</div>
-              <div className="progress" style={{ marginTop: 6, height: 12 }}>
-                <div style={{ width: `${Math.min(100, Math.max(0, pipelineSummary.finalPercent || 0))}%` }} />
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                {numberFormatter.format(pipelineSummary.finalCount || 0)} / {numberFormatter.format(pipelineSummary.total || 0)} · {percentFormatter.format(Number.isFinite(pipelineSummary.finalPercent) ? pipelineSummary.finalPercent : 0)}%
-              </div>
-            </div>
-            <div style={{ display: 'grid', gap: 10 }}>
-              {pipelineSummary.counts.map(item => {
-                const safePercent = Number.isFinite(item.percent) ? item.percent : 0
-                return (
-                  <div key={item.stage} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                    <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', fontSize: 14, fontWeight: 600 }}>
-                      <span>{item.stage}</span>
-                      <span>{numberFormatter.format(item.count)} · {percentFormatter.format(safePercent)}%</span>
-                    </div>
-                    <div className="progress" style={{ marginTop: 6, height: 8 }}>
-                      <div style={{ width: `${Math.min(100, Math.max(0, safePercent))}%` }} />
-                    </div>
-                  </div>
-                )
-              })}
-              {!pipelineSummary.total && (
-                <div style={{ fontSize: 13, color: 'var(--muted)' }}>Sin inversionistas cargados.</div>
-              )}
+            <div style={{ color: 'var(--muted)', fontSize: 13 }}>
+              {payload.name ? `Editando: ${payload.name}` : 'Selecciona o crea un inversionista'}
             </div>
           </div>
+        </div>
 
-          <div className="card">
-            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="h2" style={{ marginTop: 0 }}>Inversionistas activos</div>
+        <div style={{ maxWidth: 1100, margin: '24px auto', padding: '0 20px', display: 'grid', gap: 16 }}>
+          <Card>
+            <div className="toolbar">
+              <button
+                type="button"
+                className="btn"
+                onClick={handleLoadInvestor}
+                disabled={investorLoading || !canLoadInvestor}
+              >
+                {investorLoading ? 'Cargando…' : 'Cargar datos'}
+              </button>
               <button
                 type="button"
                 className="btn secondary"
-                onClick={loadInvestorList}
-                disabled={investorListLoading}
+                onClick={handleOpenPanelModal}
+                disabled={!canLoadInvestor}
               >
-                {investorListLoading ? 'Actualizando…' : 'Actualizar'}
+                Ver panel
+              </button>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={handleOpenDeleteModal}
+                disabled={!canLoadInvestor || deletingInvestor === normalizedPayloadSlug}
+              >
+                {deletingInvestor === normalizedPayloadSlug ? 'Eliminando…' : 'Eliminar'}
               </button>
             </div>
-            <div className="kpi" style={{ marginTop: 4 }}>
-              <div className="num">{investorListLoading ? '—' : numberFormatter.format(pipelineSummary.total || 0)}</div>
-              <div className="label">Total dados de alta</div>
-            </div>
-            {investorListError && <div className="notice" style={{ marginTop: 12 }}>{investorListError}</div>}
-          </div>
+          </Card>
 
-          <div className="card">
-            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="h2" style={{ marginTop: 0 }}>Alertas de fechas próximas</div>
-              {investorDetailsLoading && <span className="badge">Cargando…</span>}
+          <form onSubmit={onSubmit} style={{ display: 'grid', gap: 16 }}>
+            <div className="two-col" style={{ display: 'grid', gap: 16 }}>
+              <Section title="Datos del inversionista">
+                <div style={{ display: 'grid', gap: 12 }}>
+                  <Field label="Slug">
+                    <input
+                      className="input"
+                      placeholder="femsa"
+                      value={payload.id}
+                      onChange={e => setPayload({ ...payload, id: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Nombre">
+                    <input
+                      className="input"
+                      placeholder="FEMSA"
+                      value={payload.name}
+                      onChange={e => setPayload({ ...payload, name: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Estado">
+                    <select
+                      className="select"
+                      value={payload.status}
+                      onChange={e => setPayload({ ...payload, status: e.target.value })}
+                    >
+                      {PIPELINE_STAGES.map(stage => (
+                        <option key={stage}>{stage}</option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+              </Section>
+
+              <Section
+                title="Deadlines"
+                actions={(
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => handleDeadlinesSubmit(Array.isArray(deadlineRows) ? deadlineRows : [])}
+                    disabled={deadlinesSaving || !canLoadInvestor}
+                  >
+                    {deadlinesSaving ? 'Guardando…' : 'Guardar'}
+                  </button>
+                )}
+              >
+                <DeadlinesForm
+                  key={deadlineFormKey}
+                  initial={deadlineRows}
+                  onChange={handleDeadlinesChange}
+                  saving={deadlinesSaving}
+                  hideSubmit
+                />
+                {deadlinesMsg && <div className="notice" style={{ marginTop: 12 }}>{deadlinesMsg}</div>}
+                {deadlinesErr && <div className="notice" style={{ marginTop: 12 }}>{deadlinesErr}</div>}
+              </Section>
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>
-              Próximos
-              <input
-                type="number"
-                min="0"
-                className="input"
-                value={deadlineThreshold}
-                onChange={handleDeadlineThresholdChange}
-                style={{ width: 90, padding: '6px 8px' }}
-              />
-              días
-            </label>
-            {upcomingDeadlines.length === 0 && !investorDetailsLoading ? (
-              <div style={{ fontSize: 13, color: 'var(--muted)' }}>Sin alertas dentro del rango configurado.</div>
-            ) : (
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
-                {upcomingDeadlines.map(item => {
-                  const dateLabel = item.formattedDate || item.date || '—'
-                  const dueLabel = item.dueText || (item.days === 0
-                    ? 'Vence hoy'
-                    : `Vence en ${item.days} día${item.days === 1 ? '' : 's'}`)
-                  return (
-                    <li key={`${item.slug}-${item.label}`} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                        <div>
-                          <div style={{ fontWeight: 600 }}>{item.investorName}</div>
-                          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                            {item.label} · {dueLabel} ({dateLabel})
+
+            <Section title="Métricas clave">
+              <div style={{ display: 'grid', gap: 16 }}>
+                <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
+                  <Card style={{ padding: 20 }}>
+                    <span className="label">Días a decisión</span>
+                    <div className={decisionBadgeClass} style={{ fontSize: 24, fontWeight: 700 }}>
+                      {decisionLabel}
+                    </div>
+                  </Card>
+                  <Field label="Inversión de capital fiscal (MXN)" className="metric-field">
+                    <input
+                      id="metric-fiscal"
+                      className="input"
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={metrics.fiscalCapitalInvestment ?? ''}
+                      onChange={e => updateMetric('fiscalCapitalInvestment', e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Utilidad de proyecto (MXN)" className="metric-field">
+                    <input
+                      id="metric-project-amount"
+                      className="input"
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={projectProfitability.amount ?? ''}
+                      onChange={e => updateMetric('projectProfitability', current => ({ ...(current || {}), amount: e.target.value }))}
+                    />
+                  </Field>
+                  <Field label="Horizonte (años)" className="metric-field">
+                    <input
+                      id="metric-project-years"
+                      className="input"
+                      type="number"
+                      min="0"
+                      value={projectProfitability.years ?? ''}
+                      onChange={e => updateMetric('projectProfitability', current => ({ ...(current || {}), years: e.target.value }))}
+                    />
+                  </Field>
+                </div>
+
+                <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
+                  <Field label="Inversionistas activos" className="metric-field">
+                    <input
+                      className="input"
+                      type="number"
+                      min="0"
+                      value={metrics.investorsActive ?? ''}
+                      onChange={e => updateMetric('investorsActive', e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Deals acelerados" className="metric-field">
+                    <input
+                      className="input"
+                      type="number"
+                      min="0"
+                      value={metrics.dealsAccelerated ?? ''}
+                      onChange={e => updateMetric('dealsAccelerated', e.target.value)}
+                    />
+                  </Field>
+                  <Field label="NPS" className="metric-field">
+                    <input
+                      className="input"
+                      type="number"
+                      min="0"
+                      value={metrics.nps ?? ''}
+                      onChange={e => updateMetric('nps', e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Portafolio" className="metric-field">
+                    <select
+                      id="metric-portfolio-type"
+                      className="select"
+                      value={portfolio.type || ''}
+                      onChange={e => handlePortfolioTypeChange(e.target.value)}
+                    >
+                      <option value="">Selecciona una opción</option>
+                      {PORTFOLIO_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+
+                {isPortfolioMix && (
+                  <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))' }}>
+                    {MIX_FIELDS.map(field => (
+                      <Field key={field.key} label={`${field.label} (%)`} className="metric-field">
+                        <input
+                          id={`metric-portfolio-${field.key}`}
+                          className="input"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="any"
+                          value={mixValues[field.key] ?? ''}
+                          onChange={e => handleMixChange(field.key, e.target.value)}
+                        />
+                      </Field>
+                    ))}
+                    <div style={{ alignSelf: 'end', fontSize: 12, color: 'var(--muted)' }}>Suma: {mixTotal}%</div>
+                  </div>
+                )}
+              </div>
+            </Section>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="btn" type="submit">Guardar cambios</button>
+            </div>
+
+            {msg && <div className="notice">{msg}</div>}
+            {err && <div className="notice">{err}</div>}
+          </form>
+
+          {isAdmin && (
+            <div style={{ display: 'grid', gap: 16 }}>
+              <Section
+                title="Pipeline global"
+                actions={investorListLoading ? <span className="badge">Actualizando…</span> : null}
+              >
+                <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 12 }}>
+                  Total inversionistas: {numberFormatter.format(pipelineSummary.total || 0)}
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>Avance hacia {finalStageLabel || 'cierre'}</div>
+                  <div className="progress" style={{ marginTop: 6, height: 12 }}>
+                    <div style={{ width: `${Math.min(100, Math.max(0, pipelineSummary.finalPercent || 0))}%` }} />
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+                    {numberFormatter.format(pipelineSummary.finalCount || 0)} / {numberFormatter.format(pipelineSummary.total || 0)} · {percentFormatter.format(Number.isFinite(pipelineSummary.finalPercent) ? pipelineSummary.finalPercent : 0)}%
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {pipelineSummary.counts.map(item => {
+                    const safePercent = Number.isFinite(item.percent) ? item.percent : 0
+                    return (
+                      <div key={item.stage} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
+                          <span>{item.stage}</span>
+                          <span>{numberFormatter.format(item.count)} · {percentFormatter.format(safePercent)}%</span>
+                        </div>
+                        <div className="progress" style={{ marginTop: 6, height: 8 }}>
+                          <div style={{ width: `${Math.min(100, Math.max(0, safePercent))}%` }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {pipelineSummary.others > 0 && (
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 12 }}>
+                    Otros estados: {pipelineSummary.others}
+                  </div>
+                )}
+              </Section>
+
+              <Section
+                title="Faltan documentos"
+                actions={(
+                  <button
+                    type="button"
+                    className="btn secondary"
+                    onClick={handleRefreshDocInventories}
+                    disabled={docHealthLoading}
+                  >
+                    {docHealthLoading ? 'Verificando…' : 'Revisar'}
+                  </button>
+                )}
+              >
+                <p style={{ margin: '0 0 12px', color: 'var(--muted)', fontSize: 13 }}>
+                  Estatus por categorías clave.
+                </p>
+                {!investorList.length ? (
+                  <div style={{ fontSize: 13, color: 'var(--muted)' }}>Da de alta inversionistas para revisar su documentación.</div>
+                ) : !docInventoriesReady ? (
+                  docHealthLoading
+                    ? <div style={{ fontSize: 13, color: 'var(--muted)' }}>Verificando documentación…</div>
+                    : <div style={{ fontSize: 13, color: 'var(--muted)' }}>No se pudo obtener el estado actual.</div>
+                ) : (
+                  docHealthSummary.map(summary => {
+                    const previewNames = summary.missing.slice(0, 3).map(item => item.name).join(', ')
+                    const remaining = summary.missing.length - Math.min(summary.missing.length, 3)
+                    const hasErrors = summary.missing.some(item => item.error)
+                    const disabledFolder = summary.total === 0
+                    return (
+                      <div key={summary.category} style={{ borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 10 }}>
+                        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <span style={{ fontSize: 20, lineHeight: 1 }}>{summary.hasAll ? '✅' : '⛔'}</span>
+                            <div>
+                              <div style={{ fontWeight: 700 }}>{summary.category}</div>
+                              <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+                                {summary.total === 0
+                                  ? 'Sin inversionistas registrados.'
+                                  : summary.hasAll
+                                    ? 'Documentación completa.'
+                                    : `Faltan ${summary.missing.length} de ${summary.total}.`}
+                              </div>
+                              {!summary.hasAll && summary.missing.length > 0 && (
+                                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+                                  {previewNames}
+                                  {remaining > 0 && ` +${remaining} más`}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              className="btn secondary"
+                              onClick={() => navigateToDocsSection(summary.category, summary.fallbackSlug, 'upload')}
+                            >
+                              Subir
+                            </button>
+                            <button
+                              type="button"
+                              className="btn secondary"
+                              onClick={() => navigateToDocsSection(summary.category, (summary.folderTarget && summary.folderTarget.slug) || summary.fallbackSlug, 'folder')}
+                              disabled={disabledFolder}
+                            >
+                              Carpeta
+                            </button>
                           </div>
                         </div>
-                        {item.docTarget && (
-                          <button
-                            type="button"
-                            className="btn secondary"
-                            onClick={() => navigateToDocsSection(
-                              item.docTarget.category,
-                              item.slug,
-                              item.docTarget.target || 'upload'
-                            )}
-                          >
-                            Ir a {item.docTarget.category}
-                          </button>
+                        {hasErrors && (
+                          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
+                            Algunos registros devolvieron errores al consultar sus carpetas.
+                          </div>
                         )}
                       </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-            {investorDetailsError && <div className="notice" style={{ marginTop: 12 }}>{investorDetailsError}</div>}
-          </div>
+                    )
+                  })
+                )}
+                {docHealthError && <div className="notice" style={{ marginTop: 12 }}>{docHealthError}</div>}
+              </Section>
 
-          <div className="card">
-            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="h2" style={{ marginTop: 0 }}>Faltan documentos</div>
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={handleRefreshDocInventories}
-                disabled={docHealthLoading}
+              <Section
+                title="Actividad reciente"
+                actions={(
+                  <button
+                    type="button"
+                    className="btn secondary"
+                    onClick={handleRefreshActivity}
+                    disabled={activityLoading}
+                  >
+                    {activityLoading ? 'Consultando…' : 'Actualizar'}
+                  </button>
+                )}
               >
-                {docHealthLoading ? 'Verificando…' : 'Revisar'}
-              </button>
-            </div>
-            <p style={{ margin: '4px 0 12px', color: 'var(--muted)', fontSize: 13 }}>
-              Estatus por categorías clave.
-            </p>
-            {!investorList.length ? (
-              <div style={{ fontSize: 13, color: 'var(--muted)' }}>Da de alta inversionistas para revisar su documentación.</div>
-            ) : !docInventoriesReady ? (
-              docHealthLoading
-                ? <div style={{ fontSize: 13, color: 'var(--muted)' }}>Verificando documentación…</div>
-                : <div style={{ fontSize: 13, color: 'var(--muted)' }}>No se pudo obtener el estado actual.</div>
-            ) : (
-              docHealthSummary.map(summary => {
-                const previewNames = summary.missing.slice(0, 3).map(item => item.name).join(', ')
-                const remaining = summary.missing.length - Math.min(summary.missing.length, 3)
-                const hasErrors = summary.missing.some(item => item.error)
-                const disabledFolder = summary.total === 0
-                return (
-                  <div key={summary.category} style={{ borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 10 }}>
-                    <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <span style={{ fontSize: 20, lineHeight: 1 }}>{summary.hasAll ? '✅' : '⛔'}</span>
-                        <div>
-                          <div style={{ fontWeight: 700 }}>{summary.category}</div>
-                          <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-                            {summary.total === 0
-                              ? 'Sin inversionistas registrados.'
-                              : summary.hasAll
-                                ? 'Documentación completa.'
-                                : `Faltan ${summary.missing.length} de ${summary.total}.`}
+                {activityError && <div className="notice" style={{ marginTop: 12 }}>{activityError}</div>}
+                {activityLoading && <div style={{ marginTop: 12, color: 'var(--muted)' }}>Consultando actividad…</div>}
+                {!activityLoading && !activityError && activityDisplayItems.length === 0 && (
+                  <div style={{ marginTop: 12, color: 'var(--muted)', fontSize: 13 }}>Sin eventos recientes.</div>
+                )}
+                {activityDisplayItems.length > 0 && (
+                  <ul style={{ listStyle: 'none', margin: 12, marginTop: 12, padding: 0, display: 'grid', gap: 10 }}>
+                    {activityDisplayItems.map(item => (
+                      <li key={item.key} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: 18, lineHeight: 1 }}>{item.icon}</span>
+                          <div>
+                            <div style={{ fontWeight: 600 }}>{item.title}</div>
+                            {item.detail && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{item.detail}</div>}
+                            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{item.dateLabel}</div>
                           </div>
-                          {!summary.hasAll && summary.missing.length > 0 && (
-                            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                              {previewNames}
-                              {remaining > 0 && ` +${remaining} más`}
-                            </div>
-                          )}
                         </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                        <button
-                          type="button"
-                          className="btn secondary"
-                          onClick={() => navigateToDocsSection(summary.category, summary.fallbackSlug, 'upload')}
-                        >
-                          Subir
-                        </button>
-                        <button
-                          type="button"
-                          className="btn secondary"
-                          onClick={() => navigateToDocsSection(summary.category, (summary.folderTarget && summary.folderTarget.slug) || summary.fallbackSlug, 'folder')}
-                          disabled={disabledFolder}
-                        >
-                          Carpeta
-                        </button>
-                      </div>
-                    </div>
-                    {hasErrors && (
-                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-                        Algunos registros devolvieron errores al consultar sus carpetas.
-                      </div>
-                    )}
-                  </div>
-                )
-              })
-            )}
-            {docHealthError && <div className="notice" style={{ marginTop: 12 }}>{docHealthError}</div>}
-          </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Section>
+            </div>
+          )}
 
-          <div className="card" style={{ gridColumn: 'span 2', minWidth: 280 }}>
-            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="h2" style={{ marginTop: 0 }}>Actividad reciente</div>
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={handleRefreshActivity}
-                disabled={activityLoading}
-              >
-                {activityLoading ? 'Consultando…' : 'Actualizar'}
-              </button>
-            </div>
-            {activityError && <div className="notice" style={{ marginTop: 12 }}>{activityError}</div>}
-            {activityLoading && <div style={{ marginTop: 12, color: 'var(--muted)' }}>Consultando actividad…</div>}
-            {!activityLoading && !activityError && activityDisplayItems.length === 0 && (
-              <div style={{ marginTop: 12, color: 'var(--muted)', fontSize: 13 }}>Sin eventos recientes.</div>
-            )}
-            {activityDisplayItems.length > 0 && (
-              <ul style={{ listStyle: 'none', margin: 12, marginTop: 12, padding: 0, display: 'grid', gap: 10 }}>
-                {activityDisplayItems.map(item => (
-                  <li key={item.key} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                      <span style={{ fontSize: 18, lineHeight: 1 }}>{item.icon}</span>
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{item.title}</div>
-                        {item.detail && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{item.detail}</div>}
-                        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{item.dateLabel}</div>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          </div>
-        )}
-        <div className="card" style={{marginBottom:12}}>
-          <div className="h2">Alta de Inversionista</div>
-          <form onSubmit={onCreate} aria-busy={invLoading}>
-            <div className="form-row">
-              <input className="input" type="email" placeholder="Email corporativo" value={inv.email} onChange={e => setInv({ ...inv, email: e.target.value })} required />
-              <input className="input" placeholder="Nombre de la empresa" value={inv.companyName} onChange={e => setInv({ ...inv, companyName: e.target.value })} required />
-              <input className="input" placeholder="Slug deseado (opcional)" value={inv.slug} onChange={e => setInv({ ...inv, slug: e.target.value })} />
-              <select className="select" value={inv.status} onChange={e => setInv({ ...inv, status: e.target.value })}>
-                {PIPELINE_STAGES.map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-            <div style={{marginTop:8}}>
+          <Section title="Alta de inversionista">
+            <form onSubmit={onCreate} aria-busy={invLoading} style={{ display: 'grid', gap: 12 }}>
+              <div className="form-row">
+                <input className="input" type="email" placeholder="Email corporativo" value={inv.email} onChange={e => setInv({ ...inv, email: e.target.value })} required />
+                <input className="input" placeholder="Nombre de la empresa" value={inv.companyName} onChange={e => setInv({ ...inv, companyName: e.target.value })} required />
+                <input className="input" placeholder="Slug deseado (opcional)" value={inv.slug} onChange={e => setInv({ ...inv, slug: e.target.value })} />
+                <select className="select" value={inv.status} onChange={e => setInv({ ...inv, status: e.target.value })}>
+                  {PIPELINE_STAGES.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
               <DeadlinesForm
                 key={invDeadlinesKey}
                 initial={inv.deadlines}
                 onChange={rows => setInv(prev => ({ ...prev, deadlines: ensureDeadlineRows(rows) }))}
                 hideSubmit
               />
-            </div>
-            <button className="btn" type="submit" disabled={invLoading} style={{marginTop:8}}>
-              {invLoading ? 'Creando…' : 'Crear'}
-            </button>
-          </form>
-          {invLoading && <div className="progress" style={{marginTop:8}}><div style={{width: progress + '%'}} /></div>}
-          {invMsg && (
-            <div className="notice" style={{marginTop:8, display:'flex', alignItems:'center', justifyContent:'space-between'}}>
-              <span style={{wordBreak:'break-all'}}>{invMsg}</span>
-              <button className="btn" type="button" onClick={() => navigator.clipboard && navigator.clipboard.writeText(invMsg)}>Copiar</button>
-            </div>
-          )}
-          {invErr && <div className="notice" style={{marginTop:8}}>{invErr}</div>}
-        </div>
-        {isAdmin && (
-          <div className="card" style={{marginBottom:12}}>
-            <div className="h2">Inversionistas activos</div>
-            <p style={{marginTop:0, marginBottom:12, color:'var(--muted)', fontSize:14}}>
-              Consulta los inversionistas dados de alta y dales de baja cuando sea necesario.
-            </p>
-            <div className="form-row" style={{marginBottom:12}}>
-              <input
-                className="input"
-                placeholder="Buscar por nombre, correo o slug"
-                value={investorSearch}
-                onChange={e => setInvestorSearch(e.target.value)}
-              />
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={loadInvestorList}
-                disabled={investorListLoading}
-              >
-                {investorListLoading ? 'Actualizando...' : 'Actualizar lista'}
+              <button className="btn" type="submit" disabled={invLoading}>
+                {invLoading ? 'Creando…' : 'Crear inversionista'}
               </button>
-            </div>
-            {investorListError && <div className="notice" style={{marginBottom:12}}>{investorListError}</div>}
-            {investorDeleteErr && <div className="notice" style={{marginBottom:12}}>{investorDeleteErr}</div>}
-            {investorDeleteMsg && <div className="notice" style={{marginBottom:12}}>{investorDeleteMsg}</div>}
-            <div style={{fontSize:13, color:'var(--muted)', marginBottom:8}}>
-              {investorListLoading
-                ? 'Cargando inversionistas...'
-                : `${filteredInvestorCount} inversionista${filteredInvestorCount === 1 ? '' : 's'} coincidente${filteredInvestorCount === 1 ? '' : 's'}`}
-            </div>
-            <div style={{overflowX:'auto'}}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th style={{minWidth:140}}>Empresa</th>
-                    <th style={{minWidth:180}}>Correo</th>
-                    <th style={{minWidth:100}}>Slug</th>
-                    <th style={{minWidth:120}}>Estado</th>
-                    <th style={{minWidth:120}}>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {investorListLoading && (
-                    <tr>
-                      <td colSpan={5} style={{paddingTop:12, paddingBottom:12}}>Cargando datos...</td>
-                    </tr>
-                  )}
-                  {!investorListLoading && filteredInvestors.map(item => (
-                    <tr key={item.slug}>
-                      <td>{item.name || '—'}</td>
-                      <td>{item.email || '—'}</td>
-                      <td>{item.slug}</td>
-                      <td>{item.status || '—'}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn secondary"
-                          onClick={() => handleDeleteInvestor(item.slug)}
-                          disabled={deletingInvestor === item.slug}
-                        >
-                          {deletingInvestor === item.slug ? 'Eliminando...' : 'Eliminar'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {!investorListLoading && filteredInvestors.length === 0 && (
-                    <tr>
-                      <td colSpan={5} style={{paddingTop:12, paddingBottom:12, color:'var(--muted)'}}>
-                        No se encontraron inversionistas con los criterios actuales.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-        <div className="card">
-          <div className="h2">Actualizar estado de inversionista</div>
-          <form onSubmit={onSubmit}>
-            <div className="form-row">
-              <input
-                className="input"
-                placeholder="slug (id)"
-                value={payload.id}
-                onChange={e => setPayload({ ...payload, id: e.target.value })}
-              />
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  className="btn secondary"
-                  onClick={handleLoadInvestor}
-                  disabled={investorLoading || !canLoadInvestor}
-                >
-                  {investorLoading ? 'Cargando...' : 'Cargar datos'}
-                </button>
-                <button
-                  type="button"
-                  className="btn secondary"
-                  onClick={handleOpenPanelModal}
-                  disabled={!canLoadInvestor}
-                >
-                  Ver panel
-                </button>
-                <button
-                  type="button"
-                  className="btn secondary"
-                  onClick={handleOpenDeleteModal}
-                  disabled={!canLoadInvestor || deletingInvestor === normalizedPayloadSlug}
-                >
-                  {deletingInvestor === normalizedPayloadSlug ? 'Eliminando...' : 'Eliminar'}
-                </button>
-              </div>
-              <input
-                className="input"
-                placeholder="Nombre"
-                value={payload.name}
-                onChange={e => setPayload({ ...payload, name: e.target.value })}
-              />
-              <select
-                className="select"
-                value={payload.status}
-                onChange={e => setPayload({ ...payload, status: e.target.value })}
-              >
-                {PIPELINE_STAGES.map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-
-            <div style={{ marginTop: 12, fontWeight: 700 }}>Deadlines</div>
-            <div style={{ marginTop: 8 }}>
-              <DeadlinesForm
-                key={deadlineFormKey}
-                initial={deadlineRows}
-                onChange={handleDeadlinesChange}
-                onSubmit={handleDeadlinesSubmit}
-                saving={deadlinesSaving}
-              />
-              {deadlinesMsg && (
-                <div className="notice" style={{ marginTop: 8 }}>{deadlinesMsg}</div>
-              )}
-              {deadlinesErr && (
-                <div className="notice" style={{ marginTop: 8 }}>{deadlinesErr}</div>
-              )}
-            </div>
-
-            <div style={{ marginTop: 12, fontWeight: 700 }}>Métricas clave</div>
-
-            <div className="form-row" style={{ marginTop: 8 }}>
-              <div style={fieldStyle}>
-                <div style={labelStyle}>Días a decisión</div>
-                <span className={decisionBadgeClass}>{decisionLabel}</span>
-              </div>
-              <div style={fieldStyle}>
-                <label htmlFor="metric-fiscal" style={labelStyle}>Inversión de capital fiscal (MXN)</label>
-                <input
-                  id="metric-fiscal"
-                  className="input"
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={metrics.fiscalCapitalInvestment ?? ''}
-                  onChange={e => updateMetric('fiscalCapitalInvestment', e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="form-row" style={{ marginTop: 8 }}>
-              <div style={fieldStyle}>
-                <label htmlFor="metric-project-amount" style={labelStyle}>Utilidad de proyecto (MXN)</label>
-                <input
-                  id="metric-project-amount"
-                  className="input"
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={projectProfitability.amount ?? ''}
-                  onChange={e => updateMetric('projectProfitability', current => ({ ...(current || {}), amount: e.target.value }))}
-                />
-              </div>
-              <div style={fieldStyle}>
-                <label htmlFor="metric-project-years" style={labelStyle}>Horizonte (años)</label>
-                <input
-                  id="metric-project-years"
-                  className="input"
-                  type="number"
-                  min="0"
-                  value={projectProfitability.years ?? ''}
-                  onChange={e => updateMetric('projectProfitability', current => ({ ...(current || {}), years: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div className="form-row" style={{ marginTop: 8 }}>
-              <div style={fieldStyle}>
-                <label htmlFor="metric-portfolio-type" style={labelStyle}>Portafolio</label>
-                <select
-                  id="metric-portfolio-type"
-                  className="select"
-                  value={portfolio.type || ''}
-                  onChange={e => handlePortfolioTypeChange(e.target.value)}
-                >
-                  <option value="">Selecciona una opción</option>
-                  {PORTFOLIO_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {isPortfolioMix && (
-              <div style={{ marginTop: 8 }}>
-                <div className="form-row">
-                  {MIX_FIELDS.map(field => (
-                    <div key={field.key} style={mixFieldStyle}>
-                      <label htmlFor={`metric-portfolio-${field.key}`} style={labelStyle}>{field.label} (%)</label>
-                      <input
-                        id={`metric-portfolio-${field.key}`}
-                        className="input"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="any"
-                        value={mixValues[field.key] ?? ''}
-                        onChange={e => handleMixChange(field.key, e.target.value)}
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>Suma: {mixTotal}%</div>
+            </form>
+            {invLoading && <div className="progress" style={{ marginTop: 8 }}><div style={{ width: progress + '%' }} /></div>}
+            {invMsg && (
+              <div className="notice" style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <span style={{ wordBreak: 'break-all' }}>{invMsg}</span>
+                <button className="btn secondary" type="button" onClick={() => navigator.clipboard && navigator.clipboard.writeText(invMsg)}>Copiar</button>
               </div>
             )}
+            {invErr && <div className="notice" style={{ marginTop: 8 }}>{invErr}</div>}
+          </Section>
 
-            <button className="btn" type="submit" style={{ marginTop: 12 }}>Guardar</button>
-          </form>
-          {msg && <div className="notice" style={{marginTop:8}}>{msg}</div>}
-          {err && <div className="notice" style={{marginTop:8}}>{err}</div>}
-        </div>
-        <div className="card" style={{marginTop:12}} ref={docsCardRef}>
-          <div className="h2">Documentos por inversionista</div>
-          <form
-            onSubmit={handleDocSlugSubmit}
-            className="form-row"
-            style={{ marginTop: 8, alignItems: 'flex-end', gap: 12 }}
-          >
-            <div style={{ ...fieldStyle, minWidth: 200 }}>
-              <label htmlFor="docs-slug" style={labelStyle}>Slug del inversionista</label>
-              <input
-                id="docs-slug"
-                className="input"
-                value={docSlugInput}
-                onChange={e => setDocSlugInput(e.target.value)}
-                placeholder="slug"
-              />
-            </div>
-            <div style={{ ...fieldStyle, minWidth: 200 }}>
-              <label htmlFor="docs-category" style={labelStyle}>Categoría</label>
-              <select
-                id="docs-category"
-                className="select"
-                value={docCategory}
-                onChange={e => { setDocCategory(e.target.value); setDocsNotice(null); setDocsError(null) }}
-              >
-                {DOCUMENT_SECTIONS_ORDER.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-            <button className="btn" type="submit" disabled={docsLoading || docsWorking}>Ver carpeta</button>
-            <button
-              className="btn secondary"
-              type="button"
-              onClick={() => { setDocsNotice(null); setDocsError(null); loadDocs() }}
-              disabled={docsLoading || docsWorking}
-            >
-              Actualizar
-            </button>
-          </form>
-          <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>
-            Gestionando: <code>{docCategory}/{effectiveDocSlug}</code>
-          </div>
-          <form onSubmit={handleDocUpload} className="form-row" style={{ marginTop: 12 }} aria-busy={docsWorking}>
-            <input name="file" type="file" className="input" disabled={docsWorking} ref={docsUploadInputRef} />
-            <button className="btn" type="submit" disabled={docsWorking}>
-              {docsWorking ? 'Subiendo…' : 'Subir'}
-            </button>
-            <span className="notice">Los archivos se guardan en GitHub.</span>
-          </form>
-          {docsError && <div className="notice" style={{marginTop:8}}>{docsError}</div>}
-          {docsNotice && <div className="notice" style={{marginTop:8}}>{docsNotice}</div>}
-          {docsWorking && !docsLoading && <div style={{marginTop:8, color:'var(--muted)'}}>Procesando...</div>}
-          {docsLoading && <div style={{marginTop:8, color:'var(--muted)'}}>Cargando documentos...</div>}
-          <table className="table" style={{ marginTop: 12 }} ref={docsTableRef}>
-            <thead>
-              <tr>
-                <th>Archivo</th>
-                <th>Tamaño</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {docList.map(file => (
-                <tr key={file.path}>
-                  <td>{file.name}</td>
-                  <td>{(file.size / 1024).toFixed(1)} KB</td>
-                  <td style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                    <a
-                      className="btn secondary"
-                      href={api.downloadDocPath(file.path)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Descargar
-                    </a>
-                    <button
-                      type="button"
-                      className="btn secondary"
-                      onClick={() => handleDocDelete(file)}
-                      disabled={docsWorking}
-                    >
-                      Eliminar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {!docList.length && !docsLoading && (
-                <tr>
-                  <td colSpan="3">No hay documentos en esta carpeta.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        {docRenamePrompt && (
-          <div style={modalBackdropStyle} role="dialog" aria-modal="true" aria-labelledby="doc-rename-title">
-            <div style={modalCardStyle}>
-              <div className="h2" id="doc-rename-title" style={{ marginTop: 0 }}>Archivo duplicado</div>
-              <p style={{ marginTop: 8, color: 'var(--muted)', fontSize: 14 }}>
-                Ya existe un archivo con ese nombre. ¿Quieres subirlo con un sufijo automático?
+          {isAdmin && (
+            <Section title="Inversionistas activos">
+              <p style={{ marginTop: 0, marginBottom: 12, color: 'var(--muted)', fontSize: 14 }}>
+                Consulta los inversionistas dados de alta y dales de baja cuando sea necesario.
               </p>
-              <p style={{ fontSize: 13 }}>
-                <code>{docRenamePrompt.path}</code>
-              </p>
-              <div style={modalButtonRowStyle}>
+              <div className="form-row" style={{ marginBottom: 12 }}>
+                <input
+                  className="input"
+                  placeholder="Buscar por nombre, correo o slug"
+                  value={investorSearch}
+                  onChange={e => setInvestorSearch(e.target.value)}
+                />
                 <button
                   type="button"
                   className="btn secondary"
-                  onClick={handleCancelDocRename}
-                  disabled={docsWorking}
+                  onClick={loadInvestorList}
+                  disabled={investorListLoading}
                 >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={handleConfirmDocRename}
-                  disabled={docsWorking}
-                  aria-busy={docsWorking}
-                >
-                  {docsWorking ? 'Subiendo…' : 'Renombrar y subir'}
+                  {investorListLoading ? 'Actualizando…' : 'Actualizar lista'}
                 </button>
               </div>
+              {investorListError && <div className="notice" style={{ marginBottom: 12 }}>{investorListError}</div>}
+              {investorDeleteErr && <div className="notice" style={{ marginBottom: 12 }}>{investorDeleteErr}</div>}
+              {investorDeleteMsg && <div className="notice" style={{ marginBottom: 12 }}>{investorDeleteMsg}</div>}
+              <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>
+                {investorListLoading
+                  ? 'Cargando inversionistas…'
+                  : `${filteredInvestorCount} inversionista${filteredInvestorCount === 1 ? '' : 's'} coincidente${filteredInvestorCount === 1 ? '' : 's'}`}
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th style={{ minWidth: 140 }}>Empresa</th>
+                      <th style={{ minWidth: 180 }}>Correo</th>
+                      <th style={{ minWidth: 100 }}>Slug</th>
+                      <th style={{ minWidth: 120 }}>Estado</th>
+                      <th style={{ minWidth: 120 }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {investorListLoading && (
+                      <tr>
+                        <td colSpan={5} style={{ paddingTop: 12, paddingBottom: 12 }}>Cargando datos…</td>
+                      </tr>
+                    )}
+                    {!investorListLoading && filteredInvestors.map(item => (
+                      <tr key={item.slug}>
+                        <td>{item.name || '—'}</td>
+                        <td>{item.email || '—'}</td>
+                        <td>{item.slug}</td>
+                        <td>{item.status || '—'}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn ghost"
+                            onClick={() => handleDeleteInvestor(item.slug)}
+                            disabled={deletingInvestor === item.slug}
+                          >
+                            {deletingInvestor === item.slug ? 'Eliminando…' : 'Eliminar'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {!investorListLoading && filteredInvestors.length === 0 && (
+                      <tr>
+                        <td colSpan={5} style={{ paddingTop: 12, paddingBottom: 12, color: 'var(--muted)' }}>
+                          No se encontraron inversionistas con los criterios actuales.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Section>
+          )}
+
+          <div ref={docsCardRef}>
+            <Section title="Documentos por inversionista">
+            <form
+              onSubmit={handleDocSlugSubmit}
+              className="form-row"
+              style={{ marginTop: 8, alignItems: 'flex-end', gap: 12 }}
+            >
+              <Field label="Slug del inversionista" className="metric-field">
+                <input
+                  id="docs-slug"
+                  className="input"
+                  value={docSlugInput}
+                  onChange={e => setDocSlugInput(e.target.value)}
+                  placeholder="slug"
+                />
+              </Field>
+              <Field label="Categoría" className="metric-field">
+                <select
+                  id="docs-category"
+                  className="select"
+                  value={docCategory}
+                  onChange={e => { setDocCategory(e.target.value); setDocsNotice(null); setDocsError(null) }}
+                >
+                  {DOCUMENT_SECTIONS_ORDER.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </Field>
+              <button className="btn" type="submit" disabled={docsLoading || docsWorking}>Ver carpeta</button>
+              <button
+                className="btn secondary"
+                type="button"
+                onClick={() => { setDocsNotice(null); setDocsError(null); loadDocs() }}
+                disabled={docsLoading || docsWorking}
+              >
+                Actualizar
+              </button>
+            </form>
+            <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>
+              Gestionando: <code>{docCategory}/{effectiveDocSlug}</code>
             </div>
+            <form onSubmit={handleDocUpload} className="form-row" style={{ marginTop: 12 }} aria-busy={docsWorking}>
+              <input name="file" type="file" className="input" disabled={docsWorking} ref={docsUploadInputRef} />
+              <button className="btn" type="submit" disabled={docsWorking}>
+                {docsWorking ? 'Subiendo…' : 'Subir'}
+              </button>
+              <span className="notice">Los archivos se guardan en GitHub.</span>
+            </form>
+            {docsError && <div className="notice" style={{ marginTop: 8 }}>{docsError}</div>}
+            {docsNotice && <div className="notice" style={{ marginTop: 8 }}>{docsNotice}</div>}
+            {docsWorking && !docsLoading && <div style={{ marginTop: 8, color: 'var(--muted)' }}>Procesando…</div>}
+            {docsLoading && <div style={{ marginTop: 8, color: 'var(--muted)' }}>Cargando documentos…</div>}
+            <table className="table" style={{ marginTop: 12 }} ref={docsTableRef}>
+              <thead>
+                <tr>
+                  <th>Archivo</th>
+                  <th>Tamaño</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {docList.map(file => (
+                  <tr key={file.path}>
+                    <td>{file.name}</td>
+                    <td>{(file.size / 1024).toFixed(1)} KB</td>
+                    <td style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                      <a
+                        className="btn secondary"
+                        href={api.downloadDocPath(file.path)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Descargar
+                      </a>
+                      <button
+                        type="button"
+                        className="btn ghost"
+                        onClick={() => handleDocDelete(file)}
+                        disabled={docsWorking}
+                      >
+                        Eliminar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {!docList.length && !docsLoading && (
+                  <tr>
+                    <td colSpan={3}>No hay documentos en esta carpeta.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            </Section>
           </div>
-        )}
-        <div className="card" style={{marginTop:12}}>
-          <div className="h2">Gestionar proyectos activos</div>
-          <p style={{ margin: 0, color: 'var(--muted)', fontSize: 14 }}>Actualiza la lista que aparece en la sección de Proyectos.</p>
-          {projectLoadErr && <div className="notice" style={{marginTop:8}}>{projectLoadErr}</div>}
-          {projectsLoading ? (
-            <div style={{marginTop:8, color:'var(--muted)'}}>Cargando proyectos...</div>
-          ) : (
-            <form onSubmit={onSaveProjects}>
-              {projectList.map((project, index) => (
-                <div key={project.id || index} style={projectBoxStyle}>
-                  <div className="row" style={{justifyContent:'space-between'}}>
-                    <div style={{fontWeight:700}}>{project.name || project.id || `Proyecto ${index + 1}`}</div>
-                    <button
-                      type="button"
-                      className="btn secondary"
-                      style={{padding:'6px 12px', fontSize:12}}
-                      onClick={() => removeProject(index)}
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                  <div className="form-row" style={{marginTop:8}}>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-id`} style={labelStyle}>ID</label>
-                      <input
-                        id={`project-${index}-id`}
-                        className="input"
-                        value={project.id}
-                        onChange={e => updateProjectField(index, 'id', e.target.value)}
-                      />
-                    </div>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-name`} style={labelStyle}>Nombre</label>
-                      <input
-                        id={`project-${index}-name`}
-                        className="input"
-                        value={project.name}
-                        onChange={e => updateProjectField(index, 'name', e.target.value)}
-                      />
-                    </div>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-client`} style={labelStyle}>Cliente</label>
-                      <input
-                        id={`project-${index}-client`}
-                        className="input"
-                        value={project.client}
-                        onChange={e => updateProjectField(index, 'client', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="form-row" style={{marginTop:8}}>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-location`} style={labelStyle}>Ubicación</label>
-                      <input
-                        id={`project-${index}-location`}
-                        className="input"
-                        value={project.location}
-                        onChange={e => updateProjectField(index, 'location', e.target.value)}
-                      />
-                    </div>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-model`} style={labelStyle}>Modelo</label>
-                      <input
-                        id={`project-${index}-model`}
-                        className="input"
-                        value={project.model}
-                        onChange={e => updateProjectField(index, 'model', e.target.value)}
-                      />
-                    </div>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-status`} style={labelStyle}>Estado</label>
-                      <input
-                        id={`project-${index}-status`}
-                        className="input"
-                        value={project.status}
-                        onChange={e => updateProjectField(index, 'status', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="form-row" style={{marginTop:8}}>
-                    {PROJECT_NUMBER_FIELDS.map(field => (
-                      <div key={field.key} style={fieldStyle}>
-                        <label htmlFor={`project-${index}-${field.key}`} style={labelStyle}>{field.label}</label>
+
+          <Section title="Proyectos disponibles">
+            {projectsLoading && <div style={{ color: 'var(--muted)' }}>Cargando proyectos…</div>}
+            {projectLoadErr && <div className="notice" style={{ marginTop: 8 }}>{projectLoadErr}</div>}
+            {!projectsLoading && (
+              <form onSubmit={onSaveProjects} style={{ display: 'grid', gap: 12 }}>
+                {projectList.map((project, index) => (
+                  <div key={project.id || index} style={projectBoxStyle}>
+                    <div className="form-row">
+                      <Field label="ID" className="metric-field">
                         <input
-                          id={`project-${index}-${field.key}`}
+                          className="input"
+                          value={project.id}
+                          onChange={e => updateProjectField(index, 'id', e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Nombre" className="metric-field">
+                        <input
+                          className="input"
+                          value={project.name}
+                          onChange={e => updateProjectField(index, 'name', e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Cliente" className="metric-field">
+                        <input
+                          className="input"
+                          value={project.client}
+                          onChange={e => updateProjectField(index, 'client', e.target.value)}
+                        />
+                      </Field>
+                    </div>
+                    <div className="form-row">
+                      <Field label="Ubicación" className="metric-field">
+                        <input
+                          className="input"
+                          value={project.location}
+                          onChange={e => updateProjectField(index, 'location', e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Empresa" className="metric-field">
+                        <input
+                          className="input"
+                          value={project.empresa}
+                          onChange={e => updateProjectField(index, 'empresa', e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Modelo" className="metric-field">
+                        <input
+                          className="input"
+                          value={project.model}
+                          onChange={e => updateProjectField(index, 'model', e.target.value)}
+                        />
+                      </Field>
+                    </div>
+                    <div className="form-row">
+                      <Field label="Potencia (kWp)" className="metric-field">
+                        <input
                           className="input"
                           type="number"
                           min="0"
-                          step="any"
-                          value={project[field.key] ?? ''}
-                          onChange={e => updateProjectField(index, field.key, e.target.value)}
+                          value={project.power_kwp}
+                          onChange={e => updateProjectField(index, 'power_kwp', e.target.value)}
                         />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="form-row" style={{marginTop:8}}>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-termMonths`} style={labelStyle}>Plazo (meses)</label>
-                      <input
-                        id={`project-${index}-termMonths`}
-                        className="input"
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={project.termMonths ?? 0}
-                        onChange={e => updateProjectField(index, 'termMonths', e.target.value)}
-                      />
+                      </Field>
+                      <Field label="Energía anual (MWh)" className="metric-field">
+                        <input
+                          className="input"
+                          type="number"
+                          min="0"
+                          value={project.energy_mwh}
+                          onChange={e => updateProjectField(index, 'energy_mwh', e.target.value)}
+                        />
+                      </Field>
+                      <Field label="CO₂ evitado (t/año)" className="metric-field">
+                        <input
+                          className="input"
+                          type="number"
+                          min="0"
+                          value={project.co2_tons}
+                          onChange={e => updateProjectField(index, 'co2_tons', e.target.value)}
+                        />
+                      </Field>
                     </div>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-empresa`} style={labelStyle}>Empresa</label>
-                      <input
-                        id={`project-${index}-empresa`}
-                        className="input"
-                        type="text"
-                        value={project.empresa ?? ''}
-                        onChange={e => updateProjectField(index, 'empresa', e.target.value)}
-                        placeholder="Razón social / filial"
-                      />
+                    <div className="form-row">
+                      <Field label="Estado" className="metric-field">
+                        <input
+                          className="input"
+                          value={project.status}
+                          onChange={e => updateProjectField(index, 'status', e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Plazo (meses)" className="metric-field">
+                        <input
+                          className="input"
+                          type="number"
+                          min="0"
+                          value={project.termMonths}
+                          onChange={e => updateProjectField(index, 'termMonths', e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Imagen" className="metric-field">
+                        <input
+                          className="input"
+                          value={project.imageUrl}
+                          onChange={e => updateProjectField(index, 'imageUrl', e.target.value)}
+                        />
+                      </Field>
                     </div>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-imageUrl`} style={labelStyle}>Imagen (URL)</label>
-                      <input
-                        id={`project-${index}-imageUrl`}
-                        className="input"
-                        type="url"
-                        placeholder="https://..."
-                        value={project.imageUrl ?? ''}
-                        onChange={e => updateProjectField(index, 'imageUrl', e.target.value)}
-                      />
-                      {project.imageUrl && /^https?:\/\//i.test(project.imageUrl) && (
-                        <div style={{ marginTop: 8 }}>
-                          <img
-                            src={project.imageUrl}
-                            alt={project.name || project.id || 'Proyecto'}
-                            style={{ maxWidth: 160, borderRadius: 8 }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="form-row" style={{marginTop:8}}>
-                    <div style={{ ...fieldStyle, minWidth: 260 }}>
-                      <label htmlFor={`project-${index}-notes`} style={labelStyle}>Notas</label>
-                      <textarea
-                        id={`project-${index}-notes`}
-                        className="input"
-                        style={noteAreaStyle}
-                        value={project.notes}
-                        onChange={e => updateProjectField(index, 'notes', e.target.value)}
-                      />
-                    </div>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-loi`} style={labelStyle}>Enlace a LOI</label>
-                      <input
-                        id={`project-${index}-loi`}
-                        className="input"
-                        type="url"
-                        placeholder="https://"
-                        value={project.loi_template}
-                        onChange={e => updateProjectField(index, 'loi_template', e.target.value)}
-                      />
+                    <div className="form-row">
+                      <Field label="Notas" className="metric-field">
+                        <textarea
+                          className="input"
+                          style={noteAreaStyle}
+                          value={project.notes}
+                          onChange={e => updateProjectField(index, 'notes', e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Enlace a LOI" className="metric-field">
+                        <input
+                          className="input"
+                          type="url"
+                          placeholder="https://"
+                          value={project.loi_template}
+                          onChange={e => updateProjectField(index, 'loi_template', e.target.value)}
+                        />
+                      </Field>
                     </div>
                   </div>
+                ))}
+                {!projectList.length && (
+                  <div style={{ marginTop: 12, color: 'var(--muted)' }}>No hay proyectos cargados. Usa "Agregar proyecto".</div>
+                )}
+                <div className="toolbar" style={{ justifyContent: 'flex-end' }}>
+                  <button type="button" className="btn secondary" onClick={addProject}>Agregar proyecto</button>
+                  <button type="submit" className="btn" disabled={projectSaving}>
+                    {projectSaving ? 'Guardando…' : 'Guardar proyectos'}
+                  </button>
                 </div>
-              ))}
-              {!projectList.length && (
-                <div style={{marginTop:12, color:'var(--muted)'}}>No hay proyectos cargados. Usa "Agregar proyecto".</div>
-              )}
-              <div className="row" style={{marginTop:12, gap:8}}>
-                <button type="button" className="btn secondary" onClick={addProject}>Agregar proyecto</button>
-                <button type="submit" className="btn" disabled={projectSaving}>
-                  {projectSaving ? 'Guardando...' : 'Guardar proyectos'}
-                </button>
-              </div>
-            </form>
-          )}
-          {projectSaveMsg && <div className="notice" style={{marginTop:8}}>{projectSaveMsg}</div>}
-          {projectSaveErr && <div className="notice" style={{marginTop:8}}>{projectSaveErr}</div>}
-        </div>
-        <div className="card" style={{marginTop:12}}>
-          <div className="h2">Notas</div>
-          <ul>
-            <li>Este panel hace commits a GitHub (mismo repo) en <code>data/investors/&lt;slug&gt;.json</code>.</li>
-            <li>Netlify vuelve a construir el sitio y los cambios quedan visibles al instante.</li>
-          </ul>
+              </form>
+            )}
+            {projectSaveMsg && <div className="notice" style={{ marginTop: 8 }}>{projectSaveMsg}</div>}
+            {projectSaveErr && <div className="notice" style={{ marginTop: 8 }}>{projectSaveErr}</div>}
+          </Section>
+
+          <Section title="Notas">
+            <ul>
+              <li>Este panel hace commits a GitHub (mismo repo) en <code>data/investors/&lt;slug&gt;.json</code>.</li>
+              <li>Netlify vuelve a construir el sitio y los cambios quedan visibles al instante.</li>
+            </ul>
+          </Section>
         </div>
       </div>
+
+      {docRenamePrompt && (
+        <div style={modalBackdropStyle} role="dialog" aria-modal="true" aria-labelledby="doc-rename-title">
+          <div style={modalCardStyle}>
+            <div className="h2" id="doc-rename-title" style={{ marginTop: 0 }}>Archivo duplicado</div>
+            <p style={{ marginTop: 8, color: 'var(--muted)', fontSize: 14 }}>
+              Ya existe un archivo con ese nombre. ¿Quieres subirlo con un sufijo automático?
+            </p>
+            <p style={{ fontSize: 13 }}>
+              <code>{docRenamePrompt.path}</code>
+            </p>
+            <div style={modalButtonRowStyle}>
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={handleCancelDocRename}
+                disabled={docsWorking}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={handleConfirmDocRename}
+                disabled={docsWorking}
+              >
+                Subir con sufijo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {panelModal && (
         <div style={modalBackdropStyle}>
           <div style={modalCardStyle}>
@@ -2092,13 +1163,13 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
           </div>
         </div>
       )}
+
       {deleteModal && (
         <div style={modalBackdropStyle}>
           <div style={modalCardStyle}>
             <div style={{ fontSize: 18, fontWeight: 700 }}>Eliminar inversionista</div>
             <p style={{ marginTop: 8, marginBottom: 12, color: 'var(--muted)', fontSize: 14 }}>
-              Se eliminará <code>data/investors/{deleteModal.slug}.json</code> y, si existe, la carpeta <code>data/docs/{deleteModal.slug}/</code>.
-              Esta acción no se puede deshacer.
+              Se eliminará <code>data/investors/{deleteModal.slug}.json</code> y, si existe, la carpeta <code>data/docs/{deleteModal.slug}/</code>. Esta acción no se puede deshacer.
             </p>
             {deleteModalError && <div className="notice" style={{ marginTop: 8 }}>{deleteModalError}</div>}
             <div style={modalButtonRowStyle}>
@@ -2116,7 +1187,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                 onClick={confirmDeleteFromModal}
                 disabled={deleteModalLoading}
               >
-                {deleteModalLoading ? 'Eliminando...' : 'Eliminar'}
+                {deleteModalLoading ? 'Eliminando…' : 'Eliminar'}
               </button>
             </div>
           </div>

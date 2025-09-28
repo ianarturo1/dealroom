@@ -1,59 +1,78 @@
-import { useMemo, useState } from "react";
-import { DeadlinesRow } from "./DeadlinesRow";
-import { validateRows, suggestNextStage } from "@/lib/deadlineValidators";
-import { STAGES } from "@/lib/stages";
+import { useMemo, useState } from "react"
+import { DeadlinesRow } from "./DeadlinesRow"
+import { validateRows, suggestNextStage } from "@/lib/deadlineValidators"
+import { STAGES } from "@/lib/stages"
 
-type Row = { stage?: string; date?: string };
+type Row = { stage?: string; date?: string }
 
 type Props = {
-  initial?: Row[]; // [{stage, date}] opcional
-  onChange?: (rows: Row[]) => void;
-  onSubmit?: (rows: Row[]) => void;
-  saving?: boolean;
-  hideSubmit?: boolean;
-  saveLabel?: string;
-};
+  initial?: Row[]
+  onChange?: (rows: Row[]) => void
+  onSubmit?: (rows: Row[]) => void
+  saving?: boolean
+  hideSubmit?: boolean
+  saveLabel?: string
+}
 
 export function DeadlinesForm({ initial = [], onChange, onSubmit, saving = false, hideSubmit = false, saveLabel = "Guardar" }: Props) {
-  const [rows, setRows] = useState<Row[]>(initial.length ? initial : [{ stage: "", date: "" }]);
+  const safeInitial = Array.isArray(initial) && initial.length ? initial : [{ stage: "", date: "" }]
+  const [rows, setRows] = useState<Row[]>(safeInitial)
 
   const { validation, availableOptions } = useMemo(() => {
-    const v = validateRows(rows);
-    const used = new Set<string>();
-    rows.forEach(r => {
-      const s = r.stage?.trim();
-      if (s) used.add(s);
-    });
-    // opciones por fila: ocultar ya usadas (solo si la fila aún no eligió etapa)
-    const options = rows.map(r => {
-      if (!r.stage) return STAGES.filter(s => !Array.from(used).includes(s));
-      return STAGES;
-    });
-    return {
-      validation: v,
-      availableOptions: options,
-    };
-  }, [rows]);
+    try {
+      const safeRows = Array.isArray(rows) ? rows : []
+      const v = validateRows(safeRows)
+      const used = new Set<string>()
+      safeRows.forEach(r => {
+        const s = r?.stage?.trim()
+        if (s) used.add(s)
+      })
+
+      const options = safeRows.map(r => {
+        if (!r?.stage) {
+          return STAGES.filter(stage => !used.has(stage))
+        }
+        return STAGES
+      })
+
+      return {
+        validation: v,
+        availableOptions: options.length ? options : safeRows.map(() => STAGES),
+      }
+    } catch (e) {
+      console.error("DeadlinesForm memo error:", e)
+      const fallbackRows = Array.isArray(rows) ? rows : []
+      return {
+        validation: { ok: false, message: "Error interno." },
+        availableOptions: fallbackRows.map(() => STAGES),
+      }
+    }
+  }, [rows])
 
   function updateRow(i: number, next: Row) {
-    const copy = rows.slice();
-    copy[i] = next;
-    setRows(copy);
-    onChange?.(copy);
+    setRows(prev => {
+      const base = Array.isArray(prev) ? prev.slice() : []
+      base[i] = next ?? { stage: "", date: "" }
+      onChange?.(base)
+      return base
+    })
   }
 
   function addRow() {
-    const suggestion = suggestNextStage(rows) || "";
-    const next = [...rows, { stage: suggestion, date: "" }];
-    setRows(next);
-    onChange?.(next);
+    setRows(prev => {
+      const safeRows = Array.isArray(prev) ? prev : []
+      const suggestion = suggestNextStage(safeRows) || ""
+      const nextRows = [...safeRows, { stage: suggestion, date: "" }]
+      onChange?.(nextRows)
+      return nextRows
+    })
   }
 
-  const canSave = validation.ok && !saving;
+  const canSave = Boolean(validation?.ok) && !saving
 
   return (
-    <div className="space-y-3">
-      {rows.map((r, i) => (
+    <div style={{ display: "grid", gap: 12 }}>
+      {(Array.isArray(rows) ? rows : []).map((r, i) => (
         <DeadlinesRow
           key={i}
           value={r}
@@ -63,13 +82,15 @@ export function DeadlinesForm({ initial = [], onChange, onSubmit, saving = false
       ))}
 
       {!canSave && validation?.message && (
-        <div className="text-red-600 text-sm">{validation.message}</div>
+        <div className="notice" style={{ background: "#fef2f2", borderColor: "#fecaca", color: "#b91c1c" }}>
+          {validation.message}
+        </div>
       )}
 
-      <div className="flex gap-2">
+      <div className="toolbar">
         <button
           type="button"
-          className="px-3 py-2 rounded bg-gray-100"
+          className="btn secondary"
           onClick={addRow}
           disabled={saving}
         >
@@ -79,11 +100,13 @@ export function DeadlinesForm({ initial = [], onChange, onSubmit, saving = false
         {!hideSubmit && (
           <button
             type="button"
-            className="px-3 py-2 rounded bg-purple-600 text-white disabled:opacity-50"
+            className="btn"
             disabled={!canSave}
             onClick={() => {
-              if (!canSave) return;
-              onSubmit?.(rows);
+              if (!canSave) return
+              const currentRows = Array.isArray(rows) ? rows : []
+              if (!Array.isArray(currentRows)) return
+              onSubmit?.(currentRows)
             }}
           >
             {saving ? "Guardando…" : saveLabel}
@@ -91,5 +114,5 @@ export function DeadlinesForm({ initial = [], onChange, onSubmit, saving = false
         )}
       </div>
     </div>
-  );
+  )
 }
