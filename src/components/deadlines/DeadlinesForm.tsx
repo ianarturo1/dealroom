@@ -2,6 +2,8 @@ import { useMemo, useState } from "react"
 import { DeadlinesRow } from "./DeadlinesRow"
 import { validateRows, suggestNextStage } from "@/lib/deadlineValidators"
 import { STAGES } from "@/lib/stages"
+import { Button } from "@/components/ui/Button"
+import { Toolbar } from "@/components/ui/Toolbar"
 
 type Row = { stage?: string; date?: string }
 
@@ -71,7 +73,7 @@ export function DeadlinesForm({ initial = [], onChange, onSubmit, saving = false
   const canSave = Boolean(validation?.ok) && !saving
 
   return (
-    <div className="space-y-3">
+    <div style={{ display: "grid", gap: 12 }}>
       {(Array.isArray(rows) ? rows : []).map((r, i) => (
         <DeadlinesRow
           key={i}
@@ -82,23 +84,17 @@ export function DeadlinesForm({ initial = [], onChange, onSubmit, saving = false
       ))}
 
       {!canSave && validation?.message && (
-        <div className="text-red-600 text-sm">{validation.message}</div>
+        <div className="help" style={{ color: "#dc2626" }}>{validation.message}</div>
       )}
 
-      <div className="flex gap-2">
-        <button
-          type="button"
-          className="px-3 py-2 rounded bg-gray-100"
-          onClick={addRow}
-          disabled={saving}
-        >
+      <Toolbar>
+        <Button type="button" variant="secondary" onClick={addRow} disabled={saving}>
           Agregar deadline
-        </button>
+        </Button>
 
         {!hideSubmit && (
-          <button
+          <Button
             type="button"
-            className="px-3 py-2 rounded bg-purple-600 text-white disabled:opacity-50"
             disabled={!canSave}
             onClick={() => {
               if (!canSave) return
@@ -108,9 +104,9 @@ export function DeadlinesForm({ initial = [], onChange, onSubmit, saving = false
             }}
           >
             {saving ? "Guardando…" : saveLabel}
-          </button>
+          </Button>
         )}
-      </div>
+      </Toolbar>
     </div>
   )
 }
