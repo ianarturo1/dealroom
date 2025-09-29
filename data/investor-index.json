@@ -120,6 +120,13 @@
       "name": "AIRON VISION",
       "email": "fabi@gmail.com",
       "status": "Primera reunión"
+    },
+    "bocar": {
+      "name": "Bocar",
+      "email": "carlos.cortes@bocar.com",
+      "status": "Entrega de información",
+      "createdAt": "2025-09-29T20:48:07.890Z",
+      "updatedAt": "2025-09-29T20:48:07.890Z"
     }
   }
 }
