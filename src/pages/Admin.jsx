@@ -11,6 +11,14 @@ import { validateRows } from '@/lib/deadlineValidators'
 import { STAGES } from '@/lib/stages'
 import { useToast } from '@/lib/toast'
 import { modalBackdropStyle, modalCardStyle, modalButtonRowStyle } from '@/components/modalStyles'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
+import { Textarea } from '@/components/ui/Textarea'
+import { Card } from '@/components/ui/Card'
+import { Section } from '@/components/ui/Section'
+import { FormRow } from '@/components/ui/FormRow'
+import { Toolbar } from '@/components/ui/Toolbar'
 
 const PORTFOLIO_OPTIONS = [
   { value: 'solarFarms', label: 'Granjas Solares' },
@@ -1074,11 +1082,6 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     : 0
   const projectProfitability = metrics.projectProfitability || {}
 
-  const labelStyle = { fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 4 }
-  const fieldStyle = { display: 'flex', flexDirection: 'column', flex: 1, minWidth: 200 }
-  const mixFieldStyle = { display: 'flex', flexDirection: 'column', flex: 1, minWidth: 160 }
-  const projectBoxStyle = { border: '1px solid var(--border)', borderRadius: 12, padding: 12, marginTop: 12, background: '#f7f7fb' }
-  const noteAreaStyle = { minHeight: 96, resize: 'vertical' }
 
   const onSubmit = async (e) => {
     e.preventDefault()
@@ -1237,20 +1240,20 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
   return (
     <RoleGate user={user} allow={['admin','ri']}>
-      <div className="flex min-h-screen" style={{ display: 'flex', minHeight: '100vh', background: '#f7f7fb' }}>
+      <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
         <aside
-          className="w-64 shrink-0 overflow-y-auto border-r"
           style={{
-            width: 256,
+            width: 280,
             flexShrink: 0,
-            overflowY: 'auto',
-            borderRight: '1px solid var(--border)',
-            background: '#fff'
+            padding: '24px 16px',
+            boxSizing: 'border-box'
           }}
         >
-          <div style={{ padding: 16 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Panel admin</h2>
-            <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 8 }}>
+          <Card style={{ padding: 20, position: 'sticky', top: 24 }}>
+            <div className="title h2" style={{ marginBottom: 8 }}>
+              Panel admin
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--muted)', margin: 0 }}>
               Gestiona inversionistas, documentos y deadlines desde este panel.
             </p>
             <ul style={{ listStyle: 'disc', margin: '16px 0 0 20px', padding: 0, color: 'var(--muted)', fontSize: 13 }}>
@@ -1258,43 +1261,61 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
               <li>Actualiza documentos críticos.</li>
               <li>Gestiona deadlines y proyectos.</li>
             </ul>
-          </div>
+          </Card>
         </aside>
-        <main className="flex-1 min-w-0" style={{ flex: 1, minWidth: 0, background: '#fff' }}>
+        <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           <header
-            className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b"
             style={{
               position: 'sticky',
               top: 0,
               zIndex: 10,
-              background: 'rgba(255, 255, 255, 0.92)',
+              background: 'linear-gradient(180deg,#fff,rgba(255,255,255,.85))',
               backdropFilter: 'blur(6px)',
-              borderBottom: '1px solid var(--border)'
+              borderBottom: '1px solid rgba(0,0,0,.06)'
             }}
           >
-            <div style={{ padding: '16px 20px' }}>
-              <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>Admin / Relaciones con Inversionistas</h1>
-              <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--muted)' }}>
-                Accede a métricas clave, administra inversionistas y cuida los deadlines.
-              </p>
+            <div
+              style={{
+                maxWidth: 1100,
+                margin: '0 auto',
+                padding: '18px 24px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 16,
+                flexWrap: 'wrap'
+              }}
+            >
+              <div>
+                <div className="h1" style={{ margin: 0, color: 'var(--brand)' }}>
+                  Panel de administración
+                </div>
+                <p className="help" style={{ margin: '4px 0 0' }}>
+                  Accede a métricas clave, administra inversionistas y cuida los deadlines.
+                </p>
+              </div>
+              <span className="badge">Dealroom Finsolar</span>
             </div>
           </header>
-          <div
-            className="h-[calc(100vh-3rem)] overflow-y-auto overflow-x-hidden p-4"
-            style={{ height: 'calc(100vh - 3rem)', overflowY: 'auto', overflowX: 'hidden', padding: 16 }}
-          >
+          <div style={{ flex: 1, overflowY: 'auto' }}>
             <div
-              className="space-y-6"
-              style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 1120, margin: '0 auto' }}
+              style={{
+                maxWidth: 1120,
+                margin: '24px auto',
+                padding: '0 24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 24
+              }}
             >
                     {isAdmin && (
-                      <div className="grid" style={{ marginBottom: 16 }}>
-                      <div className="card" style={{ gridColumn: 'span 2', minWidth: 280 }}>
-                        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div className="h2" style={{ marginTop: 0 }}>Pipeline global</div>
-                          {investorListLoading && <span className="badge">Actualizando…</span>}
-                        </div>
-                        <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 12 }}>
+                      <div className="grid-2">
+                      <Section
+                        title="Pipeline global"
+                        style={{ gridColumn: '1 / -1' }}
+                        actions={investorListLoading ? <span className="badge">Actualizando…</span> : null}
+                      >
+                        <div className="help" style={{ marginBottom: 12 }}>
                           Total inversionistas: {numberFormatter.format(pipelineSummary.total || 0)}
                         </div>
                         <div style={{ marginBottom: 16 }}>
@@ -1325,44 +1346,44 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                             <div style={{ fontSize: 13, color: 'var(--muted)' }}>Sin inversionistas cargados.</div>
                           )}
                         </div>
-                      </div>
+                      </Section>
 
-                      <div className="card">
-                        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div className="h2" style={{ marginTop: 0 }}>Inversionistas activos</div>
-                          <button
+                      <Section
+                        title="Inversionistas activos"
+                        actions={
+                          <Button
                             type="button"
-                            className="btn secondary"
+                            variant="secondary"
                             onClick={loadInvestorList}
                             disabled={investorListLoading}
                           >
                             {investorListLoading ? 'Actualizando…' : 'Actualizar'}
-                          </button>
+                          </Button>
+                        }
+                      >
+                        <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--brand)' }}>
+                          {investorListLoading ? '—' : numberFormatter.format(pipelineSummary.total || 0)}
                         </div>
-                        <div className="kpi" style={{ marginTop: 4 }}>
-                          <div className="num">{investorListLoading ? '—' : numberFormatter.format(pipelineSummary.total || 0)}</div>
-                          <div className="label">Total dados de alta</div>
-                        </div>
+                        <div className="help">Total dados de alta</div>
                         {investorListError && <div className="notice" style={{ marginTop: 12 }}>{investorListError}</div>}
-                      </div>
+                      </Section>
 
-                      <div className="card">
-                        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div className="h2" style={{ marginTop: 0 }}>Alertas de fechas próximas</div>
-                          {investorDetailsLoading && <span className="badge">Cargando…</span>}
-                        </div>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>
-                          Próximos
-                          <input
-                            type="number"
-                            min="0"
-                            className="input"
-                            value={deadlineThreshold}
-                            onChange={handleDeadlineThresholdChange}
-                            style={{ width: 90, padding: '6px 8px' }}
-                          />
-                          días
-                        </label>
+                      <Section
+                        title="Alertas de fechas próximas"
+                        actions={investorDetailsLoading ? <span className="badge">Cargando…</span> : null}
+                      >
+                        <FormRow label="Mostrar alertas de">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={deadlineThreshold}
+                              onChange={handleDeadlineThresholdChange}
+                              style={{ width: 90 }}
+                            />
+                            <span className="help">días</span>
+                          </div>
+                        </FormRow>
                         {upcomingDeadlines.length === 0 && !investorDetailsLoading ? (
                           <div style={{ fontSize: 13, color: 'var(--muted)' }}>Sin alertas dentro del rango configurado.</div>
                         ) : (
@@ -1382,9 +1403,9 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                                       </div>
                                     </div>
                                     {item.docTarget && (
-                                      <button
+                                      <Button
                                         type="button"
-                                        className="btn secondary"
+                                        variant="secondary"
                                         onClick={() => navigateToDocsSection(
                                           item.docTarget.category,
                                           item.slug,
@@ -1392,7 +1413,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                                         )}
                                       >
                                         Ir a {item.docTarget.category}
-                                      </button>
+                                      </Button>
                                     )}
                                   </div>
                                 </li>
@@ -1401,20 +1422,21 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                           </ul>
                         )}
                         {investorDetailsError && <div className="notice" style={{ marginTop: 12 }}>{investorDetailsError}</div>}
-                      </div>
+                      </Section>
 
-                      <div className="card">
-                        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div className="h2" style={{ marginTop: 0 }}>Faltan documentos</div>
-                          <button
+                      <Section
+                        title="Faltan documentos"
+                        actions={
+                          <Button
                             type="button"
-                            className="btn secondary"
+                            variant="secondary"
                             onClick={handleRefreshDocInventories}
                             disabled={docHealthLoading}
                           >
                             {docHealthLoading ? 'Verificando…' : 'Revisar'}
-                          </button>
-                        </div>
+                          </Button>
+                        }
+                      >
                         <p style={{ margin: '4px 0 12px', color: 'var(--muted)', fontSize: 13 }}>
                           Estatus por categorías clave.
                         </p>
@@ -1453,21 +1475,25 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                                     </div>
                                   </div>
                                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                                    <button
+                                    <Button
                                       type="button"
-                                      className="btn secondary"
+                                      variant="secondary"
                                       onClick={() => navigateToDocsSection(summary.category, summary.fallbackSlug, 'upload')}
                                     >
                                       Subir
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                       type="button"
-                                      className="btn secondary"
-                                      onClick={() => navigateToDocsSection(summary.category, (summary.folderTarget && summary.folderTarget.slug) || summary.fallbackSlug, 'folder')}
+                                      variant="secondary"
+                                      onClick={() => navigateToDocsSection(
+                                        summary.category,
+                                        (summary.folderTarget && summary.folderTarget.slug) || summary.fallbackSlug,
+                                        'folder'
+                                      )}
                                       disabled={disabledFolder}
                                     >
                                       Carpeta
-                                    </button>
+                                    </Button>
                                   </div>
                                 </div>
                                 {hasErrors && (
@@ -1480,20 +1506,22 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                           })
                         )}
                         {docHealthError && <div className="notice" style={{ marginTop: 12 }}>{docHealthError}</div>}
-                      </div>
+                      </Section>
 
-                      <div className="card" style={{ gridColumn: 'span 2', minWidth: 280 }}>
-                        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div className="h2" style={{ marginTop: 0 }}>Actividad reciente</div>
-                          <button
+                      <Section
+                        title="Actividad reciente"
+                        style={{ gridColumn: '1 / -1' }}
+                        actions={
+                          <Button
                             type="button"
-                            className="btn secondary"
+                            variant="secondary"
                             onClick={handleRefreshActivity}
                             disabled={activityLoading}
                           >
                             {activityLoading ? 'Consultando…' : 'Actualizar'}
-                          </button>
-                        </div>
+                          </Button>
+                        }
+                      >
                         {activityError && <div className="notice" style={{ marginTop: 12 }}>{activityError}</div>}
                         {activityLoading && <div style={{ marginTop: 12, color: 'var(--muted)' }}>Consultando actividad…</div>}
                         {!activityLoading && !activityError && activityDisplayItems.length === 0 && (
@@ -1515,21 +1543,48 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                             ))}
                           </ul>
                         )}
-                      </div>
+                      </Section>
                       </div>
                     )}
-                    <div className="card" style={{marginBottom:12}}>
-                      <div className="h2">Alta de Inversionista</div>
-                      <form onSubmit={onCreate} aria-busy={invLoading}>
-                        <div className="form-row">
-                          <input className="input" type="email" placeholder="Email corporativo" value={inv.email} onChange={e => setInv({ ...inv, email: e.target.value })} required />
-                          <input className="input" placeholder="Nombre de la empresa" value={inv.companyName} onChange={e => setInv({ ...inv, companyName: e.target.value })} required />
-                          <input className="input" placeholder="Slug deseado (opcional)" value={inv.slug} onChange={e => setInv({ ...inv, slug: e.target.value })} />
-                          <select className="select" value={inv.status} onChange={e => setInv({ ...inv, status: e.target.value })}>
-                            {PIPELINE_STAGES.map(s => <option key={s}>{s}</option>)}
-                          </select>
+                    <Section title="Alta de inversionista">
+                      <form onSubmit={onCreate} aria-busy={invLoading} style={{ display: 'grid', gap: 16 }}>
+                        <div className="grid-2">
+                          <FormRow label="Email corporativo">
+                            <Input
+                              type="email"
+                              placeholder="Email corporativo"
+                              value={inv.email}
+                              onChange={e => setInv({ ...inv, email: e.target.value })}
+                              required
+                            />
+                          </FormRow>
+                          <FormRow label="Nombre de la empresa">
+                            <Input
+                              placeholder="Nombre de la empresa"
+                              value={inv.companyName}
+                              onChange={e => setInv({ ...inv, companyName: e.target.value })}
+                              required
+                            />
+                          </FormRow>
+                          <FormRow label="Slug deseado (opcional)">
+                            <Input
+                              placeholder="Slug opcional"
+                              value={inv.slug}
+                              onChange={e => setInv({ ...inv, slug: e.target.value })}
+                            />
+                          </FormRow>
+                          <FormRow label="Estado inicial">
+                            <Select value={inv.status} onChange={e => setInv({ ...inv, status: e.target.value })}>
+                              {PIPELINE_STAGES.map(s => (
+                                <option key={s} value={s}>
+                                  {s}
+                                </option>
+                              ))}
+                            </Select>
+                          </FormRow>
                         </div>
-                        <div style={{marginTop:8}}>
+                        <div>
+                          <span className="label">Deadlines</span>
                           <DeadlinesForm
                             key={invDeadlinesKey}
                             initial={inv.deadlines}
@@ -1537,87 +1592,99 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                             hideSubmit
                           />
                         </div>
-                        <button className="btn" type="submit" disabled={invLoading} style={{marginTop:8}}>
-                          {invLoading ? 'Creando…' : 'Crear'}
-                        </button>
+                        <Toolbar>
+                          <Button type="submit" disabled={invLoading}>
+                            {invLoading ? 'Creando…' : 'Crear'}
+                          </Button>
+                        </Toolbar>
                       </form>
-                      {invLoading && <div className="progress" style={{marginTop:8}}><div style={{width: progress + '%'}} /></div>}
-                      {invMsg && (
-                        <div className="notice" style={{marginTop:8, display:'flex', alignItems:'center', justifyContent:'space-between'}}>
-                          <span style={{wordBreak:'break-all'}}>{invMsg}</span>
-                          <button className="btn" type="button" onClick={() => navigator.clipboard && navigator.clipboard.writeText(invMsg)}>Copiar</button>
+                      {invLoading && (
+                        <div className="progress" style={{ marginTop: 8 }}>
+                          <div style={{ width: progress + '%' }} />
                         </div>
                       )}
-                      {invErr && <div className="notice" style={{marginTop:8}}>{invErr}</div>}
-                    </div>
+                      {invMsg && (
+                        <div className="notice" style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ wordBreak: 'break-all' }}>{invMsg}</span>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => navigator.clipboard && navigator.clipboard.writeText(invMsg)}
+                          >
+                            Copiar
+                          </Button>
+                        </div>
+                      )}
+                      {invErr && <div className="notice" style={{ marginTop: 8 }}>{invErr}</div>}
+                    </Section>
                     {isAdmin && (
-                      <div className="card" style={{marginBottom:12}}>
-                        <div className="h2">Inversionistas activos</div>
-                        <p style={{marginTop:0, marginBottom:12, color:'var(--muted)', fontSize:14}}>
+                      <Section title="Inversionistas activos">
+                        <p style={{ marginTop: 0, marginBottom: 12, color: 'var(--muted)', fontSize: 14 }}>
                           Consulta los inversionistas dados de alta y dales de baja cuando sea necesario.
                         </p>
-                        <div className="form-row" style={{marginBottom:12}}>
-                          <input
-                            className="input"
+                        <Toolbar style={{ marginBottom: 12 }}>
+                          <Input
                             placeholder="Buscar por nombre, correo o slug"
                             value={investorSearch}
                             onChange={e => setInvestorSearch(e.target.value)}
+                            style={{ flex: 1, minWidth: 220 }}
                           />
-                          <button
+                          <Button
                             type="button"
-                            className="btn secondary"
+                            variant="secondary"
                             onClick={loadInvestorList}
                             disabled={investorListLoading}
                           >
                             {investorListLoading ? 'Actualizando...' : 'Actualizar lista'}
-                          </button>
-                        </div>
-                        {investorListError && <div className="notice" style={{marginBottom:12}}>{investorListError}</div>}
-                        {investorDeleteErr && <div className="notice" style={{marginBottom:12}}>{investorDeleteErr}</div>}
-                        {investorDeleteMsg && <div className="notice" style={{marginBottom:12}}>{investorDeleteMsg}</div>}
-                        <div style={{fontSize:13, color:'var(--muted)', marginBottom:8}}>
+                          </Button>
+                        </Toolbar>
+                        {investorListError && <div className="notice" style={{ marginBottom: 12 }}>{investorListError}</div>}
+                        {investorDeleteErr && <div className="notice" style={{ marginBottom: 12 }}>{investorDeleteErr}</div>}
+                        {investorDeleteMsg && <div className="notice" style={{ marginBottom: 12 }}>{investorDeleteMsg}</div>}
+                        <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>
                           {investorListLoading
                             ? 'Cargando inversionistas...'
                             : `${filteredInvestorCount} inversionista${filteredInvestorCount === 1 ? '' : 's'} coincidente${filteredInvestorCount === 1 ? '' : 's'}`}
                         </div>
-                        <div style={{overflowX:'auto'}}>
+                        <div style={{ overflowX: 'auto' }}>
                           <table className="table">
                             <thead>
                               <tr>
-                                <th style={{minWidth:140}}>Empresa</th>
-                                <th style={{minWidth:180}}>Correo</th>
-                                <th style={{minWidth:100}}>Slug</th>
-                                <th style={{minWidth:120}}>Estado</th>
-                                <th style={{minWidth:120}}>Acciones</th>
+                                <th style={{ minWidth: 140 }}>Empresa</th>
+                                <th style={{ minWidth: 180 }}>Correo</th>
+                                <th style={{ minWidth: 100 }}>Slug</th>
+                                <th style={{ minWidth: 120 }}>Estado</th>
+                                <th style={{ minWidth: 120 }}>Acciones</th>
                               </tr>
                             </thead>
                             <tbody>
                               {investorListLoading && (
                                 <tr>
-                                  <td colSpan={5} style={{paddingTop:12, paddingBottom:12}}>Cargando datos...</td>
+                                  <td colSpan={5} style={{ paddingTop: 12, paddingBottom: 12 }}>Cargando datos...</td>
                                 </tr>
                               )}
-                              {!investorListLoading && filteredInvestors.map(item => (
-                                <tr key={item.slug}>
-                                  <td>{item.name || '—'}</td>
-                                  <td>{item.email || '—'}</td>
-                                  <td>{item.slug}</td>
-                                  <td>{item.status || '—'}</td>
-                                  <td>
-                                    <button
-                                      type="button"
-                                      className="btn secondary"
-                                      onClick={() => handleDeleteInvestor(item.slug)}
-                                      disabled={deletingInvestor === item.slug}
-                                    >
-                                      {deletingInvestor === item.slug ? 'Eliminando...' : 'Eliminar'}
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
+                              {!investorListLoading &&
+                                filteredInvestors.map(item => (
+                                  <tr key={item.slug}>
+                                    <td>{item.name || '—'}</td>
+                                    <td>{item.email || '—'}</td>
+                                    <td>{item.slug}</td>
+                                    <td>{item.status || '—'}</td>
+                                    <td>
+                                      <Button
+                                        type="button"
+                                        variant="secondary"
+                                        onClick={() => handleDeleteInvestor(item.slug)}
+                                        disabled={deletingInvestor === item.slug}
+                                      >
+                                        {deletingInvestor === item.slug ? 'Eliminando...' : 'Eliminar'}
+                                      </Button>
+                                    </td>
+                                  </tr>
+                                ))}
                               {!investorListLoading && filteredInvestors.length === 0 && (
                                 <tr>
-                                  <td colSpan={5} style={{paddingTop:12, paddingBottom:12, color:'var(--muted)'}}>
+                                  <td colSpan={5} style={{ paddingTop: 12, paddingBottom: 12, color: 'var(--muted)' }}>
                                     No se encontraron inversionistas con los criterios actuales.
                                   </td>
                                 </tr>
@@ -1625,61 +1692,65 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                             </tbody>
                           </table>
                         </div>
-                      </div>
+                      </Section>
                     )}
-                    <div className="card">
-                      <div className="h2">Actualizar estado de inversionista</div>
-                      <form onSubmit={onSubmit}>
-                        <div className="form-row">
-                          <input
-                            className="input"
-                            placeholder="slug (id)"
-                            value={payload.id}
-                            onChange={e => setPayload({ ...payload, id: e.target.value })}
-                          />
-                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            <button
-                              type="button"
-                              className="btn secondary"
-                              onClick={handleLoadInvestor}
-                              disabled={investorLoading || !canLoadInvestor}
-                            >
-                              {investorLoading ? 'Cargando...' : 'Cargar datos'}
-                            </button>
-                            <button
-                              type="button"
-                              className="btn secondary"
-                              onClick={handleOpenPanelModal}
-                              disabled={!canLoadInvestor}
-                            >
-                              Ver panel
-                            </button>
-                            <button
-                              type="button"
-                              className="btn secondary"
-                              onClick={handleOpenDeleteModal}
-                              disabled={!canLoadInvestor || deletingInvestor === normalizedPayloadSlug}
-                            >
-                              {deletingInvestor === normalizedPayloadSlug ? 'Eliminando...' : 'Eliminar'}
-                            </button>
-                          </div>
-                          <input
-                            className="input"
-                            placeholder="Nombre"
-                            value={payload.name}
-                            onChange={e => setPayload({ ...payload, name: e.target.value })}
-                          />
-                          <select
-                            className="select"
-                            value={payload.status}
-                            onChange={e => setPayload({ ...payload, status: e.target.value })}
-                          >
-                            {PIPELINE_STAGES.map(s => <option key={s}>{s}</option>)}
-                          </select>
+                    <Section title="Actualizar estado de inversionista">
+                      <form onSubmit={onSubmit} style={{ display: 'grid', gap: 20 }}>
+                        <div className="grid-2">
+                          <FormRow label="Slug (id)">
+                            <Input
+                              placeholder="slug (id)"
+                              value={payload.id}
+                              onChange={e => setPayload({ ...payload, id: e.target.value })}
+                            />
+                          </FormRow>
+                          <FormRow label="Nombre">
+                            <Input
+                              placeholder="Nombre"
+                              value={payload.name}
+                              onChange={e => setPayload({ ...payload, name: e.target.value })}
+                            />
+                          </FormRow>
+                          <FormRow label="Estado">
+                            <Select value={payload.status} onChange={e => setPayload({ ...payload, status: e.target.value })}>
+                              {PIPELINE_STAGES.map(s => (
+                                <option key={s} value={s}>
+                                  {s}
+                                </option>
+                              ))}
+                            </Select>
+                          </FormRow>
                         </div>
 
-                        <div style={{ marginTop: 12, fontWeight: 700 }}>Deadlines</div>
-                        <div style={{ marginTop: 8 }}>
+                        <Toolbar>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={handleLoadInvestor}
+                            disabled={investorLoading || !canLoadInvestor}
+                          >
+                            {investorLoading ? 'Cargando...' : 'Cargar datos'}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={handleOpenPanelModal}
+                            disabled={!canLoadInvestor}
+                          >
+                            Ver panel
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={handleOpenDeleteModal}
+                            disabled={!canLoadInvestor || deletingInvestor === normalizedPayloadSlug}
+                          >
+                            {deletingInvestor === normalizedPayloadSlug ? 'Eliminando...' : 'Eliminar'}
+                          </Button>
+                        </Toolbar>
+
+                        <div>
+                          <span className="label">Deadlines</span>
                           <DeadlinesForm
                             key={deadlineFormKey}
                             initial={deadlineRows}
@@ -1687,160 +1758,157 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                             onSubmit={handleDeadlinesSubmit}
                             saving={deadlinesSaving}
                           />
-                          {deadlinesMsg && (
-                            <div className="notice" style={{ marginTop: 8 }}>{deadlinesMsg}</div>
-                          )}
-                          {deadlinesErr && (
-                            <div className="notice" style={{ marginTop: 8 }}>{deadlinesErr}</div>
-                          )}
+                          {deadlinesMsg && <div className="notice" style={{ marginTop: 8 }}>{deadlinesMsg}</div>}
+                          {deadlinesErr && <div className="notice" style={{ marginTop: 8 }}>{deadlinesErr}</div>}
                         </div>
 
-                        <div style={{ marginTop: 12, fontWeight: 700 }}>Métricas clave</div>
-
-                        <div className="form-row" style={{ marginTop: 8 }}>
-                          <div style={fieldStyle}>
-                            <div style={labelStyle}>Días a decisión</div>
+                        <div style={{ display: 'grid', gap: 16 }}>
+                          <div>
+                            <span className="label">Días a decisión</span>
                             <span className={decisionBadgeClass}>{decisionLabel}</span>
                           </div>
-                          <div style={fieldStyle}>
-                            <label htmlFor="metric-fiscal" style={labelStyle}>Inversión de capital fiscal (MXN)</label>
-                            <input
-                              id="metric-fiscal"
-                              className="input"
-                              type="number"
-                              min="0"
-                              step="any"
-                              value={metrics.fiscalCapitalInvestment ?? ''}
-                              onChange={e => updateMetric('fiscalCapitalInvestment', e.target.value)}
-                            />
+                          <div className="grid-2">
+                            <FormRow label="Inversión de capital fiscal (MXN)">
+                              <Input
+                                id="metric-fiscal"
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={metrics.fiscalCapitalInvestment ?? ''}
+                                onChange={e => updateMetric('fiscalCapitalInvestment', e.target.value)}
+                              />
+                            </FormRow>
+                            <FormRow label="Utilidad de proyecto (MXN)">
+                              <Input
+                                id="metric-project-amount"
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={projectProfitability.amount ?? ''}
+                                onChange={e => updateMetric('projectProfitability', current => ({ ...(current || {}), amount: e.target.value }))}
+                              />
+                            </FormRow>
+                            <FormRow label="Horizonte (años)">
+                              <Input
+                                id="metric-project-years"
+                                type="number"
+                                min="0"
+                                value={projectProfitability.years ?? ''}
+                                onChange={e => updateMetric('projectProfitability', current => ({ ...(current || {}), years: e.target.value }))}
+                              />
+                            </FormRow>
+                            <FormRow label="Portafolio">
+                              <Select
+                                id="metric-portfolio-type"
+                                value={portfolio.type || ''}
+                                onChange={e => handlePortfolioTypeChange(e.target.value)}
+                              >
+                                <option value="">Selecciona una opción</option>
+                                {PORTFOLIO_OPTIONS.map(opt => (
+                                  <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </Select>
+                            </FormRow>
                           </div>
-                        </div>
 
-                        <div className="form-row" style={{ marginTop: 8 }}>
-                          <div style={fieldStyle}>
-                            <label htmlFor="metric-project-amount" style={labelStyle}>Utilidad de proyecto (MXN)</label>
-                            <input
-                              id="metric-project-amount"
-                              className="input"
-                              type="number"
-                              min="0"
-                              step="any"
-                              value={projectProfitability.amount ?? ''}
-                              onChange={e => updateMetric('projectProfitability', current => ({ ...(current || {}), amount: e.target.value }))}
-                            />
-                          </div>
-                          <div style={fieldStyle}>
-                            <label htmlFor="metric-project-years" style={labelStyle}>Horizonte (años)</label>
-                            <input
-                              id="metric-project-years"
-                              className="input"
-                              type="number"
-                              min="0"
-                              value={projectProfitability.years ?? ''}
-                              onChange={e => updateMetric('projectProfitability', current => ({ ...(current || {}), years: e.target.value }))}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="form-row" style={{ marginTop: 8 }}>
-                          <div style={fieldStyle}>
-                            <label htmlFor="metric-portfolio-type" style={labelStyle}>Portafolio</label>
-                            <select
-                              id="metric-portfolio-type"
-                              className="select"
-                              value={portfolio.type || ''}
-                              onChange={e => handlePortfolioTypeChange(e.target.value)}
-                            >
-                              <option value="">Selecciona una opción</option>
-                              {PORTFOLIO_OPTIONS.map(opt => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-
-                        {isPortfolioMix && (
-                          <div style={{ marginTop: 8 }}>
-                            <div className="form-row">
-                              {MIX_FIELDS.map(field => (
-                                <div key={field.key} style={mixFieldStyle}>
-                                  <label htmlFor={`metric-portfolio-${field.key}`} style={labelStyle}>{field.label} (%)</label>
-                                  <input
-                                    id={`metric-portfolio-${field.key}`}
-                                    className="input"
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    step="any"
-                                    value={mixValues[field.key] ?? ''}
-                                    onChange={e => handleMixChange(field.key, e.target.value)}
-                                  />
-                                </div>
-                              ))}
+                          {isPortfolioMix && (
+                            <div style={{ display: 'grid', gap: 12 }}>
+                              <div className="grid-3">
+                                {MIX_FIELDS.map(field => (
+                                  <FormRow key={field.key} label={`${field.label} (%)`}>
+                                    <Input
+                                      id={`metric-portfolio-${field.key}`}
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      step="any"
+                                      value={mixValues[field.key] ?? ''}
+                                      onChange={e => handleMixChange(field.key, e.target.value)}
+                                    />
+                                  </FormRow>
+                                ))}
+                              </div>
+                              <div className="help">Suma: {mixTotal}%</div>
                             </div>
-                            <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>Suma: {mixTotal}%</div>
-                          </div>
-                        )}
+                          )}
+                        </div>
 
-                        <button className="btn" type="submit" style={{ marginTop: 12 }}>Guardar</button>
+                        <Toolbar>
+                          <Button type="submit">Guardar</Button>
+                        </Toolbar>
                       </form>
-                      {msg && <div className="notice" style={{marginTop:8}}>{msg}</div>}
-                      {err && <div className="notice" style={{marginTop:8}}>{err}</div>}
-                    </div>
-                    <div className="card" style={{marginTop:12}} ref={docsCardRef}>
-                      <div className="h2">Documentos por inversionista</div>
-                      <form
-                        onSubmit={handleDocSlugSubmit}
-                        className="form-row"
-                        style={{ marginTop: 8, alignItems: 'flex-end', gap: 12 }}
-                      >
-                        <div style={{ ...fieldStyle, minWidth: 200 }}>
-                          <label htmlFor="docs-slug" style={labelStyle}>Slug del inversionista</label>
-                          <input
-                            id="docs-slug"
-                            className="input"
-                            value={docSlugInput}
-                            onChange={e => setDocSlugInput(e.target.value)}
-                            placeholder="slug"
-                          />
+                      {msg && <div className="notice" style={{ marginTop: 8 }}>{msg}</div>}
+                      {err && <div className="notice" style={{ marginTop: 8 }}>{err}</div>}
+                    </Section>
+                    <Section title="Documentos por inversionista" style={{ marginTop: 12 }} ref={docsCardRef}>
+                      <form onSubmit={handleDocSlugSubmit} style={{ display: 'grid', gap: 16 }}>
+                        <div className="grid-2">
+                          <FormRow label="Slug del inversionista">
+                            <Input
+                              id="docs-slug"
+                              value={docSlugInput}
+                              onChange={e => setDocSlugInput(e.target.value)}
+                              placeholder="slug"
+                            />
+                          </FormRow>
+                          <FormRow label="Categoría">
+                            <Select
+                              id="docs-category"
+                              value={docCategory}
+                              onChange={e => {
+                                setDocCategory(e.target.value)
+                                setDocsNotice(null)
+                                setDocsError(null)
+                              }}
+                            >
+                              {DOCUMENT_SECTIONS_ORDER.map(cat => (
+                                <option key={cat} value={cat}>
+                                  {cat}
+                                </option>
+                              ))}
+                            </Select>
+                          </FormRow>
                         </div>
-                        <div style={{ ...fieldStyle, minWidth: 200 }}>
-                          <label htmlFor="docs-category" style={labelStyle}>Categoría</label>
-                          <select
-                            id="docs-category"
-                            className="select"
-                            value={docCategory}
-                            onChange={e => { setDocCategory(e.target.value); setDocsNotice(null); setDocsError(null) }}
+                        <Toolbar>
+                          <Button type="submit" disabled={docsLoading || docsWorking}>
+                            Ver carpeta
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => {
+                              setDocsNotice(null)
+                              setDocsError(null)
+                              loadDocs()
+                            }}
+                            disabled={docsLoading || docsWorking}
                           >
-                            {DOCUMENT_SECTIONS_ORDER.map(cat => (
-                              <option key={cat} value={cat}>{cat}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <button className="btn" type="submit" disabled={docsLoading || docsWorking}>Ver carpeta</button>
-                        <button
-                          className="btn secondary"
-                          type="button"
-                          onClick={() => { setDocsNotice(null); setDocsError(null); loadDocs() }}
-                          disabled={docsLoading || docsWorking}
-                        >
-                          Actualizar
-                        </button>
+                            Actualizar
+                          </Button>
+                        </Toolbar>
                       </form>
-                      <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>
+                      <div className="help" style={{ marginTop: 8 }}>
                         Gestionando: <code>{docCategory}/{effectiveDocSlug}</code>
                       </div>
-                      <form onSubmit={handleDocUpload} className="form-row" style={{ marginTop: 12 }} aria-busy={docsWorking}>
-                        <input name="file" type="file" className="input" disabled={docsWorking} ref={docsUploadInputRef} />
-                        <button className="btn" type="submit" disabled={docsWorking}>
-                          {docsWorking ? 'Subiendo…' : 'Subir'}
-                        </button>
-                        <span className="notice">Los archivos se guardan en GitHub.</span>
+                      <form
+                        onSubmit={handleDocUpload}
+                        style={{ marginTop: 16, display: 'grid', gap: 12 }}
+                        aria-busy={docsWorking}
+                      >
+                        <Input name="file" type="file" disabled={docsWorking} ref={docsUploadInputRef} />
+                        <Toolbar>
+                          <Button type="submit" disabled={docsWorking}>
+                            {docsWorking ? 'Subiendo…' : 'Subir'}
+                          </Button>
+                          <span className="help">Los archivos se guardan en GitHub.</span>
+                        </Toolbar>
                       </form>
-                      {docsError && <div className="notice" style={{marginTop:8}}>{docsError}</div>}
-                      {docsNotice && <div className="notice" style={{marginTop:8}}>{docsNotice}</div>}
-                      {docsWorking && !docsLoading && <div style={{marginTop:8, color:'var(--muted)'}}>Procesando...</div>}
-                      {docsLoading && <div style={{marginTop:8, color:'var(--muted)'}}>Cargando documentos...</div>}
+                      {docsError && <div className="notice" style={{ marginTop: 8 }}>{docsError}</div>}
+                      {docsNotice && <div className="notice" style={{ marginTop: 8 }}>{docsNotice}</div>}
+                      {docsWorking && !docsLoading && <div style={{ marginTop: 8, color: 'var(--muted)' }}>Procesando...</div>}
+                      {docsLoading && <div style={{ marginTop: 8, color: 'var(--muted)' }}>Cargando documentos...</div>}
                       <table className="table" style={{ marginTop: 12 }} ref={docsTableRef}>
                         <thead>
                           <tr>
@@ -1863,25 +1931,25 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                                 >
                                   Descargar
                                 </a>
-                                <button
+                                <Button
                                   type="button"
-                                  className="btn secondary"
+                                  variant="secondary"
                                   onClick={() => handleDocDelete(file)}
                                   disabled={docsWorking}
                                 >
                                   Eliminar
-                                </button>
+                                </Button>
                               </td>
                             </tr>
                           ))}
                           {!docList.length && !docsLoading && (
                             <tr>
-                              <td colSpan="3">No hay documentos en esta carpeta.</td>
+                              <td colSpan={3}>No hay documentos en esta carpeta.</td>
                             </tr>
                           )}
                         </tbody>
                       </table>
-                    </div>
+                    </Section>
                     {docRenamePrompt && (
                       <div style={modalBackdropStyle} role="dialog" aria-modal="true" aria-labelledby="doc-rename-title">
                         <div style={modalCardStyle}>
@@ -1893,151 +1961,127 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                             <code>{docRenamePrompt.path}</code>
                           </p>
                           <div style={modalButtonRowStyle}>
-                            <button
+                            <Button
                               type="button"
-                              className="btn secondary"
+                              variant="secondary"
                               onClick={handleCancelDocRename}
                               disabled={docsWorking}
                             >
                               Cancelar
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               type="button"
-                              className="btn"
                               onClick={handleConfirmDocRename}
                               disabled={docsWorking}
                               aria-busy={docsWorking}
                             >
                               {docsWorking ? 'Subiendo…' : 'Renombrar y subir'}
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       </div>
                     )}
-                    <div className="card" style={{marginTop:12}}>
-                      <div className="h2">Gestionar proyectos activos</div>
-                      <p style={{ margin: 0, color: 'var(--muted)', fontSize: 14 }}>Actualiza la lista que aparece en la sección de Proyectos.</p>
-                      {projectLoadErr && <div className="notice" style={{marginTop:8}}>{projectLoadErr}</div>}
+                    <Section title="Gestionar proyectos activos" style={{ marginTop: 12 }}>
+                      <p style={{ margin: 0, color: 'var(--muted)', fontSize: 14 }}>
+                        Actualiza la lista que aparece en la sección de Proyectos.
+                      </p>
+                      {projectLoadErr && <div className="notice" style={{ marginTop: 8 }}>{projectLoadErr}</div>}
                       {projectsLoading ? (
-                        <div style={{marginTop:8, color:'var(--muted)'}}>Cargando proyectos...</div>
+                        <div style={{ marginTop: 8, color: 'var(--muted)' }}>Cargando proyectos...</div>
                       ) : (
-                        <form onSubmit={onSaveProjects}>
+                        <form onSubmit={onSaveProjects} style={{ display: 'grid', gap: 20 }}>
                           {projectList.map((project, index) => (
-                            <div key={project.id || index} style={projectBoxStyle}>
-                              <div className="row" style={{justifyContent:'space-between'}}>
-                                <div style={{fontWeight:700}}>{project.name || project.id || `Proyecto ${index + 1}`}</div>
-                                <button
-                                  type="button"
-                                  className="btn secondary"
-                                  style={{padding:'6px 12px', fontSize:12}}
-                                  onClick={() => removeProject(index)}
-                                >
+                            <Card key={project.id || index} style={{ padding: 20, display: 'grid', gap: 16 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                                <div className="h2" style={{ margin: 0, fontSize: 18 }}>
+                                  {project.name || project.id || `Proyecto ${index + 1}`}
+                                </div>
+                                <Button type="button" variant="secondary" onClick={() => removeProject(index)}>
                                   Eliminar
-                                </button>
+                                </Button>
                               </div>
-                              <div className="form-row" style={{marginTop:8}}>
-                                <div style={fieldStyle}>
-                                  <label htmlFor={`project-${index}-id`} style={labelStyle}>ID</label>
-                                  <input
+                              <div className="grid-3">
+                                <FormRow label="ID">
+                                  <Input
                                     id={`project-${index}-id`}
-                                    className="input"
                                     value={project.id}
                                     onChange={e => updateProjectField(index, 'id', e.target.value)}
                                   />
-                                </div>
-                                <div style={fieldStyle}>
-                                  <label htmlFor={`project-${index}-name`} style={labelStyle}>Nombre</label>
-                                  <input
+                                </FormRow>
+                                <FormRow label="Nombre">
+                                  <Input
                                     id={`project-${index}-name`}
-                                    className="input"
                                     value={project.name}
                                     onChange={e => updateProjectField(index, 'name', e.target.value)}
                                   />
-                                </div>
-                                <div style={fieldStyle}>
-                                  <label htmlFor={`project-${index}-client`} style={labelStyle}>Cliente</label>
-                                  <input
+                                </FormRow>
+                                <FormRow label="Cliente">
+                                  <Input
                                     id={`project-${index}-client`}
-                                    className="input"
                                     value={project.client}
                                     onChange={e => updateProjectField(index, 'client', e.target.value)}
                                   />
-                                </div>
+                                </FormRow>
                               </div>
-                              <div className="form-row" style={{marginTop:8}}>
-                                <div style={fieldStyle}>
-                                  <label htmlFor={`project-${index}-location`} style={labelStyle}>Ubicación</label>
-                                  <input
+                              <div className="grid-3">
+                                <FormRow label="Ubicación">
+                                  <Input
                                     id={`project-${index}-location`}
-                                    className="input"
                                     value={project.location}
                                     onChange={e => updateProjectField(index, 'location', e.target.value)}
                                   />
-                                </div>
-                                <div style={fieldStyle}>
-                                  <label htmlFor={`project-${index}-model`} style={labelStyle}>Modelo</label>
-                                  <input
+                                </FormRow>
+                                <FormRow label="Modelo">
+                                  <Input
                                     id={`project-${index}-model`}
-                                    className="input"
                                     value={project.model}
                                     onChange={e => updateProjectField(index, 'model', e.target.value)}
                                   />
-                                </div>
-                                <div style={fieldStyle}>
-                                  <label htmlFor={`project-${index}-status`} style={labelStyle}>Estado</label>
-                                  <input
+                                </FormRow>
+                                <FormRow label="Estado">
+                                  <Input
                                     id={`project-${index}-status`}
-                                    className="input"
                                     value={project.status}
                                     onChange={e => updateProjectField(index, 'status', e.target.value)}
                                   />
-                                </div>
+                                </FormRow>
                               </div>
-                              <div className="form-row" style={{marginTop:8}}>
+                              <div className="grid-3">
                                 {PROJECT_NUMBER_FIELDS.map(field => (
-                                  <div key={field.key} style={fieldStyle}>
-                                    <label htmlFor={`project-${index}-${field.key}`} style={labelStyle}>{field.label}</label>
-                                    <input
+                                  <FormRow key={field.key} label={field.label}>
+                                    <Input
                                       id={`project-${index}-${field.key}`}
-                                      className="input"
                                       type="number"
                                       min="0"
                                       step="any"
                                       value={project[field.key] ?? ''}
                                       onChange={e => updateProjectField(index, field.key, e.target.value)}
                                     />
-                                  </div>
+                                  </FormRow>
                                 ))}
                               </div>
-                              <div className="form-row" style={{marginTop:8}}>
-                                <div style={fieldStyle}>
-                                  <label htmlFor={`project-${index}-termMonths`} style={labelStyle}>Plazo (meses)</label>
-                                  <input
+                              <div className="grid-3">
+                                <FormRow label="Plazo (meses)">
+                                  <Input
                                     id={`project-${index}-termMonths`}
-                                    className="input"
                                     type="number"
                                     min="0"
                                     step="1"
                                     value={project.termMonths ?? 0}
                                     onChange={e => updateProjectField(index, 'termMonths', e.target.value)}
                                   />
-                                </div>
-                                <div style={fieldStyle}>
-                                  <label htmlFor={`project-${index}-empresa`} style={labelStyle}>Empresa</label>
-                                  <input
+                                </FormRow>
+                                <FormRow label="Empresa">
+                                  <Input
                                     id={`project-${index}-empresa`}
-                                    className="input"
-                                    type="text"
                                     value={project.empresa ?? ''}
                                     onChange={e => updateProjectField(index, 'empresa', e.target.value)}
                                     placeholder="Razón social / filial"
                                   />
-                                </div>
-                                <div style={fieldStyle}>
-                                  <label htmlFor={`project-${index}-imageUrl`} style={labelStyle}>Imagen (URL)</label>
-                                  <input
+                                </FormRow>
+                                <FormRow label="Imagen (URL)">
+                                  <Input
                                     id={`project-${index}-imageUrl`}
-                                    className="input"
                                     type="url"
                                     placeholder="https://..."
                                     value={project.imageUrl ?? ''}
@@ -2052,54 +2096,51 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                                       />
                                     </div>
                                   )}
-                                </div>
+                                </FormRow>
                               </div>
-                              <div className="form-row" style={{marginTop:8}}>
-                                <div style={{ ...fieldStyle, minWidth: 260 }}>
-                                  <label htmlFor={`project-${index}-notes`} style={labelStyle}>Notas</label>
-                                  <textarea
+                              <div className="grid-2">
+                                <FormRow label="Notas">
+                                  <Textarea
                                     id={`project-${index}-notes`}
-                                    className="input"
-                                    style={noteAreaStyle}
                                     value={project.notes}
                                     onChange={e => updateProjectField(index, 'notes', e.target.value)}
+                                    style={{ minHeight: 96 }}
                                   />
-                                </div>
-                                <div style={fieldStyle}>
-                                  <label htmlFor={`project-${index}-loi`} style={labelStyle}>Enlace a LOI</label>
-                                  <input
+                                </FormRow>
+                                <FormRow label="Enlace a LOI">
+                                  <Input
                                     id={`project-${index}-loi`}
-                                    className="input"
                                     type="url"
                                     placeholder="https://"
                                     value={project.loi_template}
                                     onChange={e => updateProjectField(index, 'loi_template', e.target.value)}
                                   />
-                                </div>
+                                </FormRow>
                               </div>
-                            </div>
+                            </Card>
                           ))}
                           {!projectList.length && (
-                            <div style={{marginTop:12, color:'var(--muted)'}}>No hay proyectos cargados. Usa "Agregar proyecto".</div>
+                            <div className="help">No hay proyectos cargados. Usa "Agregar proyecto".</div>
                           )}
-                          <div className="row" style={{marginTop:12, gap:8}}>
-                            <button type="button" className="btn secondary" onClick={addProject}>Agregar proyecto</button>
-                            <button type="submit" className="btn" disabled={projectSaving}>
+                          <Toolbar>
+                            <Button type="button" variant="secondary" onClick={addProject}>
+                              Agregar proyecto
+                            </Button>
+                            <Button type="submit" disabled={projectSaving}>
                               {projectSaving ? 'Guardando...' : 'Guardar proyectos'}
-                            </button>
-                          </div>
+                            </Button>
+                          </Toolbar>
                         </form>
                       )}
-                      {projectSaveMsg && <div className="notice" style={{marginTop:8}}>{projectSaveMsg}</div>}
-                      {projectSaveErr && <div className="notice" style={{marginTop:8}}>{projectSaveErr}</div>}
-                    </div>
-                    <div className="card" style={{marginTop:12}}>
-                      <div className="h2">Notas</div>
+                      {projectSaveMsg && <div className="notice" style={{ marginTop: 8 }}>{projectSaveMsg}</div>}
+                      {projectSaveErr && <div className="notice" style={{ marginTop: 8 }}>{projectSaveErr}</div>}
+                    </Section>
+                    <Section title="Notas" style={{ marginTop: 12 }}>
                       <ul>
                         <li>Este panel hace commits a GitHub (mismo repo) en <code>data/investors/&lt;slug&gt;.json</code>.</li>
                         <li>Netlify vuelve a construir el sitio y los cambios quedan visibles al instante.</li>
                       </ul>
-                    </div>
+                    </Section>
             </div>
           </div>
         </main>
@@ -2111,17 +2152,16 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
             <p style={{ marginTop: 8, marginBottom: 12, color: 'var(--muted)', fontSize: 14 }}>
               Comparte este enlace con el inversionista <code>{panelModal.slug}</code>.
             </p>
-            <input
-              className="input"
+            <Input
               readOnly
               value={panelModal.url}
               style={{ marginTop: 4 }}
               onFocus={e => e.target.select()}
             />
             <div style={modalButtonRowStyle}>
-              <button
+              <Button
                 type="button"
-                className="btn secondary"
+                variant="secondary"
                 onClick={() => {
                   if (typeof navigator !== 'undefined' && navigator.clipboard){
                     navigator.clipboard.writeText(panelModal.url).catch(() => {})
@@ -2129,7 +2169,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                 }}
               >
                 Copiar enlace
-              </button>
+              </Button>
               <a
                 className="btn"
                 href={panelModal.url}
@@ -2138,7 +2178,9 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
               >
                 Abrir panel
               </a>
-              <button type="button" className="btn secondary" onClick={handleClosePanelModal}>Cerrar</button>
+              <Button type="button" variant="secondary" onClick={handleClosePanelModal}>
+                Cerrar
+              </Button>
             </div>
           </div>
         </div>
@@ -2153,22 +2195,21 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
             </p>
             {deleteModalError && <div className="notice" style={{ marginTop: 8 }}>{deleteModalError}</div>}
             <div style={modalButtonRowStyle}>
-              <button
+              <Button
                 type="button"
-                className="btn secondary"
+                variant="secondary"
                 onClick={handleCloseDeleteModal}
                 disabled={deleteModalLoading}
               >
                 Cancelar
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="btn"
                 onClick={confirmDeleteFromModal}
                 disabled={deleteModalLoading}
               >
                 {deleteModalLoading ? 'Eliminando...' : 'Eliminar'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
