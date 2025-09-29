@@ -1,17 +1,23 @@
 {
   "id": "bocar",
   "name": "Bocar",
-  "status": "Entrega de información",
+  "status": "LOI",
   "deadlines": {
     "LOI": "2025-10-10",
     "Firma": "2025-10-17"
   },
-  "metrics": {},
-  "ui": {
-    "panelTitle": "Panel Bocar",
-    "theme": {}
-  },
-  "createdAt": "2025-09-29T20:48:07.890Z",
-  "updatedAt": "2025-09-29T20:49:06.738Z",
-  "email": "carlos.cortes@bocar.com"
+  "metrics": {
+    "fiscalCapitalInvestment": 200000000,
+    "projectProfitability": {
+      "amount": 812986300,
+      "years": 21
+    },
+    "portfolio": {
+      "type": "mix",
+      "mix": {}
+    },
+    "investorsActive": 12,
+    "dealsAccelerated": 38,
+    "nps": 72
+  }
 }
