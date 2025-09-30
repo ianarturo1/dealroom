@@ -20,12 +20,12 @@
     "location": "Aguascalientes, Pachuca, SLP, Torreón, Villahermosa, Zacatecas, Morelia, Toluca",
     "model": "Variado por Sitio",
     "status": "Disponible",
-    "termMonths": 60,
+    "termMonths": 0,
     "empresa": "",
     "imageUrl": "",
     "power_kwp": 755,
     "energy_mwh": 1184.34,
     "co2_tons": 519,
-    "notes": "Conjunto de propuestas PPA a 5 años en 8 sitios. Promedio de ahorro >45%. Cero inversión por parte de Danone.\""
+    "notes": "Conjunto de propuestas PPA en 8 sitios. Promedio de ahorro >45%. Cero inversión por parte de Danone.\""
   }
 ]
