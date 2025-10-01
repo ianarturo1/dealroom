@@ -80,6 +80,8 @@ VITE_PUBLIC_INVESTOR_ID=femsa
 - **Descargar:** `get-doc` entrega el archivo desde GitHub siempre que pertenezca al slug público configurado.
 - **Auditoría:** el historial de cambios queda en GitHub (quién y qué).
 
+Cada proyecto activo define su propio `slug` en `data/projects.json`; los botones “Ver documentos” en `/projects` generan enlaces `/#/documents?investor=<slug>` que cargan exclusivamente los archivos de esa carpeta (`<Categoría>/<slug>/`). Así se evita mezclar documentos entre proyectos.
+
 > Sugerencia: estructura de carpetas en el repo de docs
 >
 > ```
