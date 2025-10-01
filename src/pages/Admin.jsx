@@ -47,9 +47,8 @@ const createEmptyProject = () => ({
   power_kwp: '',
   energy_mwh: '',
   co2_tons: '',
-  model: '',
   status: 'Disponible',
-  termMonths: 0,
+  termMonths: '',
   empresa: '',
   imageUrl: '',
   notes: '',
@@ -312,8 +311,10 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     if (typeof value === 'number' && Number.isFinite(value)) {
       return Math.max(0, Math.round(value))
     }
-    const parsed = parseInt(String(value ?? '').trim(), 10)
-    if (!Number.isFinite(parsed)) return 0
+    const raw = String(value ?? '').trim()
+    if (!raw) return ''
+    const parsed = parseInt(raw, 10)
+    if (!Number.isFinite(parsed)) return ''
     return Math.max(0, parsed)
   }
 
@@ -325,7 +326,6 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     power_kwp: project.power_kwp ?? '',
     energy_mwh: project.energy_mwh ?? '',
     co2_tons: project.co2_tons ?? '',
-    model: project.model || '',
     status: project.status || 'Disponible',
     termMonths: normalizeTermMonths(project.termMonths),
     empresa: typeof project.empresa === 'string' ? project.empresa : '',
@@ -520,10 +520,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const updateProjectField = (index, field, rawValue) => {
     resetProjectFeedback()
     let value = rawValue
-    if (field === 'termMonths') {
-      const parsed = parseInt(String(rawValue ?? '').trim() || '0', 10)
-      value = Number.isFinite(parsed) ? Math.max(0, parsed) : 0
-    } else if (field === 'empresa') {
+    if (field === 'empresa') {
       value = String(rawValue || '').trim()
     } else if (field === 'imageUrl') {
       value = String(rawValue || '').trim()
@@ -545,7 +542,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const toNumberOrThrow = (value, label, id) => {
     const raw = (value === null || value === undefined) ? '' : String(value).trim()
     if (!raw){
-      throw new Error(`Proyecto ${id} requiere ${label}`)
+      return null
     }
     const num = Number(raw)
     if (!Number.isFinite(num)){
@@ -562,13 +559,11 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       const name = (project.name || '').trim()
       if (!name) throw new Error(`Proyecto ${id} requiere nombre`)
       const client = (project.client || '').trim()
-      if (!client) throw new Error(`Proyecto ${id} requiere cliente`)
       const location = (project.location || '').trim()
-      if (!location) throw new Error(`Proyecto ${id} requiere ubicación`)
-      const model = (project.model || '').trim()
-      if (!model) throw new Error(`Proyecto ${id} requiere modelo`)
       const status = (project.status || '').trim() || 'Disponible'
-      const termMonths = normalizeTermMonths(project.termMonths)
+      const termMonthsRaw = (project.termMonths === null || project.termMonths === undefined)
+        ? ''
+        : String(project.termMonths).trim()
       const empresa = typeof project.empresa === 'string' ? project.empresa.trim() : ''
       const imageUrl = typeof project.imageUrl === 'string' ? project.imageUrl.trim() : ''
       if (imageUrl && !/^https?:\/\//i.test(imageUrl)) {
@@ -578,17 +573,29 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       const base = {
         id,
         name,
-        client,
-        location,
-        power_kwp: toNumberOrThrow(project.power_kwp, 'potencia (kWp)', id),
-        energy_mwh: toNumberOrThrow(project.energy_mwh, 'energía anual (MWh)', id),
-        co2_tons: toNumberOrThrow(project.co2_tons, 'CO₂ evitado (t/año)', id),
-        model,
-        status,
-        termMonths,
-        empresa,
-        imageUrl
+        status
       }
+
+      if (client) base.client = client
+      if (location) base.location = location
+
+      for (const field of PROJECT_NUMBER_FIELDS){
+        const value = toNumberOrThrow(project[field.key], field.label, id)
+        if (value !== null) {
+          base[field.key] = value
+        }
+      }
+
+      if (termMonthsRaw) {
+        const parsedTerm = parseInt(termMonthsRaw, 10)
+        if (!Number.isFinite(parsedTerm)) {
+          throw new Error(`Proyecto ${id} tiene Plazo (meses) inválido`)
+        }
+        base.termMonths = Math.max(0, parsedTerm)
+      }
+
+      if (empresa) base.empresa = empresa
+      if (imageUrl) base.imageUrl = imageUrl
 
       const notes = (project.notes || '').trim()
       if (notes) base.notes = notes
@@ -2023,19 +2030,12 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                                   />
                                 </FormRow>
                               </div>
-                              <div className="grid-3">
+                              <div className="grid-2">
                                 <FormRow label="Ubicación">
                                   <Input
                                     id={`project-${index}-location`}
                                     value={project.location}
                                     onChange={e => updateProjectField(index, 'location', e.target.value)}
-                                  />
-                                </FormRow>
-                                <FormRow label="Modelo">
-                                  <Input
-                                    id={`project-${index}-model`}
-                                    value={project.model}
-                                    onChange={e => updateProjectField(index, 'model', e.target.value)}
                                   />
                                 </FormRow>
                                 <FormRow label="Estado">
@@ -2067,7 +2067,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                                     type="number"
                                     min="0"
                                     step="1"
-                                    value={project.termMonths ?? 0}
+                                    value={project.termMonths ?? ''}
                                     onChange={e => updateProjectField(index, 'termMonths', e.target.value)}
                                   />
                                 </FormRow>

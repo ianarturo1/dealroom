@@ -6,19 +6,28 @@ export default function ProjectCard({ p }){
   const search = location.search
   const documentsHref = `#/documents${search || ''}`
 
+  const metaParts = [p.client, p.location].filter(Boolean)
+  const formatMetric = (value, unit) => {
+    if (value === null || value === undefined || value === '') {
+      return '—'
+    }
+    return unit ? `${value} ${unit}` : value
+  }
+
   return (
     <div className="card">
       <div className="row" style={{justifyContent:'space-between'}}>
         <div className="h2">{p.name}</div>
         <span className="badge">{p.status || 'Disponible'}</span>
       </div>
-      <div style={{color:'#8b8b8b', marginBottom:8}}>{p.client} • {p.location}</div>
+      {metaParts.length > 0 && (
+        <div style={{color:'#8b8b8b', marginBottom:8}}>{metaParts.join(' • ')}</div>
+      )}
       <table className="table">
         <tbody>
-          <tr><th>Potencia</th><td>{p.power_kwp} kWp</td></tr>
-          <tr><th>Energía anual</th><td>{p.energy_mwh} MWh</td></tr>
-          <tr><th>CO₂ evitado</th><td>{p.co2_tons} t/año</td></tr>
-          <tr><th>Modelo</th><td>{p.model}</td></tr>
+          <tr><th>Potencia</th><td>{formatMetric(p.power_kwp, 'kWp')}</td></tr>
+          <tr><th>Energía anual</th><td>{formatMetric(p.energy_mwh, 'MWh')}</td></tr>
+          <tr><th>CO₂ evitado</th><td>{formatMetric(p.co2_tons, 't/año')}</td></tr>
         </tbody>
       </table>
       {p.notes && <div className="notice" style={{marginTop:10}}>{p.notes}</div>}

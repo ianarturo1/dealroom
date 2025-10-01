@@ -7,27 +7,16 @@ const numberFields = [
   { key: 'co2_tons', label: 'CO₂ evitado (t/año)' }
 ]
 
-function parseTermMonths(value){
-  if (typeof value === 'number' && Number.isFinite(value)){
-    return Math.max(0, Math.round(value))
-  }
-  const raw = trimString(value)
-  if (!raw) return 0
-  const parsed = parseInt(raw, 10)
-  if (!Number.isFinite(parsed)) return 0
-  return Math.max(0, parsed)
-}
-
 function trimString(value){
   if (value === null || value === undefined) return ''
   return String(value).trim()
 }
 
-function requireNumber(project, field, label){
+function parseOptionalNumber(project, field, label){
   const id = project.id || `#${project.__index}`
   const raw = trimString(project[field])
   if (!raw){
-    throw new Error(`Proyecto ${id} requiere ${label}`)
+    return undefined
   }
   const num = Number(raw)
   if (!Number.isFinite(num)){
@@ -47,34 +36,37 @@ function normalizeProject(project, index){
   const name = trimString(working.name)
   if (!name) throw new Error(`Proyecto ${id} requiere nombre`)
   const client = trimString(working.client)
-  if (!client) throw new Error(`Proyecto ${id} requiere cliente`)
   const location = trimString(working.location)
-  if (!location) throw new Error(`Proyecto ${id} requiere ubicación`)
-  const model = trimString(working.model)
-  if (!model) throw new Error(`Proyecto ${id} requiere modelo`)
   const status = trimString(working.status) || 'Disponible'
-  const termMonths = parseTermMonths(working.termMonths)
+  const termMonthsRaw = trimString(working.termMonths)
   const empresa = trimString(working.empresa)
   const imageUrl = trimString(working.imageUrl)
   if (imageUrl && !/^https?:\/\//i.test(imageUrl)){
     throw new Error(`Proyecto ${id} tiene Imagen (URL) inválida`)
   }
 
-  const normalized = {
-    id,
-    name,
-    client,
-    location,
-    model,
-    status,
-    termMonths,
-    empresa,
-    imageUrl
-  }
+  const normalized = { id, name, status }
+
+  if (client) normalized.client = client
+  if (location) normalized.location = location
 
   for (const field of numberFields){
-    normalized[field.key] = requireNumber(working, field.key, field.label)
+    const value = parseOptionalNumber(working, field.key, field.label)
+    if (value !== undefined){
+      normalized[field.key] = value
+    }
   }
+
+  if (termMonthsRaw){
+    const parsedTerm = parseInt(termMonthsRaw, 10)
+    if (!Number.isFinite(parsedTerm)){
+      throw new Error(`Proyecto ${id} tiene Plazo (meses) inválido`)
+    }
+    normalized.termMonths = Math.max(0, parsedTerm)
+  }
+
+  if (empresa) normalized.empresa = empresa
+  if (imageUrl) normalized.imageUrl = imageUrl
 
   const notes = trimString(working.notes)
   if (notes) normalized.notes = notes
