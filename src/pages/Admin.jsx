@@ -890,12 +890,26 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const metrics = payload.metrics || {}
   const decisionDays = getDecisionDays(payload)
   const { className: decisionBadgeClass, label: decisionLabel } = getDecisionBadge(decisionDays)
-  const normalizedPayloadSlug = normalizeSlug(payload.id)
-  const investorExists = React.useMemo(() => {
-    if (!normalizedPayloadSlug) return false
-    return investorOptions.some(option => option.slug === normalizedPayloadSlug)
-  }, [investorOptions, normalizedPayloadSlug])
-  const slugValidationError = (!investorListLoading && normalizedPayloadSlug && !investorExists)
+  const normalizedPayloadSlug = React.useMemo(() => {
+    if (!investorSearchTerm) return ''
+
+    const exactSlugMatch = investorOptions.find(option => option.slug.toLowerCase() === investorSearchTerm)
+    if (exactSlugMatch) return exactSlugMatch.slug
+
+    const exactNameMatch = investorOptions.find(option => (option.name || '').toLowerCase() === investorSearchTerm)
+    if (exactNameMatch) return exactNameMatch.slug
+
+    const partialMatch = investorOptions.find(option => {
+      const slug = option.slug.toLowerCase()
+      const name = (option.name || '').toLowerCase()
+      return slug.includes(investorSearchTerm) || name.includes(investorSearchTerm)
+    })
+
+    return partialMatch?.slug || ''
+  }, [investorOptions, investorSearchTerm])
+
+  const investorExists = Boolean(normalizedPayloadSlug)
+  const slugValidationError = (!investorListLoading && investorSearchTerm && !investorExists)
     ? 'Inversionista no encontrado'
     : null
   const selectedInvestorName = React.useMemo(() => {
@@ -1094,14 +1108,9 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const handleRefreshActivity = () => setActivityRefreshKey(value => value + 1)
 
   const handleLoadInvestor = async () => {
-    const slug = normalizeSlug(payload.id)
+    const slug = normalizedPayloadSlug
     if (!slug){
-      setErr('El slug (id) es requerido para cargar datos')
-      return
-    }
-    const exists = investorOptions.some(option => option.slug === slug)
-    if (!exists){
-      setErr('Inversionista no encontrado')
+      setErr(investorSearchTerm ? 'Inversionista no encontrado' : 'El slug o nombre es requerido para cargar datos')
       return
     }
     setMsg(null)
@@ -1126,14 +1135,9 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   }
 
   const handleOpenPanelModal = () => {
-    const slug = normalizeSlug(payload.id)
+    const slug = normalizedPayloadSlug
     if (!slug){
-      setErr('El slug (id) es requerido para ver el panel público')
-      return
-    }
-    const exists = investorOptions.some(option => option.slug === slug)
-    if (!exists){
-      setErr('Inversionista no encontrado')
+      setErr(investorSearchTerm ? 'Inversionista no encontrado' : 'El slug o nombre es requerido para ver el panel público')
       return
     }
     const base = siteBaseUrl ? siteBaseUrl.replace(/\/$/, '') : ''
@@ -1146,14 +1150,9 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   }
 
   const handleOpenDeleteModal = () => {
-    const slug = normalizeSlug(payload.id)
+    const slug = normalizedPayloadSlug
     if (!slug){
-      setErr('El slug (id) es requerido para eliminar al inversionista')
-      return
-    }
-    const exists = investorOptions.some(option => option.slug === slug)
-    if (!exists){
-      setErr('Inversionista no encontrado')
+      setErr(investorSearchTerm ? 'Inversionista no encontrado' : 'El slug o nombre es requerido para eliminar al inversionista')
       return
     }
     setDeleteModal({ slug })
@@ -1245,9 +1244,12 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     setDeadlinesMsg(null)
     setDeadlinesErr(null)
     try{
-      const normalizedId = normalizeSlug(payload.id)
+      const normalizedId = normalizedPayloadSlug
       if (!normalizedId){
-        throw new Error('El slug (id) es requerido')
+        if (investorSearchTerm){
+          throw new Error('Inversionista no encontrado')
+        }
+        throw new Error('El slug o nombre es requerido')
       }
 
       const metricsPayload = payload.metrics || {}
@@ -1328,9 +1330,9 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       setDeadlinesErr(validation.message)
       return
     }
-    const normalizedId = normalizeSlug(payload.id)
+    const normalizedId = normalizedPayloadSlug
     if (!normalizedId){
-      setDeadlinesErr('El slug (id) es requerido')
+      setDeadlinesErr(investorSearchTerm ? 'Inversionista no encontrado' : 'El slug o nombre es requerido')
       return
     }
 
