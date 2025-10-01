@@ -1,10 +1,10 @@
 import React from 'react'
-import { useLocation } from 'react-router-dom'
 
 export default function ProjectCard({ p }){
-  const location = useLocation()
-  const search = location.search
-  const documentsHref = `#/documents${search || ''}`
+  const slug = (p.slug || '').trim()
+  const documentsHref = slug
+    ? `/#/documents?investor=${encodeURIComponent(slug)}`
+    : '#/documents'
 
   const metaParts = [p.client, p.location].filter(Boolean)
   const formatMetric = (value, unit) => {
