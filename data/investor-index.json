@@ -127,6 +127,13 @@
       "status": "Entrega de información",
       "createdAt": "2025-09-29T20:48:07.890Z",
       "updatedAt": "2025-09-29T20:48:07.890Z"
+    },
+    "alsea": {
+      "name": "Alsea",
+      "email": "carlos.frias@alsea.com.mx",
+      "status": "Ajustes técnicos",
+      "createdAt": "2025-10-01T15:49:02.539Z",
+      "updatedAt": "2025-10-01T15:49:02.539Z"
     }
   }
 }
