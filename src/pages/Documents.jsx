@@ -208,7 +208,15 @@ export default function Documents(){
                         <td>{d.name}</td>
                         <td>{(d.size / 1024).toFixed(1)} KB</td>
                         <td>
-                          <a className="btn secondary" href={api.downloadDocPath(d.path)}>Descargar</a>
+                          <a
+                            className="btn secondary"
+                            href={api.downloadDocPath(d.path)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download={d.name}
+                          >
+                            Descargar
+                          </a>
                         </td>
                       </tr>
                     ))}
