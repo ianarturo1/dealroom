@@ -21,5 +21,113 @@
     "co2_tons": 519,
     "termMonths": 0,
     "notes": "Conjunto de propuestas PPA en 8 sitios. Promedio de ahorro > 45%."
+  },
+  {
+    "id": "proj-grupo-zorro-abarrotero",
+    "name": "Grupo Zorro Abarrotero",
+    "status": "Disponible",
+    "client": "Grupo Zorro Abarrotero",
+    "location": "Zona Bajio",
+    "power_kwp": 2868,
+    "energy_mwh": 4028.6,
+    "co2_tons": 1761.3,
+    "termMonths": 0,
+    "empresa": "Grupo Zorro Abarrotero"
+  },
+  {
+    "id": "proj-stepan",
+    "name": "Stepan",
+    "status": "Disponible",
+    "client": "Stepan",
+    "location": "Ecatepec y Matamoros",
+    "power_kwp": 1324,
+    "energy_mwh": 1859.8,
+    "co2_tons": 813.1,
+    "termMonths": 0,
+    "empresa": "Stepan"
+  },
+  {
+    "id": "proj-techo-celocan",
+    "name": "Techo Celocán",
+    "status": "Disponible",
+    "client": "CFE",
+    "location": "Quintana Roo",
+    "power_kwp": 120,
+    "energy_mwh": 168.6,
+    "co2_tons": 73.7,
+    "termMonths": 0,
+    "empresa": "CFE"
+  },
+  {
+    "id": "proj-techo-celoplaya",
+    "name": "Techo Celoplaya",
+    "status": "Disponible",
+    "client": "CFE",
+    "location": "Quintana Roo",
+    "power_kwp": 1847,
+    "energy_mwh": 2594.4,
+    "co2_tons": 1134.3,
+    "termMonths": 0,
+    "empresa": "CFE"
+  },
+  {
+    "id": "proj-carretera-costera-golfo",
+    "name": "Carretera Costera del Golfo",
+    "status": "Disponible",
+    "client": "CFE",
+    "location": "Quintana Roo",
+    "power_kwp": 665,
+    "energy_mwh": 934.1,
+    "co2_tons": 408.4,
+    "termMonths": 0,
+    "empresa": "CFE"
+  },
+  {
+    "id": "proj-techo-ayuntamiento-cancun",
+    "name": "Techo Ayuntamiento Cancun",
+    "status": "Disponible",
+    "client": "CFE",
+    "location": "Quintana Roo",
+    "power_kwp": 392,
+    "energy_mwh": 550.6,
+    "co2_tons": 240.7,
+    "termMonths": 0,
+    "empresa": "CFE"
+  },
+  {
+    "id": "proj-techo-teatro-cancun",
+    "name": "Techo Teatro Cancun",
+    "status": "Disponible",
+    "client": "CFE",
+    "location": "Quintana Roo",
+    "power_kwp": 206,
+    "energy_mwh": 289.4,
+    "co2_tons": 126.5,
+    "termMonths": 0,
+    "empresa": "CFE"
+  },
+  {
+    "id": "proj-terreno-mina-paa-mul",
+    "name": "Terreno Mina Paa Mul",
+    "status": "Disponible",
+    "client": "CFE",
+    "location": "Quintana Roo",
+    "power_kwp": 3000,
+    "energy_mwh": 4214,
+    "co2_tons": 1843.4,
+    "termMonths": 0,
+    "empresa": "CFE"
+  },
+  {
+    "id": "proj-20-noviembre",
+    "name": "20 de Noviembre",
+    "status": "Disponible",
+    "client": "CFE",
+    "location": "Quintana Roo",
+    "power_kwp": 3500,
+    "energy_mwh": 4916.4,
+    "co2_tons": 2149.5,
+    "termMonths": 0,
+    "empresa": "CFE"
   }
 ]
