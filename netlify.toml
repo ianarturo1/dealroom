@@ -9,8 +9,8 @@
   included_files = ["data/**"]
 
 [[redirects]]
-  from = "/i/:slug"
-  to = "/#/?investor=:slug"
+  from = "/i/:id"
+  to = "/#/?investor=:id"
   status = 200
   force = true
 

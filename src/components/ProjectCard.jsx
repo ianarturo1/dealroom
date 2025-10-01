@@ -1,9 +1,9 @@
 import React from 'react'
 
 export default function ProjectCard({ p }){
-  const slug = (p.slug || '').trim()
-  const documentsHref = slug
-    ? `/#/documents?investor=${encodeURIComponent(slug)}`
+  const investorId = (p.id || '').trim().toLowerCase()
+  const documentsHref = investorId
+    ? `/#/documents?investor=${encodeURIComponent(investorId)}`
     : '#/documents'
 
   const metaParts = [p.client, p.location].filter(Boolean)

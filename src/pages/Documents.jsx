@@ -17,7 +17,7 @@ export default function Documents(){
   const [renamePrompt, setRenamePrompt] = useState(null)
 
   const fetchDocs = useCallback(async (category) => {
-    const res = await api.listDocs({ category, slug: investorId })
+    const res = await api.listDocs({ category, investor: investorId })
     const files = Array.isArray(res?.files) ? res.files : []
     return files
   }, [investorId])
@@ -78,7 +78,7 @@ export default function Documents(){
         path: `${uploadInfo.category}`,
         filename: uploadInfo.filename,
         contentBase64: uploadInfo.base64,
-        slug: uploadInfo.slug,
+        investor: uploadInfo.investor,
         message: uploadInfo.message
       }
       if (options.strategy === 'rename'){
@@ -96,7 +96,7 @@ export default function Documents(){
       return response
     }catch(err){
       if (err?.status === 409 && err?.data?.error === 'FILE_EXISTS' && options.strategy !== 'rename'){
-        const fallbackPath = `${uploadInfo.category}/${uploadInfo.slug}/${uploadInfo.filename}`
+        const fallbackPath = `${uploadInfo.category}/${uploadInfo.investor}/${uploadInfo.filename}`
         setPendingUpload(uploadInfo)
         setRenamePrompt({ path: err.data?.path || fallbackPath, category: uploadInfo.category })
         return null
@@ -129,7 +129,7 @@ export default function Documents(){
           category,
           filename: file.name,
           base64,
-          slug: investorId,
+          investor: investorId,
           message: `Upload ${file.name} from Dealroom UI`,
           form
         })

@@ -1,7 +1,7 @@
 import { ok, text } from './_lib/utils.mjs'
 import { repoEnv, listDir } from './_lib/github.mjs'
 
-function publicSlug(){
+function publicInvestorId(){
   const raw = typeof process.env.PUBLIC_INVESTOR_SLUG === 'string'
     ? process.env.PUBLIC_INVESTOR_SLUG.trim().toLowerCase()
     : ''
@@ -11,9 +11,10 @@ function publicSlug(){
 export async function handler(event){
   try{
     const category = (event.queryStringParameters && event.queryStringParameters.category) || 'NDA'
-    const slugParam = event.queryStringParameters && event.queryStringParameters.slug
-    const requested = typeof slugParam === 'string' ? slugParam.trim().toLowerCase() : ''
-    const slug = requested || publicSlug()
+    const investorParam = event.queryStringParameters
+      && (event.queryStringParameters.investor ?? event.queryStringParameters.slug)
+    const requested = typeof investorParam === 'string' ? investorParam.trim().toLowerCase() : ''
+    const investorId = requested || publicInvestorId()
 
     const repo = repoEnv('DOCS_REPO', '')
     const branch = process.env.DOCS_BRANCH || 'main'
@@ -22,7 +23,7 @@ export async function handler(event){
       return ok({ files: [] })
     }
 
-    const basePath = `${category}/${slug}`
+    const basePath = `${category}/${investorId}`
     let list = []
     try{
       const items = await listDir(repo, basePath, branch)

@@ -31,15 +31,11 @@ function normalizeProject(project, index){
   }
 
   const working = { ...project, __index: index + 1 }
-  const id = trimString(working.id)
-  if (!id) throw new Error(`Proyecto ${index + 1} requiere un id`)
-  const slugRaw = trimString(working.slug)
-  if (!slugRaw){
-    throw new Error(`Proyecto ${id} requiere un slug`)
-  }
-  const slug = slugRaw.toLowerCase()
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)){
-    throw new Error(`Proyecto ${id} tiene slug inválido`)
+  const rawId = trimString(working.id)
+  if (!rawId) throw new Error(`Proyecto ${index + 1} requiere un id`)
+  const id = rawId.toLowerCase()
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)){
+    throw new Error(`Proyecto ${rawId} tiene id inválido`)
   }
   const name = trimString(working.name)
   if (!name) throw new Error(`Proyecto ${id} requiere nombre`)
@@ -53,7 +49,7 @@ function normalizeProject(project, index){
     throw new Error(`Proyecto ${id} tiene Imagen (URL) inválida`)
   }
 
-  const normalized = { id, slug, name, status }
+  const normalized = { id, name, status }
 
   if (client) normalized.client = client
   if (location) normalized.location = location
@@ -94,16 +90,11 @@ export async function handler(event){
     const normalized = list.map((item, index) => normalizeProject(item, index))
 
     const ids = new Set()
-    const slugs = new Set()
     for (const project of normalized){
       if (ids.has(project.id)){
         return text(400, `ID duplicado: ${project.id}`)
       }
       ids.add(project.id)
-      if (slugs.has(project.slug)){
-        return text(400, `Slug duplicado: ${project.slug}`)
-      }
-      slugs.add(project.slug)
     }
 
     const repo = repoEnv('CONTENT_REPO', '')
