@@ -4,6 +4,7 @@ import { useInvestorProfile } from '../lib/investor'
 import { DOCUMENT_SECTIONS_ORDER } from '../constants/documents'
 import { useToast } from '../lib/toast'
 import { modalBackdropStyle, modalCardStyle, modalButtonRowStyle } from '../components/modalStyles'
+import { deleteDoc } from '../services/docs'
 
 export default function Documents(){
   const [docsByCategory, setDocsByCategory] = useState({})
@@ -15,6 +16,7 @@ export default function Documents(){
   const showToast = useToast()
   const [pendingUpload, setPendingUpload] = useState(null)
   const [renamePrompt, setRenamePrompt] = useState(null)
+  const [deletingFile, setDeletingFile] = useState(null)
 
   const fetchDocs = useCallback(async (category) => {
     const res = await api.listDocs({ category, investor: investorId })
@@ -164,6 +166,28 @@ export default function Documents(){
 
   const renameBusy = renamePrompt ? uploadingCategory === renamePrompt.category : false
 
+  const handleDelete = useCallback(async (file, category) => {
+    const promptMessage = `¿Eliminar "${file.name}"? Esta acción no se puede deshacer.`
+    const confirmFn = typeof window !== 'undefined' && typeof window.confirm === 'function'
+      ? window.confirm
+      : () => true
+    if (!confirmFn(promptMessage)) return
+    const busyKey = `${category}/${file.name}`
+    try{
+      setDeletingFile(busyKey)
+      await deleteDoc({ category, investor: investorId, filename: file.name })
+      await refreshCategory(category)
+    }catch(error){
+      const message = error && error.message ? error.message : String(error)
+      const alertFn = typeof window !== 'undefined' && typeof window.alert === 'function'
+        ? window.alert
+        : console.error
+      alertFn(`Error al eliminar: ${message}`)
+    }finally{
+      setDeletingFile(null)
+    }
+  }, [investorId, refreshCategory])
+
   return (
     <>
     <div className="container">
@@ -217,6 +241,14 @@ export default function Documents(){
                           >
                             Descargar
                           </a>
+                          <button
+                            type="button"
+                            className="btn secondary"
+                            onClick={() => handleDelete(d, category)}
+                            disabled={deletingFile === `${category}/${d.name}`}
+                          >
+                            {deletingFile === `${category}/${d.name}` ? 'Eliminando…' : 'Eliminar'}
+                          </button>
                         </td>
                       </tr>
                     ))}
