@@ -1,16 +1,18 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { api } from '../lib/api'
-import RoleGate from '../components/RoleGate'
-import { DEFAULT_INVESTOR_ID } from '../lib/config'
-import { resolveDeadlineDocTarget } from '../lib/deadlines'
-import { DOCUMENT_SECTIONS_ORDER, DEFAULT_DOC_CATEGORY, DASHBOARD_DOC_CATEGORIES } from '../constants/documents'
-import { PIPELINE_STAGES, FINAL_PIPELINE_STAGE } from '../constants/pipeline'
+import { api } from '@/lib/api'
+import RoleGate from '@/components/RoleGate'
+import { DEFAULT_INVESTOR_ID } from '@/lib/config'
+import { resolveDeadlineDocTarget } from '@/lib/deadlines'
+import { DOCUMENT_SECTIONS_ORDER, DEFAULT_DOC_CATEGORY, DASHBOARD_DOC_CATEGORIES } from '@/constants/documents'
+import { PIPELINE_STAGES, FINAL_PIPELINE_STAGE } from '@/constants/pipeline'
 import { getDecisionBadge, getDecisionDays } from '@/utils/decision'
 import { DeadlinesForm } from '@/components/deadlines/DeadlinesForm'
 import { validateRows } from '@/lib/deadlineValidators'
 import { STAGES } from '@/lib/stages'
-import { useToast } from '../lib/toast'
-import { modalBackdropStyle, modalCardStyle, modalButtonRowStyle } from '../components/modalStyles'
+import { useToast } from '@/lib/toast'
+import { modalBackdropStyle, modalCardStyle, modalButtonRowStyle } from '@/components/modalStyles'
+import { Section } from '@/components/ui/Section'
+import { Card } from '@/components/ui/Card'
 
 const PORTFOLIO_OPTIONS = [
   { value: 'solarFarms', label: 'Granjas Solares' },
@@ -1074,8 +1076,17 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     : 0
   const projectProfitability = metrics.projectProfitability || {}
 
-  const labelStyle = { fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 4 }
-  const fieldStyle = { display: 'flex', flexDirection: 'column', flex: 1, minWidth: 200 }
+  const labelStyle = {
+    fontSize: 12,
+    fontWeight: 600,
+    color: 'var(--muted)',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: '.4px',
+  }
+  const fieldStyle = { display: 'grid', gap: 6, flex: 1, minWidth: 200 }
+  const formGridStyle = { display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }
+  const metricsGridStyle = { display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }
   const mixFieldStyle = { display: 'flex', flexDirection: 'column', flex: 1, minWidth: 160 }
   const projectBoxStyle = { border: '1px solid var(--border)', borderRadius: 12, padding: 12, marginTop: 12, background: '#f7f7fb' }
   const noteAreaStyle = { minHeight: 96, resize: 'vertical' }
@@ -1237,366 +1248,52 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
   return (
     <RoleGate user={user} allow={['admin','ri']}>
-      <div className="container">
-        <div className="h1">Admin / Relaciones con Inversionistas</div>
-        {isAdmin && (
-          <div className="grid" style={{ marginBottom: 16 }}>
-          <div className="card" style={{ gridColumn: 'span 2', minWidth: 280 }}>
-            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="h2" style={{ marginTop: 0 }}>Pipeline global</div>
-              {investorListLoading && <span className="badge">Actualizando…</span>}
+      <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+        <div
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+            background: 'linear-gradient(180deg,#fff,rgba(255,255,255,.85))',
+            backdropFilter: 'blur(6px)',
+            borderBottom: '1px solid rgba(0,0,0,.06)',
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 1100,
+              margin: '0 auto',
+              padding: '14px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              flexWrap: 'wrap',
+            }}
+          >
+            <div className="h1" style={{ color: 'var(--brand)' }}>
+              Panel de administración
             </div>
-            <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 12 }}>
-              Total inversionistas: {numberFormatter.format(pipelineSummary.total || 0)}
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700 }}>Avance hacia {finalStageLabel || 'cierre'}</div>
-              <div className="progress" style={{ marginTop: 6, height: 12 }}>
-                <div style={{ width: `${Math.min(100, Math.max(0, pipelineSummary.finalPercent || 0))}%` }} />
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                {numberFormatter.format(pipelineSummary.finalCount || 0)} / {numberFormatter.format(pipelineSummary.total || 0)} · {percentFormatter.format(Number.isFinite(pipelineSummary.finalPercent) ? pipelineSummary.finalPercent : 0)}%
-              </div>
-            </div>
-            <div style={{ display: 'grid', gap: 10 }}>
-              {pipelineSummary.counts.map(item => {
-                const safePercent = Number.isFinite(item.percent) ? item.percent : 0
-                return (
-                  <div key={item.stage} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                    <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', fontSize: 14, fontWeight: 600 }}>
-                      <span>{item.stage}</span>
-                      <span>{numberFormatter.format(item.count)} · {percentFormatter.format(safePercent)}%</span>
-                    </div>
-                    <div className="progress" style={{ marginTop: 6, height: 8 }}>
-                      <div style={{ width: `${Math.min(100, Math.max(0, safePercent))}%` }} />
-                    </div>
-                  </div>
-                )
-              })}
-              {!pipelineSummary.total && (
-                <div style={{ fontSize: 13, color: 'var(--muted)' }}>Sin inversionistas cargados.</div>
-              )}
-            </div>
+            <span className="kpi">Dealroom Finsolar</span>
           </div>
-
-          <div className="card">
-            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="h2" style={{ marginTop: 0 }}>Inversionistas activos</div>
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={loadInvestorList}
-                disabled={investorListLoading}
-              >
-                {investorListLoading ? 'Actualizando…' : 'Actualizar'}
-              </button>
-            </div>
-            <div className="kpi" style={{ marginTop: 4 }}>
-              <div className="num">{investorListLoading ? '—' : numberFormatter.format(pipelineSummary.total || 0)}</div>
-              <div className="label">Total dados de alta</div>
-            </div>
-            {investorListError && <div className="notice" style={{ marginTop: 12 }}>{investorListError}</div>}
-          </div>
-
-          <div className="card">
-            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="h2" style={{ marginTop: 0 }}>Alertas de fechas próximas</div>
-              {investorDetailsLoading && <span className="badge">Cargando…</span>}
-            </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>
-              Próximos
-              <input
-                type="number"
-                min="0"
-                className="input"
-                value={deadlineThreshold}
-                onChange={handleDeadlineThresholdChange}
-                style={{ width: 90, padding: '6px 8px' }}
-              />
-              días
-            </label>
-            {upcomingDeadlines.length === 0 && !investorDetailsLoading ? (
-              <div style={{ fontSize: 13, color: 'var(--muted)' }}>Sin alertas dentro del rango configurado.</div>
-            ) : (
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
-                {upcomingDeadlines.map(item => {
-                  const dateLabel = item.formattedDate || item.date || '—'
-                  const dueLabel = item.dueText || (item.days === 0
-                    ? 'Vence hoy'
-                    : `Vence en ${item.days} día${item.days === 1 ? '' : 's'}`)
-                  return (
-                    <li key={`${item.slug}-${item.label}`} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                        <div>
-                          <div style={{ fontWeight: 600 }}>{item.investorName}</div>
-                          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                            {item.label} · {dueLabel} ({dateLabel})
-                          </div>
-                        </div>
-                        {item.docTarget && (
-                          <button
-                            type="button"
-                            className="btn secondary"
-                            onClick={() => navigateToDocsSection(
-                              item.docTarget.category,
-                              item.slug,
-                              item.docTarget.target || 'upload'
-                            )}
-                          >
-                            Ir a {item.docTarget.category}
-                          </button>
-                        )}
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-            {investorDetailsError && <div className="notice" style={{ marginTop: 12 }}>{investorDetailsError}</div>}
-          </div>
-
-          <div className="card">
-            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="h2" style={{ marginTop: 0 }}>Faltan documentos</div>
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={handleRefreshDocInventories}
-                disabled={docHealthLoading}
-              >
-                {docHealthLoading ? 'Verificando…' : 'Revisar'}
-              </button>
-            </div>
-            <p style={{ margin: '4px 0 12px', color: 'var(--muted)', fontSize: 13 }}>
-              Estatus por categorías clave.
-            </p>
-            {!investorList.length ? (
-              <div style={{ fontSize: 13, color: 'var(--muted)' }}>Da de alta inversionistas para revisar su documentación.</div>
-            ) : !docInventoriesReady ? (
-              docHealthLoading
-                ? <div style={{ fontSize: 13, color: 'var(--muted)' }}>Verificando documentación…</div>
-                : <div style={{ fontSize: 13, color: 'var(--muted)' }}>No se pudo obtener el estado actual.</div>
-            ) : (
-              docHealthSummary.map(summary => {
-                const previewNames = summary.missing.slice(0, 3).map(item => item.name).join(', ')
-                const remaining = summary.missing.length - Math.min(summary.missing.length, 3)
-                const hasErrors = summary.missing.some(item => item.error)
-                const disabledFolder = summary.total === 0
-                return (
-                  <div key={summary.category} style={{ borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 10 }}>
-                    <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <span style={{ fontSize: 20, lineHeight: 1 }}>{summary.hasAll ? '✅' : '⛔'}</span>
-                        <div>
-                          <div style={{ fontWeight: 700 }}>{summary.category}</div>
-                          <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-                            {summary.total === 0
-                              ? 'Sin inversionistas registrados.'
-                              : summary.hasAll
-                                ? 'Documentación completa.'
-                                : `Faltan ${summary.missing.length} de ${summary.total}.`}
-                          </div>
-                          {!summary.hasAll && summary.missing.length > 0 && (
-                            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                              {previewNames}
-                              {remaining > 0 && ` +${remaining} más`}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                        <button
-                          type="button"
-                          className="btn secondary"
-                          onClick={() => navigateToDocsSection(summary.category, summary.fallbackSlug, 'upload')}
-                        >
-                          Subir
-                        </button>
-                        <button
-                          type="button"
-                          className="btn secondary"
-                          onClick={() => navigateToDocsSection(summary.category, (summary.folderTarget && summary.folderTarget.slug) || summary.fallbackSlug, 'folder')}
-                          disabled={disabledFolder}
-                        >
-                          Carpeta
-                        </button>
-                      </div>
-                    </div>
-                    {hasErrors && (
-                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-                        Algunos registros devolvieron errores al consultar sus carpetas.
-                      </div>
-                    )}
-                  </div>
-                )
-              })
-            )}
-            {docHealthError && <div className="notice" style={{ marginTop: 12 }}>{docHealthError}</div>}
-          </div>
-
-          <div className="card" style={{ gridColumn: 'span 2', minWidth: 280 }}>
-            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="h2" style={{ marginTop: 0 }}>Actividad reciente</div>
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={handleRefreshActivity}
-                disabled={activityLoading}
-              >
-                {activityLoading ? 'Consultando…' : 'Actualizar'}
-              </button>
-            </div>
-            {activityError && <div className="notice" style={{ marginTop: 12 }}>{activityError}</div>}
-            {activityLoading && <div style={{ marginTop: 12, color: 'var(--muted)' }}>Consultando actividad…</div>}
-            {!activityLoading && !activityError && activityDisplayItems.length === 0 && (
-              <div style={{ marginTop: 12, color: 'var(--muted)', fontSize: 13 }}>Sin eventos recientes.</div>
-            )}
-            {activityDisplayItems.length > 0 && (
-              <ul style={{ listStyle: 'none', margin: 12, marginTop: 12, padding: 0, display: 'grid', gap: 10 }}>
-                {activityDisplayItems.map(item => (
-                  <li key={item.key} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                      <span style={{ fontSize: 18, lineHeight: 1 }}>{item.icon}</span>
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{item.title}</div>
-                        {item.detail && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{item.detail}</div>}
-                        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{item.dateLabel}</div>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          </div>
-        )}
-        <div className="card" style={{marginBottom:12}}>
-          <div className="h2">Alta de Inversionista</div>
-          <form onSubmit={onCreate} aria-busy={invLoading}>
-            <div className="form-row">
-              <input className="input" type="email" placeholder="Email corporativo" value={inv.email} onChange={e => setInv({ ...inv, email: e.target.value })} required />
-              <input className="input" placeholder="Nombre de la empresa" value={inv.companyName} onChange={e => setInv({ ...inv, companyName: e.target.value })} required />
-              <input className="input" placeholder="Slug deseado (opcional)" value={inv.slug} onChange={e => setInv({ ...inv, slug: e.target.value })} />
-              <select className="select" value={inv.status} onChange={e => setInv({ ...inv, status: e.target.value })}>
-                {PIPELINE_STAGES.map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-            <div style={{marginTop:8}}>
-              <DeadlinesForm
-                key={invDeadlinesKey}
-                initial={inv.deadlines}
-                onChange={rows => setInv(prev => ({ ...prev, deadlines: ensureDeadlineRows(rows) }))}
-                hideSubmit
-              />
-            </div>
-            <button className="btn" type="submit" disabled={invLoading} style={{marginTop:8}}>
-              {invLoading ? 'Creando…' : 'Crear'}
-            </button>
-          </form>
-          {invLoading && <div className="progress" style={{marginTop:8}}><div style={{width: progress + '%'}} /></div>}
-          {invMsg && (
-            <div className="notice" style={{marginTop:8, display:'flex', alignItems:'center', justifyContent:'space-between'}}>
-              <span style={{wordBreak:'break-all'}}>{invMsg}</span>
-              <button className="btn" type="button" onClick={() => navigator.clipboard && navigator.clipboard.writeText(invMsg)}>Copiar</button>
-            </div>
-          )}
-          {invErr && <div className="notice" style={{marginTop:8}}>{invErr}</div>}
         </div>
-        {isAdmin && (
-          <div className="card" style={{marginBottom:12}}>
-            <div className="h2">Inversionistas activos</div>
-            <p style={{marginTop:0, marginBottom:12, color:'var(--muted)', fontSize:14}}>
-              Consulta los inversionistas dados de alta y dales de baja cuando sea necesario.
-            </p>
-            <div className="form-row" style={{marginBottom:12}}>
-              <input
-                className="input"
-                placeholder="Buscar por nombre, correo o slug"
-                value={investorSearch}
-                onChange={e => setInvestorSearch(e.target.value)}
-              />
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={loadInvestorList}
-                disabled={investorListLoading}
-              >
-                {investorListLoading ? 'Actualizando...' : 'Actualizar lista'}
-              </button>
-            </div>
-            {investorListError && <div className="notice" style={{marginBottom:12}}>{investorListError}</div>}
-            {investorDeleteErr && <div className="notice" style={{marginBottom:12}}>{investorDeleteErr}</div>}
-            {investorDeleteMsg && <div className="notice" style={{marginBottom:12}}>{investorDeleteMsg}</div>}
-            <div style={{fontSize:13, color:'var(--muted)', marginBottom:8}}>
-              {investorListLoading
-                ? 'Cargando inversionistas...'
-                : `${filteredInvestorCount} inversionista${filteredInvestorCount === 1 ? '' : 's'} coincidente${filteredInvestorCount === 1 ? '' : 's'}`}
-            </div>
-            <div style={{overflowX:'auto'}}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th style={{minWidth:140}}>Empresa</th>
-                    <th style={{minWidth:180}}>Correo</th>
-                    <th style={{minWidth:100}}>Slug</th>
-                    <th style={{minWidth:120}}>Estado</th>
-                    <th style={{minWidth:120}}>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {investorListLoading && (
-                    <tr>
-                      <td colSpan={5} style={{paddingTop:12, paddingBottom:12}}>Cargando datos...</td>
-                    </tr>
-                  )}
-                  {!investorListLoading && filteredInvestors.map(item => (
-                    <tr key={item.slug}>
-                      <td>{item.name || '—'}</td>
-                      <td>{item.email || '—'}</td>
-                      <td>{item.slug}</td>
-                      <td>{item.status || '—'}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn secondary"
-                          onClick={() => handleDeleteInvestor(item.slug)}
-                          disabled={deletingInvestor === item.slug}
-                        >
-                          {deletingInvestor === item.slug ? 'Eliminando...' : 'Eliminar'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {!investorListLoading && filteredInvestors.length === 0 && (
-                    <tr>
-                      <td colSpan={5} style={{paddingTop:12, paddingBottom:12, color:'var(--muted)'}}>
-                        No se encontraron inversionistas con los criterios actuales.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-        <div className="card">
-          <div className="h2">Actualizar estado de inversionista</div>
-          <form onSubmit={onSubmit}>
-            <div className="form-row">
-              <input
-                className="input"
-                placeholder="slug (id)"
-                value={payload.id}
-                onChange={e => setPayload({ ...payload, id: e.target.value })}
-              />
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+
+        <div
+          style={{
+            maxWidth: 1100,
+            margin: '24px auto',
+            padding: '0 20px',
+          }}
+        >
+          <div className="space-y-6" style={{ display: 'grid', gap: 24 }}>
+            <Card>
+              <div className="toolbar">
                 <button
                   type="button"
-                  className="btn secondary"
+                  className="btn"
                   onClick={handleLoadInvestor}
                   disabled={investorLoading || !canLoadInvestor}
                 >
-                  {investorLoading ? 'Cargando...' : 'Cargar datos'}
+                  {investorLoading ? 'Cargando…' : 'Cargar datos'}
                 </button>
                 <button
                   type="button"
@@ -1608,450 +1305,860 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                 </button>
                 <button
                   type="button"
-                  className="btn secondary"
+                  className="btn ghost"
                   onClick={handleOpenDeleteModal}
                   disabled={!canLoadInvestor || deletingInvestor === normalizedPayloadSlug}
                 >
-                  {deletingInvestor === normalizedPayloadSlug ? 'Eliminando...' : 'Eliminar'}
+                  {deletingInvestor === normalizedPayloadSlug ? 'Eliminando…' : 'Eliminar'}
                 </button>
-              </div>
-              <input
-                className="input"
-                placeholder="Nombre"
-                value={payload.name}
-                onChange={e => setPayload({ ...payload, name: e.target.value })}
-              />
-              <select
-                className="select"
-                value={payload.status}
-                onChange={e => setPayload({ ...payload, status: e.target.value })}
-              >
-                {PIPELINE_STAGES.map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-
-            <div style={{ marginTop: 12, fontWeight: 700 }}>Deadlines</div>
-            <div style={{ marginTop: 8 }}>
-              <DeadlinesForm
-                key={deadlineFormKey}
-                initial={deadlineRows}
-                onChange={handleDeadlinesChange}
-                onSubmit={handleDeadlinesSubmit}
-                saving={deadlinesSaving}
-              />
-              {deadlinesMsg && (
-                <div className="notice" style={{ marginTop: 8 }}>{deadlinesMsg}</div>
-              )}
-              {deadlinesErr && (
-                <div className="notice" style={{ marginTop: 8 }}>{deadlinesErr}</div>
-              )}
-            </div>
-
-            <div style={{ marginTop: 12, fontWeight: 700 }}>Métricas clave</div>
-
-            <div className="form-row" style={{ marginTop: 8 }}>
-              <div style={fieldStyle}>
-                <div style={labelStyle}>Días a decisión</div>
-                <span className={decisionBadgeClass}>{decisionLabel}</span>
-              </div>
-              <div style={fieldStyle}>
-                <label htmlFor="metric-fiscal" style={labelStyle}>Inversión de capital fiscal (MXN)</label>
-                <input
-                  id="metric-fiscal"
-                  className="input"
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={metrics.fiscalCapitalInvestment ?? ''}
-                  onChange={e => updateMetric('fiscalCapitalInvestment', e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="form-row" style={{ marginTop: 8 }}>
-              <div style={fieldStyle}>
-                <label htmlFor="metric-project-amount" style={labelStyle}>Utilidad de proyecto (MXN)</label>
-                <input
-                  id="metric-project-amount"
-                  className="input"
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={projectProfitability.amount ?? ''}
-                  onChange={e => updateMetric('projectProfitability', current => ({ ...(current || {}), amount: e.target.value }))}
-                />
-              </div>
-              <div style={fieldStyle}>
-                <label htmlFor="metric-project-years" style={labelStyle}>Horizonte (años)</label>
-                <input
-                  id="metric-project-years"
-                  className="input"
-                  type="number"
-                  min="0"
-                  value={projectProfitability.years ?? ''}
-                  onChange={e => updateMetric('projectProfitability', current => ({ ...(current || {}), years: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div className="form-row" style={{ marginTop: 8 }}>
-              <div style={fieldStyle}>
-                <label htmlFor="metric-portfolio-type" style={labelStyle}>Portafolio</label>
-                <select
-                  id="metric-portfolio-type"
-                  className="select"
-                  value={portfolio.type || ''}
-                  onChange={e => handlePortfolioTypeChange(e.target.value)}
-                >
-                  <option value="">Selecciona una opción</option>
-                  {PORTFOLIO_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {isPortfolioMix && (
-              <div style={{ marginTop: 8 }}>
-                <div className="form-row">
-                  {MIX_FIELDS.map(field => (
-                    <div key={field.key} style={mixFieldStyle}>
-                      <label htmlFor={`metric-portfolio-${field.key}`} style={labelStyle}>{field.label} (%)</label>
-                      <input
-                        id={`metric-portfolio-${field.key}`}
-                        className="input"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="any"
-                        value={mixValues[field.key] ?? ''}
-                        onChange={e => handleMixChange(field.key, e.target.value)}
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>Suma: {mixTotal}%</div>
-              </div>
-            )}
-
-            <button className="btn" type="submit" style={{ marginTop: 12 }}>Guardar</button>
-          </form>
-          {msg && <div className="notice" style={{marginTop:8}}>{msg}</div>}
-          {err && <div className="notice" style={{marginTop:8}}>{err}</div>}
-        </div>
-        <div className="card" style={{marginTop:12}} ref={docsCardRef}>
-          <div className="h2">Documentos por inversionista</div>
-          <form
-            onSubmit={handleDocSlugSubmit}
-            className="form-row"
-            style={{ marginTop: 8, alignItems: 'flex-end', gap: 12 }}
-          >
-            <div style={{ ...fieldStyle, minWidth: 200 }}>
-              <label htmlFor="docs-slug" style={labelStyle}>Slug del inversionista</label>
-              <input
-                id="docs-slug"
-                className="input"
-                value={docSlugInput}
-                onChange={e => setDocSlugInput(e.target.value)}
-                placeholder="slug"
-              />
-            </div>
-            <div style={{ ...fieldStyle, minWidth: 200 }}>
-              <label htmlFor="docs-category" style={labelStyle}>Categoría</label>
-              <select
-                id="docs-category"
-                className="select"
-                value={docCategory}
-                onChange={e => { setDocCategory(e.target.value); setDocsNotice(null); setDocsError(null) }}
-              >
-                {DOCUMENT_SECTIONS_ORDER.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-            <button className="btn" type="submit" disabled={docsLoading || docsWorking}>Ver carpeta</button>
-            <button
-              className="btn secondary"
-              type="button"
-              onClick={() => { setDocsNotice(null); setDocsError(null); loadDocs() }}
-              disabled={docsLoading || docsWorking}
-            >
-              Actualizar
-            </button>
-          </form>
-          <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>
-            Gestionando: <code>{docCategory}/{effectiveDocSlug}</code>
-          </div>
-          <form onSubmit={handleDocUpload} className="form-row" style={{ marginTop: 12 }} aria-busy={docsWorking}>
-            <input name="file" type="file" className="input" disabled={docsWorking} ref={docsUploadInputRef} />
-            <button className="btn" type="submit" disabled={docsWorking}>
-              {docsWorking ? 'Subiendo…' : 'Subir'}
-            </button>
-            <span className="notice">Los archivos se guardan en GitHub.</span>
-          </form>
-          {docsError && <div className="notice" style={{marginTop:8}}>{docsError}</div>}
-          {docsNotice && <div className="notice" style={{marginTop:8}}>{docsNotice}</div>}
-          {docsWorking && !docsLoading && <div style={{marginTop:8, color:'var(--muted)'}}>Procesando...</div>}
-          {docsLoading && <div style={{marginTop:8, color:'var(--muted)'}}>Cargando documentos...</div>}
-          <table className="table" style={{ marginTop: 12 }} ref={docsTableRef}>
-            <thead>
-              <tr>
-                <th>Archivo</th>
-                <th>Tamaño</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {docList.map(file => (
-                <tr key={file.path}>
-                  <td>{file.name}</td>
-                  <td>{(file.size / 1024).toFixed(1)} KB</td>
-                  <td style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                    <a
-                      className="btn secondary"
-                      href={api.downloadDocPath(file.path)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Descargar
-                    </a>
-                    <button
-                      type="button"
-                      className="btn secondary"
-                      onClick={() => handleDocDelete(file)}
-                      disabled={docsWorking}
-                    >
-                      Eliminar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {!docList.length && !docsLoading && (
-                <tr>
-                  <td colSpan="3">No hay documentos en esta carpeta.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        {docRenamePrompt && (
-          <div style={modalBackdropStyle} role="dialog" aria-modal="true" aria-labelledby="doc-rename-title">
-            <div style={modalCardStyle}>
-              <div className="h2" id="doc-rename-title" style={{ marginTop: 0 }}>Archivo duplicado</div>
-              <p style={{ marginTop: 8, color: 'var(--muted)', fontSize: 14 }}>
-                Ya existe un archivo con ese nombre. ¿Quieres subirlo con un sufijo automático?
-              </p>
-              <p style={{ fontSize: 13 }}>
-                <code>{docRenamePrompt.path}</code>
-              </p>
-              <div style={modalButtonRowStyle}>
                 <button
                   type="button"
                   className="btn secondary"
-                  onClick={handleCancelDocRename}
-                  disabled={docsWorking}
+                  onClick={() => { setDocsNotice(null); setDocsError(null); loadDocs() }}
+                  disabled={docsLoading || docsWorking}
                 >
-                  Cancelar
+                  {docsLoading || docsWorking ? 'Sincronizando…' : 'Actualizar docs'}
                 </button>
                 <button
                   type="button"
-                  className="btn"
-                  onClick={handleConfirmDocRename}
-                  disabled={docsWorking}
-                  aria-busy={docsWorking}
+                  className="btn secondary"
+                  onClick={handleRefreshActivity}
+                  disabled={activityLoading}
                 >
-                  {docsWorking ? 'Subiendo…' : 'Renombrar y subir'}
+                  {activityLoading ? 'Consultando…' : 'Actividad'}
                 </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    className="btn secondary"
+                    onClick={loadInvestorList}
+                    disabled={investorListLoading}
+                  >
+                    {investorListLoading ? 'Actualizando…' : 'Lista de inversionistas'}
+                  </button>
+                )}
               </div>
+            </Card>
+                    {isAdmin && (
+                      <div className="two-col">
+                      <Section
+                        title="Pipeline global"
+                        actions={investorListLoading ? <span className="badge">Actualizando…</span> : null}
+                      >
+                        <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 12 }}>
+                          Total inversionistas: {numberFormatter.format(pipelineSummary.total || 0)}
+                        </div>
+                        <div style={{ marginBottom: 16 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700 }}>Avance hacia {finalStageLabel || 'cierre'}</div>
+                          <div className="progress" style={{ marginTop: 6, height: 12 }}>
+                            <div style={{ width: `${Math.min(100, Math.max(0, pipelineSummary.finalPercent || 0))}%` }} />
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+                            {numberFormatter.format(pipelineSummary.finalCount || 0)} / {numberFormatter.format(pipelineSummary.total || 0)} · {percentFormatter.format(Number.isFinite(pipelineSummary.finalPercent) ? pipelineSummary.finalPercent : 0)}%
+                          </div>
+                        </div>
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          {pipelineSummary.counts.map(item => {
+                            const safePercent = Number.isFinite(item.percent) ? item.percent : 0
+                            return (
+                              <div key={item.stage} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', fontSize: 14, fontWeight: 600 }}>
+                                  <span>{item.stage}</span>
+                                  <span>{numberFormatter.format(item.count)} · {percentFormatter.format(safePercent)}%</span>
+                                </div>
+                                <div className="progress" style={{ marginTop: 6, height: 8 }}>
+                                  <div style={{ width: `${Math.min(100, Math.max(0, safePercent))}%` }} />
+                                </div>
+                              </div>
+                            )
+                          })}
+                          {!pipelineSummary.total && (
+                            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Sin inversionistas cargados.</div>
+                          )}
+                        </div>
+                      </Section>
+                      <Section
+                        title="Inversionistas activos"
+                        actions={
+                          <button
+                            type="button"
+                            className="btn secondary"
+                            onClick={loadInvestorList}
+                            disabled={investorListLoading}
+                          >
+                            {investorListLoading ? 'Actualizando…' : 'Actualizar'}
+                          </button>
+                        }
+                      >
+                        <div className="kpi">
+                          <div className="label" style={{ color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.4px' }}>
+                            Total dados de alta
+                          </div>
+                          <div className="h2" style={{ margin: 0 }}>
+                            {investorListLoading ? '—' : numberFormatter.format(pipelineSummary.total || 0)}
+                          </div>
+                        </div>
+                        {investorListError && <div className="notice">{investorListError}</div>}
+                      </Section>
+
+                      <Section
+                        title="Alertas de fechas próximas"
+                        actions={investorDetailsLoading ? <span className="badge">Cargando…</span> : null}
+                      >
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>
+                          Próximos
+                          <input
+                            type="number"
+                            min="0"
+                            className="input"
+                            value={deadlineThreshold}
+                            onChange={handleDeadlineThresholdChange}
+                            style={{ width: 90, padding: '6px 8px' }}
+                          />
+                          días
+                        </label>
+                        {upcomingDeadlines.length === 0 && !investorDetailsLoading ? (
+                          <div style={{ fontSize: 13, color: 'var(--muted)' }}>Sin alertas dentro del rango configurado.</div>
+                        ) : (
+                          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
+                            {upcomingDeadlines.map(item => {
+                              const dateLabel = item.formattedDate || item.date || '—'
+                              const dueLabel = item.dueText || (item.days === 0
+                                ? 'Vence hoy'
+                                : `Vence en ${item.days} día${item.days === 1 ? '' : 's'}`)
+                              return (
+                                <li key={`${item.slug}-${item.label}`} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                                    <div>
+                                      <div style={{ fontWeight: 600 }}>{item.investorName}</div>
+                                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+                                        {item.label} · {dueLabel} ({dateLabel})
+                                      </div>
+                                    </div>
+                                    {item.docTarget && (
+                                      <button
+                                        type="button"
+                                        className="btn secondary"
+                                        onClick={() => navigateToDocsSection(
+                                          item.docTarget.category,
+                                          item.slug,
+                                          item.docTarget.target || 'upload'
+                                        )}
+                                      >
+                                        Ir a {item.docTarget.category}
+                                      </button>
+                                    )}
+                                  </div>
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        )}
+                        {investorDetailsError && <div className="notice" style={{ marginTop: 12 }}>{investorDetailsError}</div>}
+                      </Section>
+
+                      <Section
+                        title="Faltan documentos"
+                        actions={
+                          <button
+                            type="button"
+                            className="btn secondary"
+                            onClick={handleRefreshDocInventories}
+                            disabled={docHealthLoading}
+                          >
+                            {docHealthLoading ? 'Verificando…' : 'Revisar'}
+                          </button>
+                        }
+                      >
+                        <p style={{ margin: '4px 0 12px', color: 'var(--muted)', fontSize: 13 }}>
+                          Estatus por categorías clave.
+                        </p>
+                        {!investorList.length ? (
+                          <div style={{ fontSize: 13, color: 'var(--muted)' }}>Da de alta inversionistas para revisar su documentación.</div>
+                        ) : !docInventoriesReady ? (
+                          docHealthLoading
+                            ? <div style={{ fontSize: 13, color: 'var(--muted)' }}>Verificando documentación…</div>
+                            : <div style={{ fontSize: 13, color: 'var(--muted)' }}>No se pudo obtener el estado actual.</div>
+                        ) : (
+                          docHealthSummary.map(summary => {
+                            const previewNames = summary.missing.slice(0, 3).map(item => item.name).join(', ')
+                            const remaining = summary.missing.length - Math.min(summary.missing.length, 3)
+                            const hasErrors = summary.missing.some(item => item.error)
+                            const disabledFolder = summary.total === 0
+                            return (
+                              <div key={summary.category} style={{ borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 10 }}>
+                                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                                  <div style={{ display: 'flex', gap: 8 }}>
+                                    <span style={{ fontSize: 20, lineHeight: 1 }}>{summary.hasAll ? '✅' : '⛔'}</span>
+                                    <div>
+                                      <div style={{ fontWeight: 700 }}>{summary.category}</div>
+                                      <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+                                        {summary.total === 0
+                                          ? 'Sin inversionistas registrados.'
+                                          : summary.hasAll
+                                            ? 'Documentación completa.'
+                                            : `Faltan ${summary.missing.length} de ${summary.total}.`}
+                                      </div>
+                                      {!summary.hasAll && summary.missing.length > 0 && (
+                                        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+                                          {previewNames}
+                                          {remaining > 0 && ` +${remaining} más`}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                    <button
+                                      type="button"
+                                      className="btn secondary"
+                                      onClick={() => navigateToDocsSection(summary.category, summary.fallbackSlug, 'upload')}
+                                    >
+                                      Subir
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn secondary"
+                                      onClick={() => navigateToDocsSection(summary.category, (summary.folderTarget && summary.folderTarget.slug) || summary.fallbackSlug, 'folder')}
+                                      disabled={disabledFolder}
+                                    >
+                                      Carpeta
+                                    </button>
+                                  </div>
+                                </div>
+                                {hasErrors && (
+                                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
+                                    Algunos registros devolvieron errores al consultar sus carpetas.
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })
+                        )}
+                        {docHealthError && <div className="notice" style={{ marginTop: 12 }}>{docHealthError}</div>}
+                      </Section>
+
+                      <Section
+                        title="Actividad reciente"
+                        actions={
+                          <button
+                            type="button"
+                            className="btn secondary"
+                            onClick={handleRefreshActivity}
+                            disabled={activityLoading}
+                          >
+                            {activityLoading ? 'Consultando…' : 'Actualizar'}
+                          </button>
+                        }
+                        style={{ gridColumn: 'span 2', minWidth: 280 }}
+                      >
+                        {activityError && <div className="notice" style={{ marginTop: 12 }}>{activityError}</div>}
+                        {activityLoading && <div style={{ marginTop: 12, color: 'var(--muted)' }}>Consultando actividad…</div>}
+                        {!activityLoading && !activityError && activityDisplayItems.length === 0 && (
+                          <div style={{ marginTop: 12, color: 'var(--muted)', fontSize: 13 }}>Sin eventos recientes.</div>
+                        )}
+                        {activityDisplayItems.length > 0 && (
+                          <ul style={{ listStyle: 'none', margin: 12, marginTop: 12, padding: 0, display: 'grid', gap: 10 }}>
+                            {activityDisplayItems.map(item => (
+                              <li key={item.key} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                                  <span style={{ fontSize: 18, lineHeight: 1 }}>{item.icon}</span>
+                                  <div>
+                                    <div style={{ fontWeight: 600 }}>{item.title}</div>
+                                    {item.detail && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{item.detail}</div>}
+                                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{item.dateLabel}</div>
+                                  </div>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </Section>
+                      </div>
+                    )}
+                    <div className="two-col">
+                      <Section title="Actualizar inversionista" actions={<span className="badge">{payload.status || 'Sin estado'}</span>}>
+                        <form onSubmit={onSubmit}>
+                          <div className="form-row">
+                            <input
+                              className="input"
+                              placeholder="slug (id)"
+                              value={payload.id}
+                              onChange={e => setPayload({ ...payload, id: e.target.value })}
+                            />
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              <button
+                                type="button"
+                                className="btn secondary"
+                                onClick={handleLoadInvestor}
+                                disabled={investorLoading || !canLoadInvestor}
+                              >
+                                {investorLoading ? 'Cargando...' : 'Cargar datos'}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn secondary"
+                                onClick={handleOpenPanelModal}
+                                disabled={!canLoadInvestor}
+                              >
+                                Ver panel
+                              </button>
+                              <button
+                                type="button"
+                                className="btn ghost"
+                                onClick={handleOpenDeleteModal}
+                                disabled={!canLoadInvestor || deletingInvestor === normalizedPayloadSlug}
+                              >
+                                {deletingInvestor === normalizedPayloadSlug ? 'Eliminando...' : 'Eliminar'}
+                              </button>
+                            </div>
+                            <input
+                              className="input"
+                              placeholder="Nombre"
+                              value={payload.name}
+                              onChange={e => setPayload({ ...payload, name: e.target.value })}
+                            />
+                            <select
+                              className="select"
+                              value={payload.status}
+                              onChange={e => setPayload({ ...payload, status: e.target.value })}
+                            >
+                              {PIPELINE_STAGES.map(s => <option key={s}>{s}</option>)}
+                            </select>
+                          </div>
+
+                          <div style={{ marginTop: 12, fontWeight: 700 }}>Deadlines</div>
+                          <div style={{ marginTop: 8 }}>
+                            <DeadlinesForm
+                              key={deadlineFormKey}
+                              initial={deadlineRows}
+                              onChange={handleDeadlinesChange}
+                              onSubmit={handleDeadlinesSubmit}
+                              saving={deadlinesSaving}
+                            />
+                            {deadlinesMsg && (
+                              <div className="notice" style={{ marginTop: 8 }}>{deadlinesMsg}</div>
+                            )}
+                            {deadlinesErr && (
+                              <div className="notice" style={{ marginTop: 8 }}>{deadlinesErr}</div>
+                            )}
+                          </div>
+
+                          <div style={{ marginTop: 12, fontWeight: 700 }}>Métricas clave</div>
+
+                          <div className="form-row" style={{ marginTop: 8 }}>
+                            <div style={fieldStyle}>
+                              <div style={labelStyle}>Días a decisión</div>
+                              <span className={decisionBadgeClass}>{decisionLabel}</span>
+                            </div>
+                            <div style={fieldStyle}>
+                              <label htmlFor="metric-fiscal" style={labelStyle}>Inversión de capital fiscal (MXN)</label>
+                              <input
+                                id="metric-fiscal"
+                                className="input"
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={metrics.fiscalCapitalInvestment ?? ''}
+                                onChange={e => updateMetric('fiscalCapitalInvestment', e.target.value)}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="form-row" style={{ marginTop: 8 }}>
+                            <div style={fieldStyle}>
+                              <label htmlFor="metric-project-amount" style={labelStyle}>Utilidad de proyecto (MXN)</label>
+                              <input
+                                id="metric-project-amount"
+                                className="input"
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={projectProfitability.amount ?? ''}
+                                onChange={e => updateMetric('projectProfitability', current => ({ ...(current || {}), amount: e.target.value }))}
+                              />
+                            </div>
+                            <div style={fieldStyle}>
+                              <label htmlFor="metric-project-years" style={labelStyle}>Horizonte (años)</label>
+                              <input
+                                id="metric-project-years"
+                                className="input"
+                                type="number"
+                                min="0"
+                                value={projectProfitability.years ?? ''}
+                                onChange={e => updateMetric('projectProfitability', current => ({ ...(current || {}), years: e.target.value }))}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="form-row" style={{ marginTop: 8 }}>
+                            <div style={fieldStyle}>
+                              <label htmlFor="metric-portfolio-type" style={labelStyle}>Portafolio</label>
+                              <select
+                                id="metric-portfolio-type"
+                                className="select"
+                                value={portfolio.type || ''}
+                                onChange={e => handlePortfolioTypeChange(e.target.value)}
+                              >
+                                <option value="">Selecciona una opción</option>
+                                {PORTFOLIO_OPTIONS.map(opt => (
+                                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+
+                          {isPortfolioMix && (
+                            <div style={{ marginTop: 8 }}>
+                              <div className="form-row">
+                                {MIX_FIELDS.map(field => (
+                                  <div key={field.key} style={mixFieldStyle}>
+                                    <label htmlFor={`metric-portfolio-${field.key}`} style={labelStyle}>{field.label} (%)</label>
+                                    <input
+                                      id={`metric-portfolio-${field.key}`}
+                                      className="input"
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      step="any"
+                                      value={mixValues[field.key] ?? ''}
+                                      onChange={e => handleMixChange(field.key, e.target.value)}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                              <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>Suma: {mixTotal}%</div>
+                            </div>
+                          )}
+
+                          <button className="btn" type="submit" style={{ marginTop: 12 }}>Guardar</button>
+                        </form>
+                        {msg && <div className="notice" style={{marginTop:8}}>{msg}</div>}
+                        {err && <div className="notice" style={{marginTop:8}}>{err}</div>}
+                      </Section>
+
+                      <Section title="Alta de inversionista" actions={<span className="badge">Nuevo registro</span>}>
+                        <form onSubmit={onCreate} aria-busy={invLoading}>
+                          <div className="form-row">
+                            <input className="input" type="email" placeholder="Email corporativo" value={inv.email} onChange={e => setInv({ ...inv, email: e.target.value })} required />
+                            <input className="input" placeholder="Nombre de la empresa" value={inv.companyName} onChange={e => setInv({ ...inv, companyName: e.target.value })} required />
+                            <input className="input" placeholder="Slug deseado (opcional)" value={inv.slug} onChange={e => setInv({ ...inv, slug: e.target.value })} />
+                            <select className="select" value={inv.status} onChange={e => setInv({ ...inv, status: e.target.value })}>
+                              {PIPELINE_STAGES.map(s => <option key={s}>{s}</option>)}
+                            </select>
+                          </div>
+                          <div style={{marginTop:8}}>
+                            <DeadlinesForm
+                              key={invDeadlinesKey}
+                              initial={inv.deadlines}
+                              onChange={rows => setInv(prev => ({ ...prev, deadlines: ensureDeadlineRows(rows) }))}
+                              hideSubmit
+                            />
+                          </div>
+                          <button className="btn" type="submit" disabled={invLoading} style={{marginTop:8}}>
+                            {invLoading ? 'Creando…' : 'Crear'}
+                          </button>
+                        </form>
+                        {invLoading && <div className="progress" style={{marginTop:8}}><div style={{width: progress + '%'}} /></div>}
+                        {invMsg && (
+                          <div className="notice" style={{marginTop:8, display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+                            <span style={{wordBreak:'break-all'}}>{invMsg}</span>
+                            <button className="btn secondary" type="button" onClick={() => navigator.clipboard && navigator.clipboard.writeText(invMsg)}>Copiar</button>
+                          </div>
+                        )}
+                        {invErr && <div className="notice" style={{marginTop:8}}>{invErr}</div>}
+                      </Section>
+                    </div>
+                    {isAdmin && (
+                      <Section title="Inversionistas activos">
+                        <p style={{marginTop:0, marginBottom:12, color:'var(--muted)', fontSize:14}}>
+                          Consulta los inversionistas dados de alta y dales de baja cuando sea necesario.
+                        </p>
+                        <div className="form-row" style={{marginBottom:12}}>
+                          <input
+                            className="input"
+                            placeholder="Buscar por nombre, correo o slug"
+                            value={investorSearch}
+                            onChange={e => setInvestorSearch(e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            className="btn secondary"
+                            onClick={loadInvestorList}
+                            disabled={investorListLoading}
+                          >
+                            {investorListLoading ? 'Actualizando...' : 'Actualizar lista'}
+                          </button>
+                        </div>
+                        {investorListError && <div className="notice">{investorListError}</div>}
+                        {investorDeleteErr && <div className="notice">{investorDeleteErr}</div>}
+                        {investorDeleteMsg && <div className="notice">{investorDeleteMsg}</div>}
+                        <div style={{fontSize:13, color:'var(--muted)'}}>
+                          {investorListLoading
+                            ? 'Cargando inversionistas...'
+                            : `${filteredInvestorCount} inversionista${filteredInvestorCount === 1 ? '' : 's'} coincidente${filteredInvestorCount === 1 ? '' : 's'}`}
+                        </div>
+                        <div style={{overflowX:'auto'}}>
+                          <table className="table">
+                            <thead>
+                              <tr>
+                                <th style={{minWidth:140}}>Empresa</th>
+                                <th style={{minWidth:180}}>Correo</th>
+                                <th style={{minWidth:100}}>Slug</th>
+                                <th style={{minWidth:120}}>Estado</th>
+                                <th style={{minWidth:120}}>Acciones</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {investorListLoading && (
+                                <tr>
+                                  <td colSpan={5} style={{paddingTop:12, paddingBottom:12}}>Cargando datos...</td>
+                                </tr>
+                              )}
+                              {!investorListLoading && filteredInvestors.map(item => (
+                                <tr key={item.slug}>
+                                  <td>{item.name || '—'}</td>
+                                  <td>{item.email || '—'}</td>
+                                  <td>{item.slug}</td>
+                                  <td>{item.status || '—'}</td>
+                                  <td>
+                                    <button
+                                      type="button"
+                                      className="btn ghost"
+                                      onClick={() => handleDeleteInvestor(item.slug)}
+                                      disabled={deletingInvestor === item.slug}
+                                    >
+                                      {deletingInvestor === item.slug ? 'Eliminando...' : 'Eliminar'}
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                              {!investorListLoading && filteredInvestors.length === 0 && (
+                                <tr>
+                                  <td colSpan={5} style={{paddingTop:12, paddingBottom:12, color:'var(--muted)'}}>
+                                    No se encontraron inversionistas con los criterios actuales.
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </Section>
+                    )}
+                    <div ref={docsCardRef}>
+                      <Section title="Documentos por inversionista">
+                        <form
+                          onSubmit={handleDocSlugSubmit}
+                          className="form-row"
+                          style={{ marginTop: 8, alignItems: 'flex-end', gap: 12 }}
+                        >
+                          <div style={{ ...fieldStyle, minWidth: 200 }}>
+                            <label htmlFor="docs-slug" style={labelStyle}>Slug del inversionista</label>
+                            <input
+                              id="docs-slug"
+                              className="input"
+                              value={docSlugInput}
+                              onChange={e => setDocSlugInput(e.target.value)}
+                              placeholder="slug"
+                            />
+                          </div>
+                          <div style={{ ...fieldStyle, minWidth: 200 }}>
+                            <label htmlFor="docs-category" style={labelStyle}>Categoría</label>
+                            <select
+                              id="docs-category"
+                              className="select"
+                              value={docCategory}
+                              onChange={e => { setDocCategory(e.target.value); setDocsNotice(null); setDocsError(null) }}
+                            >
+                              {DOCUMENT_SECTIONS_ORDER.map(cat => (
+                                <option key={cat} value={cat}>{cat}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <button className="btn" type="submit" disabled={docsLoading || docsWorking}>Ver carpeta</button>
+                          <button
+                            className="btn secondary"
+                            type="button"
+                            onClick={() => { setDocsNotice(null); setDocsError(null); loadDocs() }}
+                            disabled={docsLoading || docsWorking}
+                          >
+                            Actualizar
+                          </button>
+                        </form>
+                        <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>
+                          Gestionando: <code>{docCategory}/{effectiveDocSlug}</code>
+                        </div>
+                        <form onSubmit={handleDocUpload} className="form-row" style={{ marginTop: 12 }} aria-busy={docsWorking}>
+                          <input name="file" type="file" className="input" disabled={docsWorking} ref={docsUploadInputRef} />
+                          <button className="btn" type="submit" disabled={docsWorking}>
+                            {docsWorking ? 'Subiendo…' : 'Subir'}
+                          </button>
+                          <span className="notice">Los archivos se guardan en GitHub.</span>
+                        </form>
+                        {docsError && <div className="notice" style={{marginTop:8}}>{docsError}</div>}
+                        {docsNotice && <div className="notice" style={{marginTop:8}}>{docsNotice}</div>}
+                        {docsWorking && !docsLoading && <div style={{marginTop:8, color:'var(--muted)'}}>Procesando...</div>}
+                        {docsLoading && <div style={{marginTop:8, color:'var(--muted)'}}>Cargando documentos...</div>}
+                        <table className="table" style={{ marginTop: 12 }} ref={docsTableRef}>
+                          <thead>
+                            <tr>
+                              <th>Archivo</th>
+                              <th>Tamaño</th>
+                              <th></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {docList.map(file => (
+                              <tr key={file.path}>
+                                <td>{file.name}</td>
+                                <td>{(file.size / 1024).toFixed(1)} KB</td>
+                                <td style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                                  <a
+                                    className="btn secondary"
+                                    href={api.downloadDocPath(file.path)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    Descargar
+                                  </a>
+                                  <button
+                                    type="button"
+                                    className="btn secondary"
+                                    onClick={() => handleDocDelete(file)}
+                                    disabled={docsWorking}
+                                  >
+                                    Eliminar
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                            {!docList.length && !docsLoading && (
+                              <tr>
+                                <td colSpan="3">No hay documentos en esta carpeta.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </Section>
+                    </div>
+                    {docRenamePrompt && (
+                      <div style={modalBackdropStyle} role="dialog" aria-modal="true" aria-labelledby="doc-rename-title">
+                        <div style={modalCardStyle}>
+                          <div className="h2" id="doc-rename-title" style={{ marginTop: 0 }}>Archivo duplicado</div>
+                          <p style={{ marginTop: 8, color: 'var(--muted)', fontSize: 14 }}>
+                            Ya existe un archivo con ese nombre. ¿Quieres subirlo con un sufijo automático?
+                          </p>
+                          <p style={{ fontSize: 13 }}>
+                            <code>{docRenamePrompt.path}</code>
+                          </p>
+                          <div style={modalButtonRowStyle}>
+                            <button
+                              type="button"
+                              className="btn secondary"
+                              onClick={handleCancelDocRename}
+                              disabled={docsWorking}
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              className="btn"
+                              onClick={handleConfirmDocRename}
+                              disabled={docsWorking}
+                              aria-busy={docsWorking}
+                            >
+                              {docsWorking ? 'Subiendo…' : 'Renombrar y subir'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <Section title="Gestionar proyectos activos">
+                      <p style={{ margin: 0, color: 'var(--muted)', fontSize: 14 }}>Actualiza la lista que aparece en la sección de Proyectos.</p>
+                      {projectLoadErr && <div className="notice" style={{marginTop:8}}>{projectLoadErr}</div>}
+                      {projectsLoading ? (
+                        <div style={{marginTop:8, color:'var(--muted)'}}>Cargando proyectos...</div>
+                      ) : (
+                        <form onSubmit={onSaveProjects}>
+                          {projectList.map((project, index) => (
+                            <div key={project.id || index} style={projectBoxStyle}>
+                              <div className="row" style={{justifyContent:'space-between'}}>
+                                <div style={{fontWeight:700}}>{project.name || project.id || `Proyecto ${index + 1}`}</div>
+                                <button
+                                  type="button"
+                                  className="btn secondary"
+                                  style={{padding:'6px 12px', fontSize:12}}
+                                  onClick={() => removeProject(index)}
+                                >
+                                  Eliminar
+                                </button>
+                              </div>
+                              <div className="form-row" style={{marginTop:8}}>
+                                <div style={fieldStyle}>
+                                  <label htmlFor={`project-${index}-id`} style={labelStyle}>ID</label>
+                                  <input
+                                    id={`project-${index}-id`}
+                                    className="input"
+                                    value={project.id}
+                                    onChange={e => updateProjectField(index, 'id', e.target.value)}
+                                  />
+                                </div>
+                                <div style={fieldStyle}>
+                                  <label htmlFor={`project-${index}-name`} style={labelStyle}>Nombre</label>
+                                  <input
+                                    id={`project-${index}-name`}
+                                    className="input"
+                                    value={project.name}
+                                    onChange={e => updateProjectField(index, 'name', e.target.value)}
+                                  />
+                                </div>
+                                <div style={fieldStyle}>
+                                  <label htmlFor={`project-${index}-client`} style={labelStyle}>Cliente</label>
+                                  <input
+                                    id={`project-${index}-client`}
+                                    className="input"
+                                    value={project.client}
+                                    onChange={e => updateProjectField(index, 'client', e.target.value)}
+                                  />
+                                </div>
+                              </div>
+                              <div className="form-row" style={{marginTop:8}}>
+                                <div style={fieldStyle}>
+                                  <label htmlFor={`project-${index}-location`} style={labelStyle}>Ubicación</label>
+                                  <input
+                                    id={`project-${index}-location`}
+                                    className="input"
+                                    value={project.location}
+                                    onChange={e => updateProjectField(index, 'location', e.target.value)}
+                                  />
+                                </div>
+                                <div style={fieldStyle}>
+                                  <label htmlFor={`project-${index}-model`} style={labelStyle}>Modelo</label>
+                                  <input
+                                    id={`project-${index}-model`}
+                                    className="input"
+                                    value={project.model}
+                                    onChange={e => updateProjectField(index, 'model', e.target.value)}
+                                  />
+                                </div>
+                                <div style={fieldStyle}>
+                                  <label htmlFor={`project-${index}-status`} style={labelStyle}>Estado</label>
+                                  <input
+                                    id={`project-${index}-status`}
+                                    className="input"
+                                    value={project.status}
+                                    onChange={e => updateProjectField(index, 'status', e.target.value)}
+                                  />
+                                </div>
+                              </div>
+                              <div className="form-row" style={{marginTop:8}}>
+                                {PROJECT_NUMBER_FIELDS.map(field => (
+                                  <div key={field.key} style={fieldStyle}>
+                                    <label htmlFor={`project-${index}-${field.key}`} style={labelStyle}>{field.label}</label>
+                                    <input
+                                      id={`project-${index}-${field.key}`}
+                                      className="input"
+                                      type="number"
+                                      min="0"
+                                      step="any"
+                                      value={project[field.key] ?? ''}
+                                      onChange={e => updateProjectField(index, field.key, e.target.value)}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="form-row" style={{marginTop:8}}>
+                                <div style={fieldStyle}>
+                                  <label htmlFor={`project-${index}-termMonths`} style={labelStyle}>Plazo (meses)</label>
+                                  <input
+                                    id={`project-${index}-termMonths`}
+                                    className="input"
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    value={project.termMonths ?? 0}
+                                    onChange={e => updateProjectField(index, 'termMonths', e.target.value)}
+                                  />
+                                </div>
+                                <div style={fieldStyle}>
+                                  <label htmlFor={`project-${index}-empresa`} style={labelStyle}>Empresa</label>
+                                  <input
+                                    id={`project-${index}-empresa`}
+                                    className="input"
+                                    type="text"
+                                    value={project.empresa ?? ''}
+                                    onChange={e => updateProjectField(index, 'empresa', e.target.value)}
+                                    placeholder="Razón social / filial"
+                                  />
+                                </div>
+                                <div style={fieldStyle}>
+                                  <label htmlFor={`project-${index}-imageUrl`} style={labelStyle}>Imagen (URL)</label>
+                                  <input
+                                    id={`project-${index}-imageUrl`}
+                                    className="input"
+                                    type="url"
+                                    placeholder="https://..."
+                                    value={project.imageUrl ?? ''}
+                                    onChange={e => updateProjectField(index, 'imageUrl', e.target.value)}
+                                  />
+                                  {project.imageUrl && /^https?:\/\//i.test(project.imageUrl) && (
+                                    <div style={{ marginTop: 8 }}>
+                                      <img
+                                        src={project.imageUrl}
+                                        alt={project.name || project.id || 'Proyecto'}
+                                        style={{ maxWidth: 160, borderRadius: 8 }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="form-row" style={{marginTop:8}}>
+                                <div style={{ ...fieldStyle, minWidth: 260 }}>
+                                  <label htmlFor={`project-${index}-notes`} style={labelStyle}>Notas</label>
+                                  <textarea
+                                    id={`project-${index}-notes`}
+                                    className="input"
+                                    style={noteAreaStyle}
+                                    value={project.notes}
+                                    onChange={e => updateProjectField(index, 'notes', e.target.value)}
+                                  />
+                                </div>
+                                <div style={fieldStyle}>
+                                  <label htmlFor={`project-${index}-loi`} style={labelStyle}>Enlace a LOI</label>
+                                  <input
+                                    id={`project-${index}-loi`}
+                                    className="input"
+                                    type="url"
+                                    placeholder="https://"
+                                    value={project.loi_template}
+                                    onChange={e => updateProjectField(index, 'loi_template', e.target.value)}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {!projectList.length && (
+                            <div style={{marginTop:12, color:'var(--muted)'}}>No hay proyectos cargados. Usa "Agregar proyecto".</div>
+                          )}
+                          <div className="row" style={{marginTop:12, gap:8}}>
+                            <button type="button" className="btn secondary" onClick={addProject}>Agregar proyecto</button>
+                            <button type="submit" className="btn" disabled={projectSaving}>
+                              {projectSaving ? 'Guardando...' : 'Guardar proyectos'}
+                            </button>
+                          </div>
+                        </form>
+                      )}
+                      {projectSaveMsg && <div className="notice" style={{marginTop:8}}>{projectSaveMsg}</div>}
+                      {projectSaveErr && <div className="notice" style={{marginTop:8}}>{projectSaveErr}</div>}
+                    </Section>
+                    <Section title="Notas" style={{marginTop:12}}>
+                      <ul>
+                        <li>Este panel hace commits a GitHub (mismo repo) en <code>data/investors/&lt;slug&gt;.json</code>.</li>
+                        <li>Netlify vuelve a construir el sitio y los cambios quedan visibles al instante.</li>
+                      </ul>
+                    </Section>
             </div>
           </div>
-        )}
-        <div className="card" style={{marginTop:12}}>
-          <div className="h2">Gestionar proyectos activos</div>
-          <p style={{ margin: 0, color: 'var(--muted)', fontSize: 14 }}>Actualiza la lista que aparece en la sección de Proyectos.</p>
-          {projectLoadErr && <div className="notice" style={{marginTop:8}}>{projectLoadErr}</div>}
-          {projectsLoading ? (
-            <div style={{marginTop:8, color:'var(--muted)'}}>Cargando proyectos...</div>
-          ) : (
-            <form onSubmit={onSaveProjects}>
-              {projectList.map((project, index) => (
-                <div key={project.id || index} style={projectBoxStyle}>
-                  <div className="row" style={{justifyContent:'space-between'}}>
-                    <div style={{fontWeight:700}}>{project.name || project.id || `Proyecto ${index + 1}`}</div>
-                    <button
-                      type="button"
-                      className="btn secondary"
-                      style={{padding:'6px 12px', fontSize:12}}
-                      onClick={() => removeProject(index)}
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                  <div className="form-row" style={{marginTop:8}}>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-id`} style={labelStyle}>ID</label>
-                      <input
-                        id={`project-${index}-id`}
-                        className="input"
-                        value={project.id}
-                        onChange={e => updateProjectField(index, 'id', e.target.value)}
-                      />
-                    </div>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-name`} style={labelStyle}>Nombre</label>
-                      <input
-                        id={`project-${index}-name`}
-                        className="input"
-                        value={project.name}
-                        onChange={e => updateProjectField(index, 'name', e.target.value)}
-                      />
-                    </div>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-client`} style={labelStyle}>Cliente</label>
-                      <input
-                        id={`project-${index}-client`}
-                        className="input"
-                        value={project.client}
-                        onChange={e => updateProjectField(index, 'client', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="form-row" style={{marginTop:8}}>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-location`} style={labelStyle}>Ubicación</label>
-                      <input
-                        id={`project-${index}-location`}
-                        className="input"
-                        value={project.location}
-                        onChange={e => updateProjectField(index, 'location', e.target.value)}
-                      />
-                    </div>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-model`} style={labelStyle}>Modelo</label>
-                      <input
-                        id={`project-${index}-model`}
-                        className="input"
-                        value={project.model}
-                        onChange={e => updateProjectField(index, 'model', e.target.value)}
-                      />
-                    </div>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-status`} style={labelStyle}>Estado</label>
-                      <input
-                        id={`project-${index}-status`}
-                        className="input"
-                        value={project.status}
-                        onChange={e => updateProjectField(index, 'status', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="form-row" style={{marginTop:8}}>
-                    {PROJECT_NUMBER_FIELDS.map(field => (
-                      <div key={field.key} style={fieldStyle}>
-                        <label htmlFor={`project-${index}-${field.key}`} style={labelStyle}>{field.label}</label>
-                        <input
-                          id={`project-${index}-${field.key}`}
-                          className="input"
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={project[field.key] ?? ''}
-                          onChange={e => updateProjectField(index, field.key, e.target.value)}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="form-row" style={{marginTop:8}}>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-termMonths`} style={labelStyle}>Plazo (meses)</label>
-                      <input
-                        id={`project-${index}-termMonths`}
-                        className="input"
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={project.termMonths ?? 0}
-                        onChange={e => updateProjectField(index, 'termMonths', e.target.value)}
-                      />
-                    </div>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-empresa`} style={labelStyle}>Empresa</label>
-                      <input
-                        id={`project-${index}-empresa`}
-                        className="input"
-                        type="text"
-                        value={project.empresa ?? ''}
-                        onChange={e => updateProjectField(index, 'empresa', e.target.value)}
-                        placeholder="Razón social / filial"
-                      />
-                    </div>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-imageUrl`} style={labelStyle}>Imagen (URL)</label>
-                      <input
-                        id={`project-${index}-imageUrl`}
-                        className="input"
-                        type="url"
-                        placeholder="https://..."
-                        value={project.imageUrl ?? ''}
-                        onChange={e => updateProjectField(index, 'imageUrl', e.target.value)}
-                      />
-                      {project.imageUrl && /^https?:\/\//i.test(project.imageUrl) && (
-                        <div style={{ marginTop: 8 }}>
-                          <img
-                            src={project.imageUrl}
-                            alt={project.name || project.id || 'Proyecto'}
-                            style={{ maxWidth: 160, borderRadius: 8 }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="form-row" style={{marginTop:8}}>
-                    <div style={{ ...fieldStyle, minWidth: 260 }}>
-                      <label htmlFor={`project-${index}-notes`} style={labelStyle}>Notas</label>
-                      <textarea
-                        id={`project-${index}-notes`}
-                        className="input"
-                        style={noteAreaStyle}
-                        value={project.notes}
-                        onChange={e => updateProjectField(index, 'notes', e.target.value)}
-                      />
-                    </div>
-                    <div style={fieldStyle}>
-                      <label htmlFor={`project-${index}-loi`} style={labelStyle}>Enlace a LOI</label>
-                      <input
-                        id={`project-${index}-loi`}
-                        className="input"
-                        type="url"
-                        placeholder="https://"
-                        value={project.loi_template}
-                        onChange={e => updateProjectField(index, 'loi_template', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {!projectList.length && (
-                <div style={{marginTop:12, color:'var(--muted)'}}>No hay proyectos cargados. Usa "Agregar proyecto".</div>
-              )}
-              <div className="row" style={{marginTop:12, gap:8}}>
-                <button type="button" className="btn secondary" onClick={addProject}>Agregar proyecto</button>
-                <button type="submit" className="btn" disabled={projectSaving}>
-                  {projectSaving ? 'Guardando...' : 'Guardar proyectos'}
-                </button>
-              </div>
-            </form>
-          )}
-          {projectSaveMsg && <div className="notice" style={{marginTop:8}}>{projectSaveMsg}</div>}
-          {projectSaveErr && <div className="notice" style={{marginTop:8}}>{projectSaveErr}</div>}
-        </div>
-        <div className="card" style={{marginTop:12}}>
-          <div className="h2">Notas</div>
-          <ul>
-            <li>Este panel hace commits a GitHub (mismo repo) en <code>data/investors/&lt;slug&gt;.json</code>.</li>
-            <li>Netlify vuelve a construir el sitio y los cambios quedan visibles al instante.</li>
-          </ul>
-        </div>
+        </main>
       </div>
       {panelModal && (
         <div style={modalBackdropStyle}>

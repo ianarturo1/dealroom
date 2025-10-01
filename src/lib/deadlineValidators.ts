@@ -1,11 +1,11 @@
-import { STAGES } from "./stages";
+import { STAGES } from "@/lib/stages"
 
-const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_RE = /^\d{4}-\d{2}-\d{2}$/
 
 export function isValidISODate(s: string) {
-  if (!ISO_RE.test(s)) return false;
-  const d = new Date(s);
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+  if (!ISO_RE.test(s)) return false
+  const d = new Date(s)
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s
 }
 
 export function normalize(s: string) {
@@ -13,7 +13,7 @@ export function normalize(s: string) {
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .trim()
-    .toLowerCase();
+    .toLowerCase()
 }
 
 /**
@@ -23,72 +23,76 @@ export function normalize(s: string) {
  *  - etapas duplicadas
  *  - orden cronológico según STAGES (solo compara etapas presentes)
  */
-export function validateRows(rows: Array<{ stage?: string; date?: string }>) {
-  // normaliza y arma mapa stage->date con la forma canónica de etapa
-  const stageByNorm: Record<string, string> = {};
-  STAGES.forEach(s => (stageByNorm[normalize(s)] = s));
+export function validateRows(rows: Array<{ stage?: string; date?: string }> = []) {
+  try {
+    const safeRows = Array.isArray(rows) ? rows : []
+    const stageByNorm: Record<string, string> = {}
+    STAGES.forEach(s => (stageByNorm[normalize(s)] = s))
 
-  const usedStages = new Set<string>();
-  const deadlines: Record<string, string> = {};
+    const usedStages = new Set<string>()
+    const deadlines: Record<string, string> = {}
 
-  for (const r of rows) {
-    const stageInput = r.stage?.trim() || "";
-    const date = r.date?.trim() || "";
+    for (const r of safeRows) {
+      const stageInput = r?.stage?.trim() || ""
+      const date = r?.date?.trim() || ""
 
-    if (!stageInput && !date) continue; // fila vacía
+      if (!stageInput && !date) continue
 
-    // mapear "firma" -> "Firma", ignorando acentos/caso/espacios
-    const canonical = stageByNorm[normalize(stageInput)];
-    if (!canonical) {
-      return { ok: false, message: `Etapa inválida: "${stageInput}". Selecciona una de la lista.` };
+      const canonical = stageByNorm[normalize(stageInput)]
+      if (!canonical) {
+        return { ok: false, message: `Etapa inválida: "${stageInput}". Selecciona una de la lista.` }
+      }
+
+      if (!date) {
+        return { ok: false, message: `Falta la fecha para "${canonical}".` }
+      }
+
+      if (!isValidISODate(date)) {
+        return { ok: false, message: `Fecha inválida en "${canonical}". Usa formato YYYY-MM-DD.` }
+      }
+
+      if (usedStages.has(canonical)) {
+        return { ok: false, message: `La etapa "${canonical}" está repetida.` }
+      }
+      usedStages.add(canonical)
+      deadlines[canonical] = date
     }
 
-    if (!date) {
-      return { ok: false, message: `Falta la fecha para "${canonical}".` };
+    const present = STAGES.filter(s => deadlines[s])
+    for (let i = 0; i < present.length - 1; i++) {
+      const a = present[i]
+      const b = present[i + 1]
+      if (deadlines[a] > deadlines[b]) {
+        return {
+          ok: false,
+          message: `La fecha de "${a}" (${deadlines[a]}) no puede ser posterior a "${b}" (${deadlines[b]}).`,
+        }
+      }
     }
 
-    if (!isValidISODate(date)) {
-      return { ok: false, message: `Fecha inválida en "${canonical}". Usa formato YYYY-MM-DD.` };
-    }
-
-    if (usedStages.has(canonical)) {
-      return { ok: false, message: `La etapa "${canonical}" está repetida.` };
-    }
-    usedStages.add(canonical);
-    deadlines[canonical] = date;
+    return { ok: true, deadlines, canonicalStages: Array.from(usedStages) }
+  } catch (err) {
+    console.error("validateRows error:", err)
+    return { ok: false, message: "Error validando deadlines." }
   }
-
-  // orden no-decreciente según STAGES
-  const present = STAGES.filter(s => deadlines[s]);
-  for (let i = 0; i < present.length - 1; i++) {
-    const a = present[i], b = present[i + 1];
-    if (deadlines[a] > deadlines[b]) {
-      return {
-        ok: false,
-        message: `La fecha de "${a}" (${deadlines[a]}) no puede ser posterior a "${b}" (${deadlines[b]}).`,
-      };
-    }
-  }
-
-  return { ok: true, deadlines, canonicalStages: Array.from(usedStages) };
 }
 
 /** devuelve la siguiente etapa sugerida que aún no está en rows */
-export function suggestNextStage(rows: Array<{ stage?: string }>) {
+export function suggestNextStage(rows: Array<{ stage?: string }> = []) {
   const current = new Set(
-    rows
-      .map(r => r.stage || "")
+    (Array.isArray(rows) ? rows : [])
+      .map(r => r?.stage || "")
       .map(s => stageByCanonicalOrNull(s))
       .filter(Boolean) as string[]
-  );
+  )
   for (const s of STAGES) {
-    if (!current.has(s)) return s;
+    if (!current.has(s)) return s
   }
-  return ""; // no hay sugerencia
+  return ""
 }
 
 function stageByCanonicalOrNull(s: string) {
-  const map: Record<string, string> = {};
-  STAGES.forEach(x => (map[normalize(x)] = x));
-  return map[normalize(s)] || "";
+  const map: Record<string, string> = {}
+  STAGES.forEach(x => (map[normalize(x)] = x))
+  return map[normalize(s)] || ""
 }

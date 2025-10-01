@@ -1,4 +1,4 @@
-export const STAGES = [
+export const STAGES: string[] = [
   "Primera reunión",
   "NDA",
   "Entrega de información",
@@ -10,4 +10,4 @@ export const STAGES = [
   "Due Diligence",
   "Cronograma de inversión",
   "Firma",
-];
+]

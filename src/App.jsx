@@ -1,13 +1,14 @@
 import React from 'react'
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
-import Dashboard from './pages/Dashboard'
-import Documents from './pages/Documents'
-import Projects from './pages/Projects'
-import Admin from './pages/Admin'
-import Updates from './pages/Updates'
-import NotFound from './pages/NotFound'
+import Dashboard from '@/pages/Dashboard'
+import Documents from '@/pages/Documents'
+import Projects from '@/pages/Projects'
+import AdminPage from '@/pages/Admin'
+import Updates from '@/pages/Updates'
+import NotFound from '@/pages/NotFound'
 import './styles.css'
-import { useInvestorProfile } from './lib/investor'
+import { useInvestorProfile } from '@/lib/investor'
+import { ErrorBoundary } from '@/components/system/ErrorBoundary'
 
 export default function App(){
   const location = useLocation()
@@ -64,14 +65,25 @@ export default function App(){
         </div>
       </header>
       <main className="main">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/projects" element={<Projects />} />
-          <Route path="/documents" element={<Documents />} />
-          <Route path="/updates" element={<Updates />} />
-          {!isInvestorProfile && <Route path="/admin" element={<Admin user={null} />} />}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/projects" element={<Projects />} />
+            <Route path="/documents" element={<Documents />} />
+            <Route path="/updates" element={<Updates />} />
+            {!isInvestorProfile && (
+              <Route
+                path="/admin"
+                element={(
+                  <ErrorBoundary>
+                    <AdminPage user={null} />
+                  </ErrorBoundary>
+                )}
+              />
+            )}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </ErrorBoundary>
       </main>
       <div className="footer">© Finsolar Dealroom</div>
     </>
