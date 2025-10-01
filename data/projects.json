@@ -1,16 +1,5 @@
 [
   {
-    "id": "proj-celocan-celoplaya",
-    "name": "Granjas solares en Celocán y Celoplaya – Quintana Roo",
-    "status": "Disponible",
-    "client": "TBD",
-    "location": "Cancún y Playa del Carmen",
-    "power_kwp": 1967,
-    "energy_mwh": 2763,
-    "co2_tons": 1208,
-    "termMonths": 0
-  },
-  {
     "id": "proj-danone-multi-sitios",
     "name": "Sistemas solares Danone – Múltiples ubicaciones",
     "status": "Disponible",
