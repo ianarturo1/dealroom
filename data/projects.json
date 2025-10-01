@@ -1,29 +1,25 @@
 [
   {
-    "id": "celocan-celoplaya-qroo",
+    "id": "proj-celocan-celoplaya",
     "name": "Granjas solares en Celocán y Celoplaya – Quintana Roo",
+    "status": "Disponible",
     "client": "TBD",
     "location": "Cancún y Playa del Carmen",
-    "status": "Disponible",
-    "termMonths": 0,
-    "empresa": "",
-    "imageUrl": "",
     "power_kwp": 1967,
     "energy_mwh": 2763,
-    "co2_tons": 1208
+    "co2_tons": 1208,
+    "termMonths": 0
   },
   {
-    "id": "danone-multi-sitios",
+    "id": "proj-danone-multi-sitios",
     "name": "Sistemas solares Danone – Múltiples ubicaciones",
+    "status": "Disponible",
     "client": "Danone",
     "location": "Aguascalientes, Pachuca, SLP, Torreón, Villahermosa, Zacatecas, Morelia, Toluca",
-    "status": "Disponible",
-    "termMonths": 0,
-    "empresa": "",
-    "imageUrl": "",
     "power_kwp": 755,
     "energy_mwh": 1184.34,
     "co2_tons": 519,
+    "termMonths": 0,
     "notes": "Conjunto de propuestas PPA en 8 sitios. Promedio de ahorro > 45%."
   }
 ]
