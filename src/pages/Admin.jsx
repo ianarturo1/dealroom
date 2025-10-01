@@ -129,7 +129,7 @@ export default function Admin({ user }){
   const [investorLoading, setInvestorLoading] = useState(false)
 
   const [invDeadlinesKey, setInvDeadlinesKey] = useState(0)
-  const [inv, setInv] = useState({ email: '', companyName: '', slug: '', status: 'NDA', deadlines: ensureDeadlineRows([]) })
+  const [inv, setInv] = useState({ email: '', companyName: '', id: '', status: 'NDA', deadlines: ensureDeadlineRows([]) })
   const [invMsg, setInvMsg] = useState(null)
   const [invErr, setInvErr] = useState(null)
   const [invLoading, setInvLoading] = useState(false)
@@ -174,7 +174,7 @@ useEffect(() => {
   try {
     const data = JSON.parse(raw);
     const category = DOCUMENT_SECTIONS_ORDER.includes(data?.category) ? data.category : DEFAULT_DOC_CATEGORY;
-    const slug = normalizeSlug(data?.slug) || DEFAULT_INVESTOR_ID;
+    const slug = normalizeSlug(data?.id) || DEFAULT_INVESTOR_ID;
 
     setDocCategory(category);
     setDocSlugInput(slug);
@@ -266,7 +266,20 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     try{
       const res = await api.listInvestors()
       const items = Array.isArray(res?.investors) ? res.investors : []
-      setInvestorList(items)
+      const normalized = items
+        .map(item => {
+          const id = normalizeSlug(item?.id || item?.slug)
+          if (!id) return null
+          return {
+            ...item,
+            id,
+            name: item?.name || '',
+            email: item?.email || '',
+            status: item?.status || ''
+          }
+        })
+        .filter(Boolean)
+      setInvestorList(normalized)
     }catch(error){
       setInvestorList([])
       setInvestorListError(error.message)
@@ -310,7 +323,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     const term = investorSearch.trim().toLowerCase()
     if (!term) return investorList
     return investorList.filter(item => {
-      const haystack = [item.slug, item.name, item.email, item.status]
+      const haystack = [item.id, item.name, item.email, item.status]
       return haystack.some(value => (value || '').toLowerCase().includes(term))
     })
   }, [investorList, investorSearch])
@@ -318,9 +331,9 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
   const investorOptions = React.useMemo(() => {
     return investorList.map(item => ({
-      slug: item.slug,
-      name: item.name || item.slug,
-      label: `${item.name || item.slug} (${item.slug})`
+      id: item.id,
+      name: item.name || item.id,
+      label: `${item.name || item.id} (${item.id})`
     }))
   }, [investorList])
 
@@ -330,22 +343,22 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     if (!investorSearchTerm) return investorOptions
     return investorOptions.filter(option => {
       const name = option.name ? option.name.toLowerCase() : ''
-      return option.slug.toLowerCase().includes(investorSearchTerm) || name.includes(investorSearchTerm)
+      return option.id.toLowerCase().includes(investorSearchTerm) || name.includes(investorSearchTerm)
     })
   }, [investorOptions, investorSearchTerm])
 
-  const handleDeleteInvestor = useCallback(async (slug, options = {}) => {
-    if (!isAdmin || !slug) return false
+  const handleDeleteInvestor = useCallback(async (id, options = {}) => {
+    if (!isAdmin || !id) return false
     if (!options.skipConfirm && typeof window !== 'undefined'){
-      const confirmed = window.confirm(`¿Eliminar al inversionista "${slug}"? Esta acción no se puede deshacer.`)
+      const confirmed = window.confirm(`¿Eliminar al inversionista "${id}"? Esta acción no se puede deshacer.`)
       if (!confirmed) return false
     }
     setInvestorDeleteErr(null)
     setInvestorDeleteMsg(null)
-    setDeletingInvestor(slug)
+    setDeletingInvestor(id)
     try{
-      await api.deleteInvestor(slug)
-      setInvestorList(prev => prev.filter(item => item.slug !== slug))
+      await api.deleteInvestor(id)
+      setInvestorList(prev => prev.filter(item => item.id !== id))
       setInvestorDeleteMsg('Inversionista eliminado.')
       return true
     }catch(error){
@@ -360,7 +373,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     if (!option) return
     setPayload(prev => ({
       ...prev,
-      id: option.slug,
+      id: option.id,
       name: option.name || prev.name
     }))
     setInvestorDropdownOpen(false)
@@ -510,10 +523,10 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       try{
         const entries = await Promise.all(investorList.map(async (item) => {
           try{
-            const data = await api.getInvestor(item.slug)
-            return [item.slug, data]
+            const data = await api.getInvestor(item.id)
+            return [item.id, data]
           }catch(error){
-            return [item.slug, { __error: error.message }]
+            return [item.id, { __error: error.message }]
           }
         }))
         if (!active) return
@@ -568,12 +581,12 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
           for (const investor of investorList){
             if (!active) return
             try{
-              const res = await api.listDocs({ category, investor: investor.slug })
+              const res = await api.listDocs({ category, investor: investor.id })
               const files = Array.isArray(res?.files) ? res.files : []
-              categoryData[investor.slug] = { files, error: null }
+              categoryData[investor.id] = { files, error: null }
             }catch(error){
               const message = error.message || 'Error desconocido'
-              categoryData[investor.slug] = { files: [], error: message }
+              categoryData[investor.id] = { files: [], error: message }
               const lower = message.toLowerCase()
               if (lower.includes('github_token') || lower.includes('no configurado') || lower.includes('500 ')){
                 throw error
@@ -893,19 +906,19 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const normalizedPayloadSlug = React.useMemo(() => {
     if (!investorSearchTerm) return ''
 
-    const exactSlugMatch = investorOptions.find(option => option.slug.toLowerCase() === investorSearchTerm)
-    if (exactSlugMatch) return exactSlugMatch.slug
+    const exactSlugMatch = investorOptions.find(option => option.id.toLowerCase() === investorSearchTerm)
+    if (exactSlugMatch) return exactSlugMatch.id
 
     const exactNameMatch = investorOptions.find(option => (option.name || '').toLowerCase() === investorSearchTerm)
-    if (exactNameMatch) return exactNameMatch.slug
+    if (exactNameMatch) return exactNameMatch.id
 
     const partialMatch = investorOptions.find(option => {
-      const slug = option.slug.toLowerCase()
+      const slug = option.id.toLowerCase()
       const name = (option.name || '').toLowerCase()
       return slug.includes(investorSearchTerm) || name.includes(investorSearchTerm)
     })
 
-    return partialMatch?.slug || ''
+    return partialMatch?.id || ''
   }, [investorOptions, investorSearchTerm])
 
   const investorExists = Boolean(normalizedPayloadSlug)
@@ -914,7 +927,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     : null
   const selectedInvestorName = React.useMemo(() => {
     if (!normalizedPayloadSlug) return ''
-    const match = investorOptions.find(option => option.slug === normalizedPayloadSlug)
+    const match = investorOptions.find(option => option.id === normalizedPayloadSlug)
     return match?.name || ''
   }, [investorOptions, normalizedPayloadSlug])
   const canLoadInvestor = Boolean(normalizedPayloadSlug && investorExists)
@@ -923,7 +936,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const investorNameBySlug = React.useMemo(() => {
     const map = {}
     investorList.forEach(item => {
-      map[item.slug] = item.name || item.slug
+      map[item.id] = item.name || item.id
     })
     return map
   }, [investorList])
@@ -994,12 +1007,12 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     return DASHBOARD_DOC_CATEGORIES.map(category => {
       const categoryData = docInventories[category] || {}
       const missing = investorList.reduce((acc, investor) => {
-        const entry = categoryData[investor.slug]
+        const entry = categoryData[investor.id]
         const files = Array.isArray(entry?.files) ? entry.files : []
         if (!files.length){
           acc.push({
-            slug: investor.slug,
-            name: investor.name || investor.slug,
+            id: investor.id,
+            name: investor.name || investor.id,
             error: entry?.error || null
           })
         }
@@ -1007,14 +1020,14 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       }, [])
       let folderTarget = null
       for (const investor of investorList){
-        const entry = categoryData[investor.slug]
+        const entry = categoryData[investor.id]
         const files = Array.isArray(entry?.files) ? entry.files : []
         if (files.length){
-          folderTarget = { slug: investor.slug, file: files[0] }
+          folderTarget = { id: investor.id, file: files[0] }
           break
         }
       }
-      const fallbackSlug = missing.length ? missing[0].slug : (investorList[0]?.slug || DEFAULT_INVESTOR_ID)
+      const fallbackSlug = missing.length ? missing[0].id : (investorList[0]?.id || DEFAULT_INVESTOR_ID)
       return {
         category,
         missing,
@@ -1028,7 +1041,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
   const activityDisplayItems = React.useMemo(() => {
     return activityItems.map((event, index) => {
-      const slug = event?.slug || ''
+      const slug = event?.id || ''
       const investorName = slug ? (investorNameBySlug[slug] || slug) : ''
       let icon = '•'
       let title = event?.message || 'Actividad'
@@ -1110,7 +1123,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const handleLoadInvestor = async () => {
     const slug = normalizedPayloadSlug
     if (!slug){
-      setErr(investorSearchTerm ? 'Inversionista no encontrado' : 'El slug o nombre es requerido para cargar datos')
+      setErr(investorSearchTerm ? 'Inversionista no encontrado' : 'El ID o nombre es requerido para cargar datos')
       return
     }
     setMsg(null)
@@ -1137,12 +1150,12 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const handleOpenPanelModal = () => {
     const slug = normalizedPayloadSlug
     if (!slug){
-      setErr(investorSearchTerm ? 'Inversionista no encontrado' : 'El slug o nombre es requerido para ver el panel público')
+      setErr(investorSearchTerm ? 'Inversionista no encontrado' : 'El ID o nombre es requerido para ver el panel público')
       return
     }
     const base = siteBaseUrl ? siteBaseUrl.replace(/\/$/, '') : ''
     const url = `${base}/#/?investor=${slug}`
-    setPanelModal({ slug, url })
+    setPanelModal({ id: slug, url })
   }
 
   const handleClosePanelModal = () => {
@@ -1152,10 +1165,10 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const handleOpenDeleteModal = () => {
     const slug = normalizedPayloadSlug
     if (!slug){
-      setErr(investorSearchTerm ? 'Inversionista no encontrado' : 'El slug o nombre es requerido para eliminar al inversionista')
+      setErr(investorSearchTerm ? 'Inversionista no encontrado' : 'El ID o nombre es requerido para eliminar al inversionista')
       return
     }
-    setDeleteModal({ slug })
+    setDeleteModal({ id: slug })
     setDeleteModalError(null)
   }
 
@@ -1166,11 +1179,11 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   }
 
   const confirmDeleteFromModal = async () => {
-    if (!deleteModal?.slug) return
+    if (!deleteModal?.id) return
     setDeleteModalError(null)
     setDeleteModalLoading(true)
     try{
-      await handleDeleteInvestor(deleteModal.slug, { skipConfirm: true })
+      await handleDeleteInvestor(deleteModal.id, { skipConfirm: true })
       setDeleteModal(null)
     }catch(error){
       setDeleteModalError(error.message)
@@ -1249,7 +1262,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
         if (investorSearchTerm){
           throw new Error('Inversionista no encontrado')
         }
-        throw new Error('El slug o nombre es requerido')
+        throw new Error('El ID o nombre es requerido')
       }
 
       const metricsPayload = payload.metrics || {}
@@ -1332,7 +1345,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     }
     const normalizedId = normalizedPayloadSlug
     if (!normalizedId){
-      setDeadlinesErr(investorSearchTerm ? 'Inversionista no encontrado' : 'El slug o nombre es requerido')
+      setDeadlinesErr(investorSearchTerm ? 'Inversionista no encontrado' : 'El ID o nombre es requerido')
       return
     }
 
@@ -1342,7 +1355,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       const response = await fetch('/.netlify/functions/update-investor', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug: normalizedId, deadlines })
+        body: JSON.stringify({ id: normalizedId, deadlines })
       })
       if (!response.ok){
         const text = await response.text()
@@ -1375,7 +1388,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       const dl = createValidation.deadlines
 
       const payload = { email: inv.email, companyName: inv.companyName, status: inv.status, deadlines: dl }
-      if (inv.slug) payload.slug = inv.slug
+      if (inv.id) payload.id = inv.id
       const res = await api.createInvestor(payload)
       setProgress(100)
       setInvMsg(res.link)
@@ -1386,8 +1399,8 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     }catch(error){
       setProgress(0)
       if (error?.status === 409 && error?.data?.error === 'INVESTOR_EXISTS'){
-        const conflictSlug = error.data?.slug || normalizeSlug(inv.slug || inv.companyName || '') || 'desconocido'
-        showToast(`Este inversionista ya existe (slug: ${conflictSlug}).`, { tone: 'warning', duration: 5000 })
+        const conflictId = error.data?.id || normalizeSlug(inv.id || inv.companyName || '') || 'desconocido'
+        showToast(`Este inversionista ya existe (ID: ${conflictId}).`, { tone: 'warning', duration: 5000 })
       }else{
         const message = error?.message || 'Error al crear inversionista'
         setInvErr(`Error al crear inversionista: ${message}`)
@@ -1552,7 +1565,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                                 ? 'Vence hoy'
                                 : `Vence en ${item.days} día${item.days === 1 ? '' : 's'}`)
                               return (
-                                <li key={`${item.slug}-${item.label}`} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                                <li key={`${item.id}-${item.label}`} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                                     <div>
                                       <div style={{ fontWeight: 600 }}>{item.investorName}</div>
@@ -1566,7 +1579,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                                         variant="secondary"
                                         onClick={() => navigateToDocsSection(
                                           item.docTarget.category,
-                                          item.slug,
+                                          item.id,
                                           item.docTarget.target || 'upload'
                                         )}
                                       >
@@ -1645,7 +1658,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                                       variant="secondary"
                                       onClick={() => navigateToDocsSection(
                                         summary.category,
-                                        (summary.folderTarget && summary.folderTarget.slug) || summary.fallbackSlug,
+                                        (summary.folderTarget && summary.folderTarget.id) || summary.fallbackSlug,
                                         'folder'
                                       )}
                                       disabled={disabledFolder}
@@ -1724,11 +1737,11 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                               required
                             />
                           </FormRow>
-                          <FormRow label="Slug deseado (opcional)">
+                          <FormRow label="ID deseado (opcional)">
                             <Input
-                              placeholder="Slug opcional"
-                              value={inv.slug}
-                              onChange={e => setInv({ ...inv, slug: e.target.value })}
+                              placeholder="ID opcional"
+                              value={inv.id}
+                              onChange={e => setInv({ ...inv, id: e.target.value })}
                             />
                           </FormRow>
                           <FormRow label="Estado inicial">
@@ -1782,7 +1795,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                         </p>
                         <Toolbar style={{ marginBottom: 12 }}>
                           <Input
-                            placeholder="Buscar por nombre, correo o slug"
+                        placeholder="Buscar por nombre, correo o ID"
                             value={investorSearch}
                             onChange={e => setInvestorSearch(e.target.value)}
                             style={{ flex: 1, minWidth: 220 }}
@@ -1810,7 +1823,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                               <tr>
                                 <th style={{ minWidth: 140 }}>Empresa</th>
                                 <th style={{ minWidth: 180 }}>Correo</th>
-                                <th style={{ minWidth: 100 }}>Slug</th>
+                                <th style={{ minWidth: 100 }}>ID</th>
                                 <th style={{ minWidth: 120 }}>Estado</th>
                                 <th style={{ minWidth: 120 }}>Acciones</th>
                               </tr>
@@ -1823,19 +1836,19 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                               )}
                               {!investorListLoading &&
                                 filteredInvestors.map(item => (
-                                  <tr key={item.slug}>
+                                  <tr key={item.id}>
                                     <td>{item.name || '—'}</td>
                                     <td>{item.email || '—'}</td>
-                                    <td>{item.slug}</td>
+                                    <td>{item.id}</td>
                                     <td>{item.status || '—'}</td>
                                     <td>
                                       <Button
                                         type="button"
                                         variant="secondary"
-                                        onClick={() => handleDeleteInvestor(item.slug)}
-                                        disabled={deletingInvestor === item.slug}
+                                        onClick={() => handleDeleteInvestor(item.id)}
+                                        disabled={deletingInvestor === item.id}
                                       >
-                                        {deletingInvestor === item.slug ? 'Eliminando...' : 'Eliminar'}
+                                        {deletingInvestor === item.id ? 'Eliminando...' : 'Eliminar'}
                                       </Button>
                                     </td>
                                   </tr>
@@ -1855,7 +1868,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                     <Section title="Actualizar estado de inversionista">
                       <form onSubmit={onSubmit} style={{ display: 'grid', gap: 20 }}>
                         <div className="grid-2">
-                          <FormRow label="Inversionista (slug)">
+                        <FormRow label="Inversionista (ID)">
                             <div
                               ref={investorSelectorRef}
                               style={{ position: 'relative' }}
@@ -1865,7 +1878,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                               aria-owns="investor-autocomplete-list"
                             >
                               <Input
-                                placeholder="Busca por nombre o slug"
+                                placeholder="Busca por nombre o ID"
                                 value={payload.id}
                                 onChange={handleInvestorInputChange}
                                 onFocus={handleInvestorInputFocus}
@@ -1911,7 +1924,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                                       const isActive = index === investorHighlightIndex
                                       return (
                                         <li
-                                          key={option.slug}
+                                          key={option.id}
                                           role="option"
                                           aria-selected={isActive}
                                           onMouseDown={event => event.preventDefault()}
@@ -1930,7 +1943,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                                             {option.name}
                                           </span>
                                           <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-                                            {option.slug}
+                                            {option.id}
                                           </span>
                                         </li>
                                       )
@@ -2376,7 +2389,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                     </Section>
                     <Section title="Notas" style={{ marginTop: 12 }}>
                       <ul>
-                        <li>Este panel hace commits a GitHub (mismo repo) en <code>data/investors/&lt;slug&gt;.json</code>.</li>
+                        <li>Este panel hace commits a GitHub (mismo repo) en <code>data/investors/&lt;id&gt;.json</code>.</li>
                         <li>Netlify vuelve a construir el sitio y los cambios quedan visibles al instante.</li>
                       </ul>
                     </Section>
@@ -2389,7 +2402,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
           <div style={modalCardStyle}>
             <div style={{ fontSize: 18, fontWeight: 700 }}>Panel público del inversionista</div>
             <p style={{ marginTop: 8, marginBottom: 12, color: 'var(--muted)', fontSize: 14 }}>
-              Comparte este enlace con el inversionista <code>{panelModal.slug}</code>.
+              Comparte este enlace con el inversionista <code>{panelModal.id}</code>.
             </p>
             <Input
               readOnly
@@ -2429,7 +2442,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
           <div style={modalCardStyle}>
             <div style={{ fontSize: 18, fontWeight: 700 }}>Eliminar inversionista</div>
             <p style={{ marginTop: 8, marginBottom: 12, color: 'var(--muted)', fontSize: 14 }}>
-              Se eliminará <code>data/investors/{deleteModal.slug}.json</code> y, si existe, la carpeta <code>data/docs/{deleteModal.slug}/</code>.
+              Se eliminará <code>data/investors/{deleteModal.id}.json</code> y, si existe, la carpeta <code>data/docs/{deleteModal.id}/</code>.
               Esta acción no se puede deshacer.
             </p>
             {deleteModalError && <div className="notice" style={{ marginTop: 8 }}>{deleteModalError}</div>}

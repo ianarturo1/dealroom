@@ -145,6 +145,7 @@ export async function handler(event){
     await putFile(repo, investorPath, investorContent, `feat(investor): create ${slug}`, undefined, CONTENT_BRANCH)
 
     const indexEntry = {
+      id: slug,
       slug,
       name,
       email: investor.email || '',

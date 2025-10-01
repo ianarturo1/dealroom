@@ -30,11 +30,16 @@ export async function handler(event){
       return text(405, 'Method not allowed')
     }
 
-    const querySlug = normalizeSlug(event.queryStringParameters?.slug)
+    const querySlug = normalizeSlug(event.queryStringParameters?.id || event.queryStringParameters?.slug)
     const slug = querySlug || defaultSlug()
     const data = await loadInvestor(slug)
+    if (!data || typeof data !== 'object'){
+      return text(500, 'Datos de inversionista inválidos')
+    }
+    const normalizedId = normalizeSlug(data.id) || slug
+    const payload = { ...data, id: normalizedId }
 
-    return ok(data)
+    return ok(payload)
   } catch (err) {
     const message = String(err && err.message ? err.message : err)
     if (message.includes('ENOENT') || message.includes('GitHub 404')){
