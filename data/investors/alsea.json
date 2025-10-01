@@ -1,24 +1,27 @@
 {
   "id": "alsea",
-  "name": "Alsea",
-  "status": "Ajustes técnicos",
+  "name": "FEMSA",
+  "status": "LOI",
   "deadlines": {
     "LOI": "2025-10-15",
-    "Firma": "2025-11-05"
+    "Firma": "2025-11-30"
   },
   "metrics": {
-    "fiscalCapitalInvestment": 60000000,
+    "fiscalCapitalInvestment": 20000000,
     "projectProfitability": {
-      "amount": 210407889,
-      "years": 21
+      "amount": 12500000,
+      "years": 7
     },
     "portfolio": {
       "type": "mix",
-      "mix": {}
+      "mix": {
+        "solarFarms": 40,
+        "aaaCompanies": 35,
+        "ownSites": 25
+      }
     },
     "investorsActive": 12,
     "dealsAccelerated": 38,
     "nps": 72
-  },
-  "updatedAt": "2025-10-01T16:17:24.163Z"
+  }
 }
