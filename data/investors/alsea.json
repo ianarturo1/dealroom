@@ -1,0 +1,17 @@
+{
+  "id": "alsea",
+  "name": "Alsea",
+  "status": "Ajustes técnicos",
+  "deadlines": {
+    "LOI": "2025-10-17",
+    "Revisión de contratos": "2025-10-31"
+  },
+  "metrics": {},
+  "ui": {
+    "panelTitle": "Panel Alsea",
+    "theme": {}
+  },
+  "createdAt": "2025-10-01T15:49:02.539Z",
+  "updatedAt": "2025-10-01T15:49:02.539Z",
+  "email": "carlos.frias@alsea.com.mx"
+}
