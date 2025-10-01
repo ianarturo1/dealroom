@@ -21,7 +21,8 @@
     "energy_mwh": 4028.6,
     "co2_tons": 1761.3,
     "termMonths": 0,
-    "empresa": "Grupo Zorro Abarrotero"
+    "empresa": "Grupo Zorro Abarrotero",
+    "notes": "Conjunto de contratos PPA en múltiples sitios"
   },
   {
     "id": "proj-stepan",
