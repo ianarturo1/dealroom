@@ -3,15 +3,21 @@
   "name": "Alsea",
   "status": "Ajustes técnicos",
   "deadlines": {
-    "LOI": "2025-10-17",
-    "Revisión de contratos": "2025-10-31"
+    "LOI": "2025-10-15",
+    "Firma": "2025-11-07"
   },
-  "metrics": {},
-  "ui": {
-    "panelTitle": "Panel Alsea",
-    "theme": {}
-  },
-  "createdAt": "2025-10-01T15:49:02.539Z",
-  "updatedAt": "2025-10-01T15:49:02.539Z",
-  "email": "carlos.frias@alsea.com.mx"
+  "metrics": {
+    "fiscalCapitalInvestment": 60000000,
+    "projectProfitability": {
+      "amount": 210407889,
+      "years": 21
+    },
+    "portfolio": {
+      "type": "mix",
+      "mix": {}
+    },
+    "investorsActive": 12,
+    "dealsAccelerated": 38,
+    "nps": 72
+  }
 }
