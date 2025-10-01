@@ -56,9 +56,9 @@ export async function handler(event){
 
   try{
     const body = JSON.parse(event.body || '{}')
-    const slug = normalizeSlug(body.slug)
+    const slug = normalizeSlug(body.id || body.slug)
     if (!slug){
-      return text(400, 'Falta slug de inversionista')
+      return text(400, 'Falta id de inversionista')
     }
 
     const repo = repoEnv('CONTENT_REPO', '')
