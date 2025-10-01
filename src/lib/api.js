@@ -28,13 +28,16 @@ export const api = {
     })
   },
   listInvestors(){ return req('/.netlify/functions/list-investors') },
-  deleteInvestor(slug){
+  deleteInvestor(id){
     return req('/.netlify/functions/delete-investor', {
       method: 'POST',
-      body: { slug }
+      body: { id }
     })
   },
-  getInvestor(slug){ return req(`/.netlify/functions/get-investor${slug ? ('?slug='+encodeURIComponent(slug)) : ''}`) },
+  getInvestor(id){
+    const query = id ? `?id=${encodeURIComponent(id)}` : ''
+    return req(`/.netlify/functions/get-investor${query}`)
+  },
   listDocs(params){
     const q = new URLSearchParams(params || {}).toString()
     return req(`/.netlify/functions/list-docs${q ? ('?'+q) : ''}`)
@@ -51,8 +54,8 @@ export const api = {
   async createInvestor(payload){
     return req('/.netlify/functions/create-investor', { method:'POST', body: payload })
   },
-  calendarIcsUrl(slug){
-    return `/.netlify/functions/calendar?slug=${encodeURIComponent(slug)}`
+  calendarIcsUrl(id){
+    return `/.netlify/functions/calendar?slug=${encodeURIComponent(id)}`
   },
   downloadDocPath(relPath){
     const normalized = (relPath || '').replace(/^\/+/, '')

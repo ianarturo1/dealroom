@@ -16,6 +16,7 @@ const parseInvestorsArray = (items) => {
       const slug = (item.slug || '').toString().trim().toLowerCase()
       if (!slug) return null
       return {
+        id: slug,
         slug,
         name: item.name || '',
         email: item.email || '',
@@ -30,13 +31,14 @@ const parseInvestorsArray = (items) => {
 const parseInvestorsMap = (map) => {
   if (!map || typeof map !== 'object') return []
   return Object.entries(map).map(([slug, info]) => ({
+    id: (slug || '').toString().trim().toLowerCase(),
     slug: (slug || '').toString().trim().toLowerCase(),
     name: info?.name || '',
     email: info?.email || '',
     status: info?.status || '',
     createdAt: info?.createdAt,
     updatedAt: info?.updatedAt
-  })).filter(item => Boolean(item.slug))
+  })).filter(item => Boolean(item.id))
 }
 
 const decodeIndexContent = (content) => {
@@ -64,11 +66,12 @@ const buildIndexPayload = (entries, rest = {}) => {
   const seen = new Set()
   const investors = {}
   entries.forEach(entry => {
-    if (!entry || !entry.slug) return
-    if (seen.has(entry.slug)) return
-    seen.add(entry.slug)
-    const { slug, ...info } = entry
-    investors[slug] = {
+    const id = entry?.id || entry?.slug
+    if (!id) return
+    if (seen.has(id)) return
+    seen.add(id)
+    const { slug, id: entryId, ...info } = entry
+    investors[id] = {
       ...info,
       name: info.name || '',
       email: info.email || '',
