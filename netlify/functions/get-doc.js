@@ -1,19 +1,19 @@
 import { text } from './_lib/utils.mjs'
 import { repoEnv, getFile } from './_lib/github.mjs'
 
-function normalizeSlug(value){
+function normalizeId(value){
   return typeof value === 'string' ? value.trim().toLowerCase() : ''
 }
 
-function publicSlug(){
-  const raw = normalizeSlug(process.env.PUBLIC_INVESTOR_SLUG)
+function publicInvestorId(){
+  const raw = normalizeId(process.env.PUBLIC_INVESTOR_SLUG)
   return raw || 'femsa'
 }
 
-function allowedSlugFrom(event){
+function allowedInvestorIdFrom(event){
   const qp = event?.queryStringParameters || {}
-  const requested = normalizeSlug(qp.investor)
-  return requested || publicSlug()
+  const requested = normalizeId(qp.investor ?? qp.slug)
+  return requested || publicInvestorId()
 }
 
 export async function handler(event){
@@ -30,17 +30,17 @@ export async function handler(event){
     const pathParts = normalizedPath.split('/').filter(Boolean)
     if (pathParts.length < 3) return text(400, 'Ruta inválida')
 
-    const [category, slugPart, ...restParts] = pathParts
-    const allowedSlug = allowedSlugFrom(event)
-    if (!category || !slugPart || restParts.length === 0) return text(400, 'Ruta inválida')
+    const [category, investorSegment, ...restParts] = pathParts
+    const allowedInvestorId = allowedInvestorIdFrom(event)
+    if (!category || !investorSegment || restParts.length === 0) return text(400, 'Ruta inválida')
 
-    if (normalizeSlug(slugPart) !== allowedSlug){
+    if (normalizeId(investorSegment) !== allowedInvestorId){
       return text(404, 'Documento no encontrado o acceso denegado.')
     }
 
     if (!repo || !process.env.GITHUB_TOKEN) return text(500, 'DOCS_REPO/GITHUB_TOKEN no configurados')
 
-    const repoPath = [category, allowedSlug, ...restParts].join('/')
+    const repoPath = [category, allowedInvestorId, ...restParts].join('/')
     const file = await getFile(repo, repoPath, branch)
     const encoding = typeof file.encoding === 'string' ? file.encoding.toLowerCase() : 'base64'
     const buff = encoding === 'base64'

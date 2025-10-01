@@ -8,8 +8,7 @@
     "power_kwp": 1967,
     "energy_mwh": 2763,
     "co2_tons": 1208,
-    "termMonths": 0,
-    "slug": "celocan-celoplaya"
+    "termMonths": 0
   },
   {
     "id": "proj-danone-multi-sitios",
@@ -21,8 +20,7 @@
     "energy_mwh": 1184.34,
     "co2_tons": 519,
     "termMonths": 0,
-    "notes": "Conjunto de propuestas PPA en 8 sitios. Promedio de ahorro > 45%.",
-    "slug": "danone-multi-sitios"
+    "notes": "Conjunto de propuestas PPA en 8 sitios. Promedio de ahorro > 45%."
   },
   {
     "id": "proj-grupo-zorro-abarrotero",
@@ -34,8 +32,7 @@
     "energy_mwh": 4028.6,
     "co2_tons": 1761.3,
     "termMonths": 0,
-    "empresa": "Grupo Zorro Abarrotero",
-    "slug": "grupo-zorro-abarrotero"
+    "empresa": "Grupo Zorro Abarrotero"
   },
   {
     "id": "proj-stepan",
@@ -47,8 +44,7 @@
     "energy_mwh": 1859.8,
     "co2_tons": 813.1,
     "termMonths": 0,
-    "empresa": "Stepan",
-    "slug": "stepan"
+    "empresa": "Stepan"
   },
   {
     "id": "proj-techo-celocan",
@@ -60,8 +56,7 @@
     "energy_mwh": 168.6,
     "co2_tons": 73.7,
     "termMonths": 0,
-    "empresa": "CFE",
-    "slug": "techo-celocan"
+    "empresa": "CFE"
   },
   {
     "id": "proj-techo-celoplaya",
@@ -73,8 +68,7 @@
     "energy_mwh": 2594.4,
     "co2_tons": 1134.3,
     "termMonths": 0,
-    "empresa": "CFE",
-    "slug": "techo-celoplaya"
+    "empresa": "CFE"
   },
   {
     "id": "proj-carretera-costera-golfo",
@@ -86,8 +80,7 @@
     "energy_mwh": 934.1,
     "co2_tons": 408.4,
     "termMonths": 0,
-    "empresa": "CFE",
-    "slug": "carretera-costera-golfo"
+    "empresa": "CFE"
   },
   {
     "id": "proj-techo-ayuntamiento-cancun",
@@ -99,8 +92,7 @@
     "energy_mwh": 550.6,
     "co2_tons": 240.7,
     "termMonths": 0,
-    "empresa": "CFE",
-    "slug": "techo-ayuntamiento-cancun"
+    "empresa": "CFE"
   },
   {
     "id": "proj-techo-teatro-cancun",
@@ -112,8 +104,7 @@
     "energy_mwh": 289.4,
     "co2_tons": 126.5,
     "termMonths": 0,
-    "empresa": "CFE",
-    "slug": "techo-teatro-cancun"
+    "empresa": "CFE"
   },
   {
     "id": "proj-terreno-mina-paa-mul",
@@ -125,8 +116,7 @@
     "energy_mwh": 4214,
     "co2_tons": 1843.4,
     "termMonths": 0,
-    "empresa": "CFE",
-    "slug": "terreno-mina-paa-mul"
+    "empresa": "CFE"
   },
   {
     "id": "proj-20-noviembre",
@@ -138,7 +128,6 @@
     "energy_mwh": 4916.4,
     "co2_tons": 2149.5,
     "termMonths": 0,
-    "empresa": "CFE",
-    "slug": "20-noviembre"
+    "empresa": "CFE"
   }
 ]

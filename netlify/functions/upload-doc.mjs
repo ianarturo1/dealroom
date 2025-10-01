@@ -1,7 +1,7 @@
 import { json, text } from './_lib/utils.mjs'
 import { repoEnv, getFile, putFile } from './_lib/github.mjs'
 
-const publicSlug = () => {
+const publicInvestorId = () => {
   const raw = typeof process.env.PUBLIC_INVESTOR_SLUG === 'string'
     ? process.env.PUBLIC_INVESTOR_SLUG.trim().toLowerCase()
     : ''
@@ -39,15 +39,17 @@ export async function handler(event){
     const category = (body.path || '').toString().trim().replace(/^\/+|\/+$/g, '')
     const fileName = (body.filename || '').toString().trim()
     const contentBase64 = (body.contentBase64 || '').toString().trim()
-    const slugInput = typeof body.slug === 'string' ? body.slug.trim().toLowerCase() : ''
-    const slug = slugInput || publicSlug()
+    const investorInput = typeof body.investor === 'string'
+      ? body.investor.trim().toLowerCase()
+      : (typeof body.slug === 'string' ? body.slug.trim().toLowerCase() : '')
+    const investorId = investorInput || publicInvestorId()
     const strategy = typeof body.strategy === 'string' ? body.strategy : undefined
 
     if (!category || !fileName || !contentBase64){
       return text(400, 'Faltan datos (path, filename, contentBase64)')
     }
 
-    const originalPath = `${category}/${slug}/${fileName}`
+    const originalPath = `${category}/${investorId}/${fileName}`
     let existing = null
     try {
       existing = await getFile(repo, originalPath, branch)
@@ -72,7 +74,7 @@ export async function handler(event){
       const base = dotIndex > -1 ? fileName.slice(0, dotIndex) : fileName
       const ext = dotIndex > -1 ? fileName.slice(dotIndex) : ''
       finalFileName = `${base}_${formatTimestamp()}${ext}`
-      finalPath = `${category}/${slug}/${finalFileName}`
+      finalPath = `${category}/${investorId}/${finalFileName}`
       renamed = true
     }
 
@@ -92,7 +94,7 @@ export async function handler(event){
     }
 
     const commitMessageSuffix = renamed ? ' (auto-rename)' : ''
-    const commitMessage = `docs(${slug}): upload ${category}/${finalFileName}${commitMessageSuffix}`
+    const commitMessage = `docs(${investorId}): upload ${category}/${finalFileName}${commitMessageSuffix}`
 
     await putFile(repo, finalPath, contentBase64, commitMessage, undefined, branch)
 

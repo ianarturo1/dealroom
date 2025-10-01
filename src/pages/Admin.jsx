@@ -358,7 +358,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     setDocsLoading(true)
     setDocsError(null)
     try{
-      const res = await api.listDocs({ category: docCategory, slug })
+      const res = await api.listDocs({ category: docCategory, investor: slug })
       setDocList(res.files || [])
     }catch(error){
       setDocList([])
@@ -450,7 +450,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
           for (const investor of investorList){
             if (!active) return
             try{
-              const res = await api.listDocs({ category, slug: investor.slug })
+              const res = await api.listDocs({ category, investor: investor.slug })
               const files = Array.isArray(res?.files) ? res.files : []
               categoryData[investor.slug] = { files, error: null }
             }catch(error){
@@ -554,8 +554,12 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const sanitizeProjects = () => {
     const seen = new Set()
     const sanitized = projectList.map((project, index) => {
-      const id = (project.id || '').trim()
-      if (!id) throw new Error(`El proyecto ${index + 1} requiere un ID`)
+      const rawId = (project.id || '').trim()
+      if (!rawId) throw new Error(`El proyecto ${index + 1} requiere un ID`)
+      const id = rawId.toLowerCase()
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) {
+        throw new Error(`Proyecto ${rawId} tiene ID inválido`)
+      }
       const name = (project.name || '').trim()
       if (!name) throw new Error(`Proyecto ${id} requiere nombre`)
       const client = (project.client || '').trim()
@@ -655,7 +659,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
         path: `${uploadInfo.category}`,
         filename: uploadInfo.filename,
         contentBase64: uploadInfo.base64,
-        slug: uploadInfo.slug,
+        investor: uploadInfo.investor,
         message: uploadInfo.message
       }
       if (options.strategy === 'rename'){
@@ -674,12 +678,12 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       return response
     }catch(error){
       if (error?.status === 409 && error?.data?.error === 'FILE_EXISTS' && options.strategy !== 'rename'){
-        const fallbackPath = `${uploadInfo.category}/${uploadInfo.slug}/${uploadInfo.filename}`
+        const fallbackPath = `${uploadInfo.category}/${uploadInfo.investor}/${uploadInfo.filename}`
         setPendingDocUpload(uploadInfo)
         setDocRenamePrompt({
           path: error.data?.path || fallbackPath,
           category: uploadInfo.category,
-          slug: uploadInfo.slug
+          investor: uploadInfo.investor
         })
         return null
       }
@@ -711,7 +715,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
           category: docCategory,
           filename: file.name,
           base64,
-          slug,
+          investor: slug,
           message: `Upload ${file.name} desde Admin`,
           form
         })

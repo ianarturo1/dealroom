@@ -57,10 +57,10 @@ export const api = {
   downloadDocPath(relPath){
     const normalized = (relPath || '').replace(/^\/+/, '')
     const parts = normalized.split('/').filter(Boolean)
-    const slug = parts.length > 1 ? parts[1] : ''
+    const investorId = parts.length > 1 ? parts[1] : ''
     const params = new URLSearchParams()
     if (normalized) params.set('path', normalized)
-    if (slug) params.set('investor', slug)
+    if (investorId) params.set('investor', investorId)
     const qs = params.toString()
     return `/.netlify/functions/get-doc${qs ? `?${qs}` : ''}`
   },

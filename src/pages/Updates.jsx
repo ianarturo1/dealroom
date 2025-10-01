@@ -167,7 +167,7 @@ export default function Updates(){
           for (const investor of investorList){
             if (!active) return
             try{
-              const res = await api.listDocs({ category, slug: investor.slug })
+              const res = await api.listDocs({ category, investor: investor.slug })
               const files = Array.isArray(res?.files) ? res.files : []
               categoryData[investor.slug] = { files, error: null }
             }catch(error){
