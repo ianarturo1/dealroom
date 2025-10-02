@@ -17,19 +17,20 @@ function getEnv(name, required = true) {
 
 function sanitizeSegment(s) {
   return String(s || "")
-    .replace(/[^A-Za-z0-9._ \-()]/g, "")
+    .normalize("NFKC")
+    .replace(/[^\p{L}\p{N}._() \-]/gu, "")
     .trim();
 }
 
 function ensureSlugAllowed(inputSlug) {
-  const publicSlug = process.env.PUBLIC_INVESTOR_SLUG;
-  if (publicSlug && publicSlug.trim()) {
-    if (inputSlug !== publicSlug) {
+  const envSlug = sanitizeSegment(process.env.PUBLIC_INVESTOR_SLUG || "");
+  if (envSlug) {
+    if (inputSlug.toLowerCase() !== envSlug.toLowerCase()) {
       throw httpError(403, "Slug not allowed");
     }
-    return publicSlug;
+    return envSlug.toLowerCase();
   }
-  return inputSlug;
+  return inputSlug.toLowerCase();
 }
 
 function guessContentType(filename) {

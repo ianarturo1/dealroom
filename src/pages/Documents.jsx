@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api'
 import { useInvestorProfile } from '../lib/investor'
 import { DOCUMENT_SECTIONS_ORDER } from '../constants/documents'
@@ -12,15 +12,19 @@ export default function Documents(){
   const [uploadingCategory, setUploadingCategory] = useState(null)
   const [hasLoaded, setHasLoaded] = useState(false)
   const { investorId } = useInvestorProfile()
+  const normalizedInvestorId = useMemo(() => (investorId || '').trim().toLowerCase(), [investorId])
+  const alseaSlug = 'alsea'
+  const isAlseaContext = normalizedInvestorId === alseaSlug
+  const slugForDocs = useMemo(() => (isAlseaContext ? alseaSlug : investorId), [alseaSlug, investorId, isAlseaContext])
   const showToast = useToast()
   const [pendingUpload, setPendingUpload] = useState(null)
   const [renamePrompt, setRenamePrompt] = useState(null)
 
   const fetchDocs = useCallback(async (category) => {
-    const res = await api.listDocs({ category, slug: investorId })
+    const res = await api.listDocs({ category, slug: slugForDocs })
     const files = Array.isArray(res?.files) ? res.files : []
     return files
-  }, [investorId])
+  }, [slugForDocs])
 
   const refreshCategory = useCallback(async (category) => {
     const files = await fetchDocs(category)
@@ -75,11 +79,10 @@ export default function Documents(){
     setUploadingCategory(uploadInfo.category)
     try{
       const payload = {
-        path: `${uploadInfo.category}`,
-        filename: uploadInfo.filename,
-        contentBase64: uploadInfo.base64,
+        category: uploadInfo.category,
         slug: uploadInfo.slug,
-        message: uploadInfo.message
+        filename: uploadInfo.filename,
+        contentBase64: uploadInfo.base64
       }
       if (options.strategy === 'rename'){
         payload.strategy = 'rename'
@@ -125,12 +128,15 @@ export default function Documents(){
         const result = typeof reader.result === 'string' ? reader.result : ''
         const base64 = result.includes(',') ? result.split(',')[1] : result
         if (!base64) throw new Error('No se pudo leer el archivo')
+        const uploadSlug = slugForDocs
+        if (!uploadSlug){
+          throw new Error('Slug no disponible para la carga')
+        }
         await performUpload({
           category,
           filename: file.name,
           base64,
-          slug: investorId,
-          message: `Upload ${file.name} from Dealroom UI`,
+          slug: uploadSlug,
           form
         })
       }catch(err){
@@ -147,7 +153,7 @@ export default function Documents(){
       setUploadingCategory(null)
     }
     reader.readAsDataURL(file)
-  }, [investorId, performUpload, showToast])
+  }, [performUpload, showToast, slugForDocs])
 
   const handleConfirmRename = useCallback(async () => {
     if (!pendingUpload){
@@ -203,15 +209,31 @@ export default function Documents(){
                     </tr>
                   </thead>
                   <tbody>
-                    {docs.map((d) => (
-                      <tr key={d.path}>
-                        <td>{d.name}</td>
-                        <td>{(d.size / 1024).toFixed(1)} KB</td>
-                        <td>
-                          <a className="btn secondary" href={api.downloadDocPath(d.path)}>Descargar</a>
-                        </td>
-                      </tr>
-                    ))}
+                    {docs.map((d) => {
+                      const filename = d.name || d.filename || d.path || ''
+                      const sizeBytes = typeof d.size === 'number'
+                        ? d.size
+                        : typeof d.sizeBytes === 'number'
+                          ? d.sizeBytes
+                          : typeof d.sizeKB === 'number'
+                            ? Math.round(d.sizeKB * 1024)
+                            : 0
+                      const sizeLabel = sizeBytes > 0 ? `${(sizeBytes / 1024).toFixed(1)} KB` : '0.0 KB'
+                      const slugForKey = slugForDocs || normalizedInvestorId || investorId || 'default'
+                      const key = d.path || `${category}/${slugForKey}/${filename}`
+                      const href = isAlseaContext
+                        ? api.docDownloadUrl({ category, slug: alseaSlug, filename })
+                        : (d.path ? api.downloadDocPath(d.path) : api.docDownloadUrl({ category, slug: slugForDocs || '', filename }))
+                      return (
+                        <tr key={key}>
+                          <td>{filename}</td>
+                          <td>{sizeLabel}</td>
+                          <td>
+                            <a className="btn secondary" href={href}>Descargar</a>
+                          </td>
+                        </tr>
+                      )
+                    })}
                     {docs.length === 0 && hasLoaded && !loading && (
                       <tr>
                         <td colSpan="3">No hay documentos aún.</td>

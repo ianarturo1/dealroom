@@ -20,19 +20,22 @@ function getEnv(name, required = true) {
 }
 
 function sanitizeSegment(s) {
-  // Solo letras, números, guiones, paréntesis y espacios puntuales
-  return String(s || "").replace(/[^A-Za-z0-9._() -]/g, "").trim();
+  return String(s || "")
+    .normalize("NFKC")
+    .replace(/[^\p{L}\p{N}._() \-]/gu, "")
+    .trim();
 }
 
 function ensureSlugAllowed(inputSlug) {
-  const publicSlug = process.env.PUBLIC_INVESTOR_SLUG;
-  if (publicSlug && publicSlug.trim()) {
-    if (inputSlug !== publicSlug) {
+  const publicSlugRaw = process.env.PUBLIC_INVESTOR_SLUG;
+  const envSlug = sanitizeSegment(publicSlugRaw);
+  if (envSlug) {
+    if (inputSlug.toLowerCase() !== envSlug.toLowerCase()) {
       throw httpError(403, "Slug not allowed");
     }
-    return publicSlug;
+    return envSlug.toLowerCase();
   }
-  return inputSlug; // fallback si no hay PUBLIC_INVESTOR_SLUG
+  return inputSlug.toLowerCase(); // fallback si no hay PUBLIC_INVESTOR_SLUG
 }
 
 export async function handler(event) {
@@ -41,7 +44,11 @@ export async function handler(event) {
   }
 
   try {
-    const { category, slug, filename, contentBase64 } = reqJson(event);
+    const body = reqJson(event);
+    let { category, slug, filename, contentBase64 } = body;
+    if (!category && body?.path){
+      category = body.path;
+    }
 
     if (!category || !slug || !filename || !contentBase64) {
       throw httpError(400, "Missing category/slug/filename/contentBase64");
@@ -139,7 +146,7 @@ export async function handler(event) {
     }
 
     return {
-      statusCode: 200,
+      statusCode: putResp.status,
       body: JSON.stringify({ ok: true, path }),
     };
   } catch (err) {
