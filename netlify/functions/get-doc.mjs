@@ -1,6 +1,12 @@
 // netlify/functions/get-doc.mjs
 import { Octokit } from "octokit";
 
+function httpError(statusCode, message) {
+  const err = new Error(message);
+  err.statusCode = statusCode;
+  return err;
+}
+
 function getEnv(name, required = true) {
   const val = process.env[name];
   if (required && (!val || !val.trim())) {
@@ -17,7 +23,7 @@ function ensureSlugAllowed(inputSlug) {
   const publicSlug = process.env.PUBLIC_INVESTOR_SLUG;
   if (publicSlug && publicSlug.trim()) {
     if (inputSlug !== publicSlug) {
-      throw new Error(`Slug not allowed: ${inputSlug}`);
+      throw httpError(403, "Slug not allowed");
     }
     return publicSlug;
   }
@@ -43,12 +49,14 @@ export async function handler(event) {
   try {
     const params = event.queryStringParameters || {};
     const category = sanitizeSegment(params.category);
-    const slug = ensureSlugAllowed(sanitizeSegment(params.slug));
+    const sanitizedSlug = sanitizeSegment(params.slug);
     const filename = sanitizeSegment(params.filename);
 
-    if (!category || !slug || !filename) {
-      return { statusCode: 400, body: "Missing category/slug/filename" };
+    if (!category || !sanitizedSlug || !filename) {
+      throw httpError(400, "Missing category/slug/filename");
     }
+
+    const slug = ensureSlugAllowed(sanitizedSlug);
 
     const path = `${category}/${slug}/${filename}`;
 
@@ -61,8 +69,8 @@ export async function handler(event) {
 
     // Traer contenido en base64 desde GitHub
     const { data } = await octokit.repos.getContent({ owner, repo, path, ref: DOCS_BRANCH });
-    if (Array.isArray(data) || !data.content) {
-      return { statusCode: 404, body: "File not found or invalid type" };
+    if (Array.isArray(data) || data.type !== "file" || !data.content) {
+      throw httpError(404, "File not found");
     }
 
     // data.content viene en base64 según GitHub
@@ -81,6 +89,8 @@ export async function handler(event) {
       isBase64Encoded: true,
     };
   } catch (err) {
-    return { statusCode: 500, body: `get-doc error: ${err.message}` };
+    const statusCode = err.statusCode || 500;
+    const message = statusCode === 500 ? "get-doc error" : err.message;
+    return { statusCode, body: message };
   }
 }
