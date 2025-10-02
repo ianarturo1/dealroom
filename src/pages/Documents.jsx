@@ -173,11 +173,6 @@ export default function Documents(){
           {loading ? 'Actualizando…' : 'Actualizar'}
         </button>
       </div>
-
-      <div className="card" style={{ marginTop: 12 }}>
-        <span className="notice">Los archivos se guardan en GitHub y se exponen públicamente.</span>
-      </div>
-
       {error && <div className="notice" style={{ marginTop: 12 }}>{error}</div>}
 
       <div style={{ marginTop: 12, display: 'grid', gap: 24 }}>
