@@ -1,109 +1,78 @@
-import { ok, text } from './_lib/utils.mjs'
-import { repoEnv } from './_lib/github.mjs'
+import { json, text } from './_lib/utils.mjs'
+import { repoEnv, getFile } from './_lib/github.mjs'
 
 const GH_API = 'https://api.github.com'
-const SEGMENT_PATTERN = /^[a-zA-Z0-9._ -]+$/
-const CATEGORY_WHITELIST = new Set([
-  'NDA',
-  'Propuestas',
-  'Modelos financieros',
-  'Contratos',
-  'LOIs',
-  'Sustento fiscal',
-  'Mitigación de riesgos',
-  'Procesos'
-])
+const SAFE_SEGMENT = /^[a-zA-Z0-9._ -]+$/
 
-function normalizeForTest(value = ''){
-  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+function sanitizeSegment(value, label) {
+  const str = typeof value === 'string' ? value.trim() : ''
+  if (!str) throw text(400, `${label} requerido`)
+  if (!SAFE_SEGMENT.test(str)) throw text(400, `${label} inválido`)
+  return str
 }
 
-function sanitizeSegment(raw, label){
-  const value = typeof raw === 'string' ? raw.trim() : ''
-  if (!value) throw Object.assign(new Error(`${label} requerido`), { statusCode: 400 })
-  if (value.includes('..') || value.includes('/') || value.includes('\\')){
-    throw Object.assign(new Error(`${label} inválido`), { statusCode: 400 })
+async function github(path, { method = 'GET', body } = {}) {
+  const token = process.env.GITHUB_TOKEN
+  const res = await fetch(`${GH_API}${path}`, {
+    method,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github+json',
+      'User-Agent': 'netlify-fns'
+    },
+    body: body ? JSON.stringify(body) : undefined
+  })
+  if (!res.ok) {
+    const txt = await res.text()
+    throw text(res.status, `GitHub ${res.status}: ${txt}`)
   }
-  const comparable = normalizeForTest(value)
-  if (!SEGMENT_PATTERN.test(comparable)){
-    throw Object.assign(new Error(`${label} inválido`), { statusCode: 400 })
+  return res.json()
+}
+
+function repoParts(repo) {
+  const [owner, name] = String(repo).split('/')
+  return { owner, name }
+}
+
+export async function handler(req) {
+  if (req.method !== 'POST') {
+    return text(405, 'Method not allowed')
   }
-  return value
-}
 
-function encodePath(path){
-  return path.split('/').map((part) => encodeURIComponent(part)).join('/')
-}
+  const repo = repoEnv('DOCS_REPO', '').trim()
+  const branch = (process.env.DOCS_BRANCH || 'main').trim()
+  const token = process.env.GITHUB_TOKEN
 
-function headersWithAuth(token){
-  return {
-    'Authorization': `Bearer ${token}`,
-    'Accept': 'application/vnd.github+json',
-    'User-Agent': 'netlify-fns',
-    'Content-Type': 'application/json'
+  if (!repo || !branch || !token) {
+    return text(500, 'DOCS_REPO/DOCS_BRANCH/GITHUB_TOKEN no configurados')
   }
-}
 
-export async function handler(event){
-  try{
-    if (event.httpMethod && event.httpMethod !== 'POST'){
-      return text(405, 'Method Not Allowed')
-    }
+  let payload = {}
+  try {
+    const raw = await req.text()
+    payload = JSON.parse(raw || '{}')
+  } catch (error) {
+    return text(400, 'JSON inválido')
+  }
 
-    let payload
-    try{
-      payload = JSON.parse(event.body || '{}')
-    }catch(_){
-      return text(400, 'JSON inválido')
-    }
+  const category = sanitizeSegment(payload.category, 'category')
+  const investor = sanitizeSegment(payload.investor, 'investor').toLowerCase()
+  const filename = sanitizeSegment(payload.filename, 'filename')
 
-    const category = sanitizeSegment(payload.category, 'Categoría')
-    const investor = sanitizeSegment(payload.investor, 'Inversor').toLowerCase()
-    const filename = sanitizeSegment(payload.filename, 'Archivo')
+  const fullPath = `${category}/${investor}/${filename}`
+  const { owner, name } = repoParts(repo)
 
-    if (CATEGORY_WHITELIST.size && !CATEGORY_WHITELIST.has(category)){
-      return text(400, 'Categoría no permitida')
-    }
+  // Paso 1: obtener el SHA actual del archivo
+  const meta = await github(`/repos/${owner}/${name}/contents/${encodeURIComponent(fullPath)}?ref=${branch}`)
 
-    const publicInvestor = typeof process.env.PUBLIC_INVESTOR_SLUG === 'string'
-      ? process.env.PUBLIC_INVESTOR_SLUG.trim().toLowerCase()
-      : ''
-    if (publicInvestor && investor !== publicInvestor){
-      return text(403, 'Inversor inválido')
-    }
+  const sha = meta.sha
+  if (!sha) return text(404, 'SHA no encontrado para el archivo')
 
-    const repo = repoEnv('DOCS_REPO', '')
-    const branch = process.env.DOCS_BRANCH || 'main'
-    const token = process.env.GITHUB_TOKEN || ''
-
-    if (!repo || !branch || !token){
-      return text(500, 'DOCS_REPO, DOCS_BRANCH o GITHUB_TOKEN no configurados')
-    }
-
-    const relPath = `${category}/${investor}/${filename}`
-    const encodedPath = encodePath(relPath)
-
-    const getUrl = `${GH_API}/repos/${repo}/contents/${encodedPath}?ref=${encodeURIComponent(branch)}`
-    const headers = headersWithAuth(token)
-
-    const getRes = await fetch(getUrl, { headers })
-    if (getRes.status === 404){
-      return text(404, 'Archivo no encontrado')
-    }
-    if (!getRes.ok){
-      const errText = await getRes.text().catch(() => '')
-      return text(getRes.status, errText || 'Error al obtener archivo')
-    }
-    const metadata = await getRes.json()
-    const sha = metadata && metadata.sha
-    if (!sha){
-      return text(500, 'No se pudo obtener SHA del archivo')
-    }
-
-    const deleteUrl = `${GH_API}/repos/${repo}/contents/${encodedPath}`
-    const message = `docs: delete ${relPath}`
-    const deleteBody = {
-      message,
+  // Paso 2: eliminar el archivo usando GitHub API
+  const result = await github(`/repos/${owner}/${name}/contents/${encodeURIComponent(fullPath)}`, {
+    method: 'PUT',
+    body: {
+      message: `docs: delete ${fullPath}`,
       sha,
       branch,
       committer: {
@@ -111,21 +80,11 @@ export async function handler(event){
         email: 'bot@finsolar.local'
       }
     }
+  })
 
-    const deleteRes = await fetch(deleteUrl, {
-      method: 'DELETE',
-      headers,
-      body: JSON.stringify(deleteBody)
-    })
-    if (!deleteRes.ok){
-      const errText = await deleteRes.text().catch(() => '')
-      return text(deleteRes.status, errText || 'No se pudo eliminar el archivo')
-    }
-
-    return ok({ ok: true })
-  }catch(err){
-    const status = err.statusCode || 500
-    const message = err.message || 'Error inesperado'
-    return text(status, message)
-  }
+  return json({
+    ok: true,
+    path: fullPath,
+    commit: result.commit?.sha
+  })
 }
