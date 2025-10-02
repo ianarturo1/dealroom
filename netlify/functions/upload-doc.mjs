@@ -1,25 +1,50 @@
 import { json, text } from './_lib/utils.mjs'
 import { repoEnv, getFile, putFile } from './_lib/github.mjs'
 
-const publicInvestorId = () => {
-  const raw = typeof process.env.PUBLIC_INVESTOR_SLUG === 'string'
-    ? process.env.PUBLIC_INVESTOR_SLUG.trim().toLowerCase()
-    : ''
-  return raw || 'femsa'
+const SAFE_SEGMENT = /^[a-zA-Z0-9._ -]+$/
+
+function sanitizeSegment(value, label, { lowercase = false } = {}){
+  const raw = typeof value === 'string' ? value.trim() : ''
+  if (!raw){
+    throw text(400, `${label} requerido`)
+  }
+  if (!SAFE_SEGMENT.test(raw)){
+    throw text(400, `${label} inválido`)
+  }
+  return lowercase ? raw.toLowerCase() : raw
 }
 
 const formatTimestamp = (date = new Date()) => {
   const pad = (value) => String(value).padStart(2, '0')
-  return [
-    date.getFullYear(),
-    pad(date.getMonth() + 1),
-    pad(date.getDate())
-  ].join('') + '-' + [pad(date.getHours()), pad(date.getMinutes()), pad(date.getSeconds())].join('')
+  const y = date.getFullYear()
+  const m = pad(date.getMonth() + 1)
+  const d = pad(date.getDate())
+  const h = pad(date.getHours())
+  const min = pad(date.getMinutes())
+  const s = pad(date.getSeconds())
+  return `${y}${m}${d}-${h}${min}${s}`
 }
 
 const isGitHubNotFound = (error) => {
   const message = String(error && error.message ? error.message : error)
   return message.includes('GitHub 404')
+}
+
+async function ensureUniquePath(repo, pathBuilder, branch){
+  let attempt = 0
+  while (attempt < 10){
+    const { path, filename } = pathBuilder(attempt)
+    try{
+      await getFile(repo, path, branch)
+      attempt += 1
+    }catch(error){
+      if (isGitHubNotFound(error)){
+        return { path, filename }
+      }
+      throw error
+    }
+  }
+  throw text(409, 'No se pudo generar un nombre único para el archivo')
 }
 
 export async function handler(event){
@@ -28,33 +53,41 @@ export async function handler(event){
       return text(405, 'Method not allowed')
     }
 
-    const repo = repoEnv('DOCS_REPO', '')
-    const branch = process.env.DOCS_BRANCH || 'main'
+    const repo = repoEnv('DOCS_REPO', '').trim()
+    const branch = (process.env.DOCS_BRANCH || 'main').trim()
     const token = process.env.GITHUB_TOKEN
-    if (!repo || !token){
-      return text(500, 'DOCS_REPO/GITHUB_TOKEN no configurados')
+
+    if (!repo || !branch || !token){
+      return text(500, 'DOCS_REPO/DOCS_BRANCH/GITHUB_TOKEN no configurados')
     }
 
-    const body = JSON.parse(event.body || '{}')
-    const category = (body.path || '').toString().trim().replace(/^\/+|\/+$/g, '')
-    const fileName = (body.filename || '').toString().trim()
-    const contentBase64 = (body.contentBase64 || '').toString().trim()
-    const investorInput = typeof body.investor === 'string'
-      ? body.investor.trim().toLowerCase()
-      : (typeof body.slug === 'string' ? body.slug.trim().toLowerCase() : '')
-    const investorId = investorInput || publicInvestorId()
-    const strategy = typeof body.strategy === 'string' ? body.strategy : undefined
-
-    if (!category || !fileName || !contentBase64){
-      return text(400, 'Faltan datos (path, filename, contentBase64)')
+    let body
+    try{
+      body = JSON.parse(event.body || '{}')
+    }catch(_err){
+      return text(400, 'JSON inválido')
     }
 
-    const originalPath = `${category}/${investorId}/${fileName}`
+    const category = sanitizeSegment(body.path || body.category, 'category')
+    const investor = sanitizeSegment(body.investor ?? body.slug, 'investor', { lowercase: true })
+    const filename = sanitizeSegment(body.filename, 'filename')
+    const contentBase64 = typeof body.contentBase64 === 'string' ? body.contentBase64.trim() : ''
+    const strategy = body.strategy === 'rename' ? 'rename' : 'default'
+
+    if (!contentBase64){
+      return text(400, 'contentBase64 requerido')
+    }
+
+    const basePath = `${category}/${investor}`
+    const originalPath = `${basePath}/${filename}`
+
     let existing = null
-    try {
+    try{
       existing = await getFile(repo, originalPath, branch)
-    } catch (error) {
-      if (!isGitHubNotFound(error)) throw error
+    }catch(error){
+      if (!isGitHubNotFound(error)){
+        throw error
+      }
     }
 
     if (existing && strategy !== 'rename'){
@@ -66,53 +99,56 @@ export async function handler(event){
     }
 
     let finalPath = originalPath
-    let finalFileName = fileName
+    let finalFilename = filename
     let renamed = false
 
     if (existing && strategy === 'rename'){
-      const dotIndex = fileName.lastIndexOf('.')
-      const base = dotIndex > -1 ? fileName.slice(0, dotIndex) : fileName
-      const ext = dotIndex > -1 ? fileName.slice(dotIndex) : ''
-      finalFileName = `${base}_${formatTimestamp()}${ext}`
-      finalPath = `${category}/${investorId}/${finalFileName}`
+      const dotIndex = filename.lastIndexOf('.')
+      const base = dotIndex > -1 ? filename.slice(0, dotIndex) : filename
+      const ext = dotIndex > -1 ? filename.slice(dotIndex) : ''
+
+      const result = await ensureUniquePath(
+        repo,
+        (attempt) => {
+          const suffixBase = formatTimestamp()
+          const suffix = attempt > 0 ? `${suffixBase}-${attempt}` : suffixBase
+          const candidate = `${base}_${suffix}${ext}`
+          return {
+            filename: candidate,
+            path: `${basePath}/${candidate}`
+          }
+        },
+        branch
+      )
+
+      finalPath = result.path
+      finalFilename = result.filename
       renamed = true
     }
 
-    if (renamed){
-      try {
-        const renamedExisting = await getFile(repo, finalPath, branch)
-        if (renamedExisting){
-          return json(409, {
-            error: 'FILE_EXISTS',
-            message: 'File already exists in that category',
-            path: finalPath
-          })
-        }
-      } catch (error) {
-        if (!isGitHubNotFound(error)) throw error
-      }
-    }
-
-    const commitMessageSuffix = renamed ? ' (auto-rename)' : ''
-    const commitMessage = `docs(${investorId}): upload ${category}/${finalFileName}${commitMessageSuffix}`
-
-    await putFile(repo, finalPath, contentBase64, commitMessage, undefined, branch)
+    await putFile(
+      repo,
+      finalPath,
+      contentBase64,
+      `docs: upload ${category}/${investor}/${finalFilename}`,
+      undefined,
+      branch
+    )
 
     return json(200, {
       ok: true,
       path: finalPath,
-      renamed,
-      fileName: finalFileName
+      filename: finalFilename,
+      renamed
     })
   }catch(error){
-    const status = error.statusCode || 500
-    const message = String(error && error.message ? error.message : error)
+    if (error && typeof error.statusCode === 'number' && error.body){
+      return error
+    }
+    const status = error && (error.statusCode || error.status) ? (error.statusCode || error.status) : 500
+    const message = error && error.message ? error.message : 'Error inesperado'
     if (status === 409){
-      return json(409, {
-        error: 'FILE_EXISTS',
-        message,
-        path: error.path || ''
-      })
+      return json(409, { error: 'FILE_EXISTS', message, path: '' })
     }
     return text(status, message)
   }
