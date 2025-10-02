@@ -1,6 +1,7 @@
 [
   {
     "id": "proj-celocan-celoplaya",
+    "slug": "celocan-celoplaya",
     "name": "Granjas solares en Celocán y Celoplaya – Quintana Roo",
     "status": "Disponible",
     "client": "TBD",
@@ -8,11 +9,11 @@
     "power_kwp": 1967,
     "energy_mwh": 2763,
     "co2_tons": 1208,
-    "termMonths": 0,
-    "slug": "celocan-celoplaya"
+    "termMonths": 0
   },
   {
     "id": "proj-danone-multi-sitios",
+    "slug": "danone-multi-sitios",
     "name": "Sistemas solares Danone – Múltiples ubicaciones",
     "status": "Disponible",
     "client": "Danone",
@@ -21,11 +22,11 @@
     "energy_mwh": 1184.34,
     "co2_tons": 519,
     "termMonths": 0,
-    "notes": "Conjunto de propuestas PPA en 8 sitios. Promedio de ahorro > 45%.",
-    "slug": "danone-multi-sitios"
+    "notes": "Conjunto de propuestas PPA en 8 sitios. Promedio de ahorro > 45%."
   },
   {
     "id": "proj-grupo-zorro-abarrotero",
+    "slug": "grupo-zorro-abarrotero",
     "name": "Grupo Zorro Abarrotero",
     "status": "Disponible",
     "client": "Grupo Zorro Abarrotero",
@@ -35,10 +36,11 @@
     "co2_tons": 1761.3,
     "termMonths": 0,
     "empresa": "Grupo Zorro Abarrotero",
-    "slug": "grupo-zorro-abarrotero"
+    "notes": "Conjunto de contratos PPA en múltiples sitios."
   },
   {
     "id": "proj-stepan",
+    "slug": "stepan",
     "name": "Stepan",
     "status": "Disponible",
     "client": "Stepan",
@@ -47,11 +49,11 @@
     "energy_mwh": 1859.8,
     "co2_tons": 813.1,
     "termMonths": 0,
-    "empresa": "Stepan",
-    "slug": "stepan"
+    "empresa": "Stepan"
   },
   {
     "id": "proj-techo-celocan",
+    "slug": "techo-celocan",
     "name": "Techo Celocán",
     "status": "Disponible",
     "client": "CFE",
@@ -60,11 +62,11 @@
     "energy_mwh": 168.6,
     "co2_tons": 73.7,
     "termMonths": 0,
-    "empresa": "CFE",
-    "slug": "techo-celocan"
+    "empresa": "CFE"
   },
   {
     "id": "proj-techo-celoplaya",
+    "slug": "techo-celoplaya",
     "name": "Techo Celoplaya",
     "status": "Disponible",
     "client": "CFE",
@@ -73,11 +75,11 @@
     "energy_mwh": 2594.4,
     "co2_tons": 1134.3,
     "termMonths": 0,
-    "empresa": "CFE",
-    "slug": "techo-celoplaya"
+    "empresa": "CFE"
   },
   {
     "id": "proj-carretera-costera-golfo",
+    "slug": "carretera-costera-golfo",
     "name": "Carretera Costera del Golfo",
     "status": "Disponible",
     "client": "CFE",
@@ -86,11 +88,11 @@
     "energy_mwh": 934.1,
     "co2_tons": 408.4,
     "termMonths": 0,
-    "empresa": "CFE",
-    "slug": "carretera-costera-golfo"
+    "empresa": "CFE"
   },
   {
     "id": "proj-techo-ayuntamiento-cancun",
+    "slug": "techo-ayuntamiento-cancun",
     "name": "Techo Ayuntamiento Cancun",
     "status": "Disponible",
     "client": "CFE",
@@ -99,11 +101,11 @@
     "energy_mwh": 550.6,
     "co2_tons": 240.7,
     "termMonths": 0,
-    "empresa": "CFE",
-    "slug": "techo-ayuntamiento-cancun"
+    "empresa": "CFE"
   },
   {
     "id": "proj-techo-teatro-cancun",
+    "slug": "techo-teatro-cancun",
     "name": "Techo Teatro Cancun",
     "status": "Disponible",
     "client": "CFE",
@@ -112,11 +114,11 @@
     "energy_mwh": 289.4,
     "co2_tons": 126.5,
     "termMonths": 0,
-    "empresa": "CFE",
-    "slug": "techo-teatro-cancun"
+    "empresa": "CFE"
   },
   {
     "id": "proj-terreno-mina-paa-mul",
+    "slug": "terreno-mina-paa-mul",
     "name": "Terreno Mina Paa Mul",
     "status": "Disponible",
     "client": "CFE",
@@ -125,11 +127,11 @@
     "energy_mwh": 4214,
     "co2_tons": 1843.4,
     "termMonths": 0,
-    "empresa": "CFE",
-    "slug": "terreno-mina-paa-mul"
+    "empresa": "CFE"
   },
   {
     "id": "proj-20-noviembre",
+    "slug": "20-noviembre",
     "name": "20 de Noviembre",
     "status": "Disponible",
     "client": "CFE",
@@ -138,7 +140,6 @@
     "energy_mwh": 4916.4,
     "co2_tons": 2149.5,
     "termMonths": 0,
-    "empresa": "CFE",
-    "slug": "20-noviembre"
+    "empresa": "CFE"
   }
 ]
