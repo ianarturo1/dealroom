@@ -7,12 +7,6 @@ function httpError(statusCode, message) {
   return err;
 }
 
-function httpError(statusCode, message) {
-  const err = new Error(message);
-  err.statusCode = statusCode;
-  return err;
-}
-
 function reqJson(event) {
   try { return JSON.parse(event.body || "{}"); } catch { return {}; }
 }
