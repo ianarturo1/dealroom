@@ -1,4 +1,5 @@
 // netlify/functions/upload-doc.mjs
+import { Buffer } from "node:buffer";
 import { Octokit } from "octokit";
 
 function httpError(statusCode, message) {
@@ -62,6 +63,7 @@ export async function handler(event) {
     const DOCS_REPO = getEnv("DOCS_REPO");
     const DOCS_BRANCH = getEnv("DOCS_BRANCH");
     const GITHUB_TOKEN = getEnv("GITHUB_TOKEN");
+    const [owner, repo] = DOCS_REPO.split("/");
 
     // Validar que el base64 sea decodificable
     let binary;
@@ -77,7 +79,6 @@ export async function handler(event) {
     // Obtener sha si el archivo ya existe (para update)
     let sha;
     try {
-      const [owner, repo] = DOCS_REPO.split("/");
       const { data } = await octokit.repos.getContent({ owner, repo, path, ref: DOCS_BRANCH });
       // Puede venir como objeto (file) o array (dir). Queremos file.
       if (!Array.isArray(data) && data.sha) sha = data.sha;
@@ -85,7 +86,6 @@ export async function handler(event) {
       // Si 404, es nuevo; continuar sin sha
     }
 
-    const [owner, repo] = DOCS_REPO.split("/");
     await octokit.repos.createOrUpdateFileContents({
       owner,
       repo,
