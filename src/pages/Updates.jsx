@@ -1,652 +1,172 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { api } from '../lib/api'
-import { DEFAULT_INVESTOR_ID } from '../lib/config'
-import { resolveDeadlineDocTarget, DEADLINE_DOC_CATEGORIES } from '../lib/deadlines'
-import { useInvestorProfile } from '../lib/investor'
-import { PIPELINE_STAGES, FINAL_PIPELINE_STAGE } from '../constants/pipeline'
-import { DASHBOARD_DOC_CATEGORIES } from '../constants/documents'
-const DOC_REDIRECT_CATEGORIES = Array.from(new Set([
-  ...DASHBOARD_DOC_CATEGORIES,
-  ...DEADLINE_DOC_CATEGORIES
-]))
-const DEFAULT_DOC_REDIRECT_CATEGORY = DOC_REDIRECT_CATEGORIES[0] || 'NDA'
+import React, { useEffect, useMemo, useState } from 'react'
+import { Card } from '@/components/ui/Card'
+import { api } from '@/lib/api'
+import { useInvestorProfile } from '@/lib/investor'
 
-const normalizeSlug = (value) => (value || '').trim().toLowerCase()
+const TYPE_LABELS = {
+  doc_upload: 'Documento subido',
+  doc_delete: 'Documento eliminado',
+  doc_update: 'Documento actualizado',
+  deadlines_update: 'Actualización de deadlines',
+  status_change: 'Cambio de estatus',
+  investor_created: 'Alta de inversionista',
+  investor_update: 'Actualización de datos'
+}
+
+function typeLabel(type){
+  return TYPE_LABELS[type] || 'Actualización'
+}
 
 export default function Updates(){
-  const navigate = useNavigate()
-  const { isInvestorProfile } = useInvestorProfile()
-  const showAdminDashboard = !isInvestorProfile
+  const { investorId } = useInvestorProfile()
+  const slug = investorId || ''
   const [items, setItems] = useState([])
-  const [investorList, setInvestorList] = useState([])
-  const [investorListLoading, setInvestorListLoading] = useState(false)
-  const [investorListError, setInvestorListError] = useState(null)
-  const [investorDetailsMap, setInvestorDetailsMap] = useState({})
-  const [investorDetailsLoading, setInvestorDetailsLoading] = useState(false)
-  const [investorDetailsError, setInvestorDetailsError] = useState(null)
-  const [deadlineThreshold, setDeadlineThreshold] = useState(14)
-  const [docInventories, setDocInventories] = useState({})
-  const [docInventoriesReady, setDocInventoriesReady] = useState(false)
-  const [docHealthLoading, setDocHealthLoading] = useState(false)
-  const [docHealthError, setDocHealthError] = useState(null)
-  const [docRefreshKey, setDocRefreshKey] = useState(0)
-  const [activityItems, setActivityItems] = useState([])
-  const [activityLoading, setActivityLoading] = useState(false)
-  const [activityError, setActivityError] = useState(null)
-  const [activityRefreshKey, setActivityRefreshKey] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
-  useEffect(() => {
-    fetch('/data/updates.json')
-      .then(r => r.json())
-      .then(setItems)
-      .catch(() => setItems([]))
-  }, [])
-
-  const finalStageLabel = FINAL_PIPELINE_STAGE
-  const numberFormatter = useMemo(() => new Intl.NumberFormat('es-MX'), [])
-  const percentFormatter = useMemo(
-    () => new Intl.NumberFormat('es-MX', { maximumFractionDigits: 1 }),
+  const dateFormatter = useMemo(
+    () => new Intl.DateTimeFormat('es-MX', { dateStyle: 'long' }),
     []
   )
-  const shortDateFormatter = useMemo(
-    () => new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium' }),
-    []
-  )
-  const dateTimeFormatter = useMemo(
-    () => new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' }),
+  const timeFormatter = useMemo(
+    () => new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }),
     []
   )
 
-  const loadInvestorList = useCallback(async () => {
-    if (!showAdminDashboard){
-      setInvestorList([])
-      setInvestorListError(null)
-      setInvestorListLoading(false)
-      return
-    }
-    setInvestorListLoading(true)
-    setInvestorListError(null)
-    try{
-      const res = await api.listInvestors()
-      const items = Array.isArray(res?.investors) ? res.investors : []
-      setInvestorList(items)
-    }catch(error){
-      setInvestorList([])
-      setInvestorListError(error.message)
-    }finally{
-      setInvestorListLoading(false)
-    }
-  }, [showAdminDashboard])
-
   useEffect(() => {
-    if (!showAdminDashboard){
-      setInvestorList([])
-      setInvestorListError(null)
-      setInvestorListLoading(false)
-      return
-    }
-    loadInvestorList()
-  }, [showAdminDashboard, loadInvestorList])
-
-  useEffect(() => {
-    if (!showAdminDashboard){
-      setInvestorDetailsMap({})
-      setInvestorDetailsError(null)
-      setInvestorDetailsLoading(false)
-      return
-    }
-    if (!investorList.length){
-      setInvestorDetailsMap({})
-      setInvestorDetailsError(null)
-      setInvestorDetailsLoading(false)
-      return
-    }
-    let active = true
-    setInvestorDetailsLoading(true)
-    setInvestorDetailsError(null)
-    ;(async () => {
-      try{
-        const entries = await Promise.all(investorList.map(async (item) => {
-          try{
-            const data = await api.getInvestor(item.slug)
-            return [item.slug, data]
-          }catch(error){
-            return [item.slug, { __error: error.message }]
-          }
-        }))
-        if (!active) return
-        const nextMap = {}
-        const errors = []
-        for (const [slug, data] of entries){
-          if (data && !data.__error){
-            nextMap[slug] = data
-          }else if (data && data.__error){
-            errors.push(`${slug}: ${data.__error}`)
-          }
-        }
-        setInvestorDetailsMap(nextMap)
-        if (errors.length){
-          setInvestorDetailsError(`Datos incompletos para ${errors.length} inversionista${errors.length === 1 ? '' : 's'}.`)
-        }
-      }catch(error){
-        if (!active) return
-        setInvestorDetailsMap({})
-        setInvestorDetailsError(error.message)
-      }finally{
-        if (active) setInvestorDetailsLoading(false)
+    let cancelled = false
+    if (!slug){
+      setItems([])
+      setError('No se ha definido un inversionista activo.')
+      setLoading(false)
+      return () => {
+        cancelled = true
       }
-    })()
-    return () => { active = false }
-  }, [investorList, showAdminDashboard])
+    }
 
-  useEffect(() => {
-    if (!showAdminDashboard){
-      setDocInventories({})
-      setDocInventoriesReady(false)
-      setDocHealthError(null)
-      setDocHealthLoading(false)
-      return
-    }
-    if (!investorList.length){
-      setDocInventories({})
-      setDocInventoriesReady(false)
-      setDocHealthError(null)
-      setDocHealthLoading(false)
-      return
-    }
-    let active = true
-    setDocHealthLoading(true)
-    setDocHealthError(null)
-    ;(async () => {
-      const next = {}
-      try{
-        for (const category of DASHBOARD_DOC_CATEGORIES){
-          if (!active) return
-          const categoryData = {}
-          for (const investor of investorList){
-            if (!active) return
-            try{
-              const res = await api.listDocs({ category, slug: investor.slug })
-              const files = Array.isArray(res?.files) ? res.files : []
-              categoryData[investor.slug] = { files, error: null }
-            }catch(error){
-              const message = error.message || 'Error desconocido'
-              categoryData[investor.slug] = { files: [], error: message }
-              const lower = message.toLowerCase()
-              if (lower.includes('github_token') || lower.includes('no configurado') || lower.includes('500 ')){
-                throw error
-              }
-            }
-          }
-          next[category] = categoryData
-        }
-        if (!active) return
-        setDocInventories(next)
-        setDocInventoriesReady(true)
-      }catch(error){
-        if (!active) return
-        setDocInventories({})
-        setDocInventoriesReady(false)
-        setDocHealthError(error.message)
-      }finally{
-        if (active) setDocHealthLoading(false)
-      }
-    })()
-    return () => { active = false }
-  }, [investorList, docRefreshKey, showAdminDashboard])
+    setLoading(true)
+    setError(null)
 
-  useEffect(() => {
-    if (!showAdminDashboard){
-      setActivityItems([])
-      setActivityError(null)
-      setActivityLoading(false)
-      return
-    }
-    let active = true
-    setActivityLoading(true)
-    setActivityError(null)
-    api.listActivity()
-      .then(res => {
-        if (!active) return
-        const events = Array.isArray(res?.events) ? res.events.slice() : []
-        events.sort((a, b) => new Date(b?.date || 0).getTime() - new Date(a?.date || 0).getTime())
-        setActivityItems(events)
+    api.listUpdates({ slug, limit: 50 })
+      .then((response) => {
+        if (cancelled) return
+        const events = Array.isArray(response?.items) ? response.items : []
+        const filtered = events.filter((item) => item && item.slug === slug)
+        filtered.sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || '')))
+        setItems(filtered)
       })
-      .catch(error => {
-        if (!active) return
-        setActivityError(error.message)
-        setActivityItems([])
+      .catch((err) => {
+        if (cancelled) return
+        const message = err?.message || 'No se pudieron cargar las actualizaciones.'
+        setError(message)
+        setItems([])
       })
       .finally(() => {
-        if (active) setActivityLoading(false)
+        if (!cancelled) setLoading(false)
       })
-    return () => { active = false }
-  }, [activityRefreshKey, showAdminDashboard])
 
-  const investorNameBySlug = useMemo(() => {
-    const map = {}
-    investorList.forEach(item => {
-      map[item.slug] = item.name || item.slug
-    })
-    return map
-  }, [investorList])
-
-  const pipelineSummary = useMemo(() => {
-    const total = investorList.length
-    const normalizedStages = PIPELINE_STAGES.map(stage => stage.toLowerCase())
-    const stageCounts = PIPELINE_STAGES.map(stage => {
-      const normalizedStage = stage.toLowerCase()
-      const count = investorList.filter(item => (item.status || '').trim().toLowerCase() === normalizedStage).length
-      const percent = total ? (count / total) * 100 : 0
-      return { stage, count, percent }
-    })
-    const othersCount = investorList.reduce((acc, item) => {
-      const normalizedStatus = (item.status || '').trim().toLowerCase()
-      if (!normalizedStatus) return acc
-      return normalizedStages.includes(normalizedStatus) ? acc : acc + 1
-    }, 0)
-    if (othersCount > 0){
-      stageCounts.push({ stage: 'Otros', count: othersCount, percent: total ? (othersCount / total) * 100 : 0 })
+    return () => {
+      cancelled = true
     }
-    const finalNormalized = finalStageLabel.toLowerCase()
-    const finalCount = investorList.filter(item => (item.status || '').trim().toLowerCase() === finalNormalized).length
-    const finalPercent = total ? (finalCount / total) * 100 : 0
-    return { total, counts: stageCounts, finalCount, finalPercent }
-  }, [investorList, finalStageLabel])
+  }, [slug])
 
-  const upcomingDeadlines = useMemo(() => {
-    if (deadlineThreshold < 0) return []
-    const thresholdMs = deadlineThreshold * 24 * 60 * 60 * 1000
-    const now = new Date()
-    const items = []
-    Object.entries(investorDetailsMap).forEach(([slug, detail]) => {
-      const deadlines = detail?.deadlines || {}
-      const investorName = detail?.name || investorNameBySlug[slug] || slug
-      Object.entries(deadlines).forEach(([label, value]) => {
-        if (!value) return
-        if (!/loi/i.test(label) && !/firma/i.test(label)) return
-        const date = new Date(value)
-        if (Number.isNaN(date.getTime())) return
-        const diffMs = date.getTime() - now.getTime()
-        const days = Math.ceil(diffMs / (24 * 60 * 60 * 1000))
-        if (days < 0) return
-        if (diffMs <= thresholdMs){
-          const formattedDate = shortDateFormatter.format(date)
-          const docTarget = resolveDeadlineDocTarget(label)
-          items.push({
-            slug,
-            label,
-            date: value,
-            days,
-            investorName,
-            formattedDate,
-            dueText: days === 0 ? 'Vence hoy' : `Vence en ${days} día${days === 1 ? '' : 's'}`,
-            docTarget
-          })
-        }
-      })
+  const groupedItems = useMemo(() => {
+    if (!items.length) return []
+    const groups = []
+    const dayMap = new Map()
+    items.forEach((item) => {
+      const date = item?.ts ? new Date(item.ts) : null
+      if (!date || Number.isNaN(date.getTime())) return
+      const key = date.toISOString().slice(0, 10)
+      if (!dayMap.has(key)){
+        dayMap.set(key, {
+          key,
+          label: dateFormatter.format(date),
+          items: []
+        })
+        groups.push(dayMap.get(key))
+      }
+      dayMap.get(key).items.push(item)
     })
-    items.sort((a, b) => {
-      if (a.days !== b.days) return a.days - b.days
-      return (a.investorName || '').localeCompare(b.investorName || '', 'es', { sensitivity: 'base' })
-    })
-    return items
-  }, [investorDetailsMap, deadlineThreshold, investorNameBySlug, shortDateFormatter])
+    return groups
+  }, [items, dateFormatter])
 
-  const docHealthSummary = useMemo(() => {
-    return DASHBOARD_DOC_CATEGORIES.map(category => {
-      const categoryData = docInventories[category] || {}
-      const missing = investorList.reduce((acc, investor) => {
-        const entry = categoryData[investor.slug]
-        const files = Array.isArray(entry?.files) ? entry.files : []
-        if (!files.length){
-          acc.push({
-            slug: investor.slug,
-            name: investor.name || investor.slug,
-            error: entry?.error || null
-          })
-        }
-        return acc
-      }, [])
-      let folderTarget = null
-      for (const investor of investorList){
-        const entry = categoryData[investor.slug]
-        const files = Array.isArray(entry?.files) ? entry.files : []
-        if (files.length){
-          folderTarget = { slug: investor.slug, file: files[0] }
-          break
-        }
-      }
-      const fallbackSlug = missing.length ? missing[0].slug : (investorList[0]?.slug || DEFAULT_INVESTOR_ID)
-      return {
-        category,
-        missing,
-        hasAll: investorList.length > 0 && missing.length === 0,
-        folderTarget,
-        fallbackSlug,
-        total: investorList.length
-      }
-    })
-  }, [docInventories, investorList])
-
-  const activityDisplayItems = useMemo(() => {
-    return activityItems.map((event, index) => {
-      const slug = event?.slug || ''
-      const investorName = slug ? (investorNameBySlug[slug] || slug) : ''
-      let icon = '•'
-      let title = event?.message || 'Actividad'
-      let detail = ''
-      switch(event?.type){
-        case 'investor-created':
-          icon = '🆕'
-          title = 'Nuevo inversionista'
-          detail = investorName || event?.slug || ''
-          break
-        case 'investor-deleted':
-          icon = '🗑️'
-          title = 'Inversionista eliminado'
-          detail = investorName || event?.slug || ''
-          break
-        case 'doc-uploaded':
-          icon = '📄'
-          title = `Documento subido (${event.category || 'Docs'})`
-          detail = [event.filename, investorName].filter(Boolean).join(' · ')
-          break
-        case 'doc-deleted':
-          icon = '🗑️'
-          title = `Documento eliminado (${event.category || 'Docs'})`
-          detail = [event.filename, investorName].filter(Boolean).join(' · ')
-          break
-        default:
-          title = event?.message || title
-      }
-      const dateValue = event?.date ? new Date(event.date) : null
-      const dateLabel = dateValue && !Number.isNaN(dateValue.getTime())
-        ? dateTimeFormatter.format(dateValue)
-        : (event?.date || '—')
-      return {
-        key: `${event?.sha || index}-${event?.path || index}`,
-        icon,
-        title,
-        detail,
-        dateLabel
-      }
-    })
-  }, [activityItems, investorNameBySlug, dateTimeFormatter])
-
-  const handleDeadlineThresholdChange = (e) => {
-    const value = Number(e.target.value)
-    if (Number.isNaN(value)){
-      setDeadlineThreshold(0)
-    }else{
-      setDeadlineThreshold(Math.max(0, value))
-    }
+  if (loading){
+    return (
+      <div className="container" style={{ maxWidth: 900 }}>
+        <div className="h1" style={{ marginBottom: 8 }}>Actualizaciones</div>
+        <Card>Cargando actualizaciones…</Card>
+      </div>
+    )
   }
 
-  const handleRefreshDocInventories = () => setDocRefreshKey(value => value + 1)
-  const handleRefreshActivity = () => setActivityRefreshKey(value => value + 1)
-
-  const navigateToDocsSection = useCallback((category, slug, target) => {
-    const safeCategory = DOC_REDIRECT_CATEGORIES.includes(category)
-      ? category
-      : DEFAULT_DOC_REDIRECT_CATEGORY
-    const safeSlug = normalizeSlug(slug) || DEFAULT_INVESTOR_ID
-    const safeTarget = target || 'upload'
-    if (typeof window !== 'undefined'){
-      const payload = { category: safeCategory, slug: safeSlug, target: safeTarget, ts: Date.now() }
-      try{ window.sessionStorage.setItem('adminDocsRedirect', JSON.stringify(payload)) }catch(_error){}
-    }
-    navigate('/admin')
-  }, [navigate])
-
   return (
-    <div className="container">
-      <div className="h1">Actualizaciones</div>
-
-      {showAdminDashboard && (
-        <div className="grid" style={{ marginBottom: 16 }}>
-          <div className="card" style={{ gridColumn: 'span 2', minWidth: 280 }}>
-            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="h2" style={{ marginTop: 0 }}>Pipeline global</div>
-            {investorListLoading && <span className="badge">Actualizando…</span>}
-          </div>
-          <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 12 }}>
-            Total inversionistas: {numberFormatter.format(pipelineSummary.total || 0)}
-          </div>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 700 }}>Avance hacia {finalStageLabel || 'cierre'}</div>
-            <div className="progress" style={{ marginTop: 6, height: 12 }}>
-              <div style={{ width: `${Math.min(100, Math.max(0, pipelineSummary.finalPercent || 0))}%` }} />
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-              {numberFormatter.format(pipelineSummary.finalCount || 0)} / {numberFormatter.format(pipelineSummary.total || 0)} · {percentFormatter.format(Number.isFinite(pipelineSummary.finalPercent) ? pipelineSummary.finalPercent : 0)}%
-            </div>
-          </div>
-          <div style={{ display: 'grid', gap: 10 }}>
-            {pipelineSummary.counts.map(item => {
-              const safePercent = Number.isFinite(item.percent) ? item.percent : 0
-              return (
-                <div key={item.stage} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                  <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', fontSize: 14, fontWeight: 600 }}>
-                    <span>{item.stage}</span>
-                    <span>{numberFormatter.format(item.count)} · {percentFormatter.format(safePercent)}%</span>
-                  </div>
-                  <div className="progress" style={{ marginTop: 6, height: 8 }}>
-                    <div style={{ width: `${Math.min(100, Math.max(0, safePercent))}%` }} />
-                  </div>
-                </div>
-              )
-            })}
-            {!pipelineSummary.total && (
-              <div style={{ fontSize: 13, color: 'var(--muted)' }}>Sin inversionistas cargados.</div>
-            )}
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <div className="h2" style={{ marginTop: 0 }}>Inversionistas activos</div>
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={loadInvestorList}
-              disabled={investorListLoading}
-            >
-              {investorListLoading ? 'Actualizando…' : 'Actualizar'}
-            </button>
-          </div>
-          <div className="kpi" style={{ marginTop: 4 }}>
-            <div className="num">{investorListLoading ? '—' : numberFormatter.format(pipelineSummary.total || 0)}</div>
-            <div className="label">Total dados de alta</div>
-          </div>
-          {investorListError && <div className="notice" style={{ marginTop: 12 }}>{investorListError}</div>}
-        </div>
-
-        <div className="card">
-          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <div className="h2" style={{ marginTop: 0 }}>Alertas de fechas próximas</div>
-            {investorDetailsLoading && <span className="badge">Cargando…</span>}
-          </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>
-            Próximos
-            <input
-              type="number"
-              min="0"
-              className="input"
-              value={deadlineThreshold}
-              onChange={handleDeadlineThresholdChange}
-              style={{ width: 72 }}
-            />
-            días
-          </label>
-          {investorDetailsError && <div className="notice" style={{ marginBottom: 12 }}>{investorDetailsError}</div>}
-          {upcomingDeadlines.length === 0 ? (
-            <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-              {investorDetailsLoading ? 'Cargando fechas…' : 'Sin hitos próximos.'}
-            </div>
-          ) : (
-            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
-              {upcomingDeadlines.map(item => {
-                const dateLabel = item.formattedDate || item.date || '—'
-                const dueLabel = item.dueText || (item.days === 0
-                  ? 'Vence hoy'
-                  : `Vence en ${item.days} día${item.days === 1 ? '' : 's'}`)
-                return (
-                  <li key={`${item.slug}-${item.label}`} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{item.investorName}</div>
-                        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                          {item.label} · {dueLabel} ({dateLabel})
-                        </div>
-                      </div>
-                      {item.docTarget && (
-                        <button
-                          type="button"
-                          className="btn secondary"
-                          onClick={() => navigateToDocsSection(
-                            item.docTarget.category,
-                            item.slug,
-                            item.docTarget.target || 'upload'
-                          )}
-                        >
-                          Ir a {item.docTarget.category}
-                        </button>
-                      )}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </div>
-
-        <div className="card">
-          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <div className="h2" style={{ marginTop: 0 }}>Faltan documentos</div>
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={handleRefreshDocInventories}
-              disabled={docHealthLoading}
-            >
-              {docHealthLoading ? 'Verificando…' : 'Revisar'}
-            </button>
-          </div>
-          <p style={{ margin: '4px 0 12px', color: 'var(--muted)', fontSize: 13 }}>
-            Estatus por categorías clave.
+    <div className="container" style={{ maxWidth: 900, display: 'grid', gap: 16 }}>
+      <div>
+        <div className="h1" style={{ marginBottom: 4 }}>Actualizaciones</div>
+        {slug ? (
+          <p className="help" style={{ margin: 0 }}>
+            Movimientos recientes para <strong>{slug}</strong>.
           </p>
-          {!investorList.length ? (
-            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Da de alta inversionistas para revisar su documentación.</div>
-          ) : !docInventoriesReady ? (
-            docHealthLoading
-              ? <div style={{ fontSize: 13, color: 'var(--muted)' }}>Verificando documentación…</div>
-              : <div style={{ fontSize: 13, color: 'var(--muted)' }}>No se pudo obtener el estado actual.</div>
-          ) : (
-            docHealthSummary.map(summary => {
-              const previewNames = summary.missing.slice(0, 3).map(item => item.name).join(', ')
-              const remaining = summary.missing.length - Math.min(summary.missing.length, 3)
-              const hasErrors = summary.missing.some(item => item.error)
-              const disabledFolder = summary.total === 0
-              return (
-                <div key={summary.category} style={{ borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 10 }}>
-                  <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <span style={{ fontSize: 20, lineHeight: 1 }}>{summary.hasAll ? '✅' : '⛔'}</span>
-                      <div>
-                        <div style={{ fontWeight: 700 }}>{summary.category}</div>
-                        <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-                          {summary.total === 0
-                            ? 'Sin inversionistas registrados.'
-                            : summary.hasAll
-                              ? 'Documentación completa.'
-                              : `Faltan ${summary.missing.length} de ${summary.total}.`}
-                        </div>
-                        {!summary.hasAll && summary.missing.length > 0 && (
-                          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                            {previewNames}
-                            {remaining > 0 && ` +${remaining} más`}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                      <button
-                        type="button"
-                        className="btn secondary"
-                        onClick={() => navigateToDocsSection(summary.category, summary.fallbackSlug, 'upload')}
-                      >
-                        Subir
-                      </button>
-                      <button
-                        type="button"
-                        className="btn secondary"
-                        onClick={() => navigateToDocsSection(summary.category, (summary.folderTarget && summary.folderTarget.slug) || summary.fallbackSlug, 'folder')}
-                        disabled={disabledFolder}
-                      >
-                        Carpeta
-                      </button>
-                    </div>
-                  </div>
-                  {hasErrors && (
-                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-                      Algunos registros devolvieron errores al consultar sus carpetas.
-                    </div>
-                  )}
-                </div>
-              )
-            })
-          )}
-          {docHealthError && <div className="notice" style={{ marginTop: 12 }}>{docHealthError}</div>}
-        </div>
+        ) : (
+          <p className="help" style={{ margin: 0 }}>
+            Selecciona un inversionista para ver su actividad.
+          </p>
+        )}
+      </div>
 
-        <div className="card" style={{ gridColumn: 'span 2', minWidth: 280 }}>
-          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <div className="h2" style={{ marginTop: 0 }}>Actividad reciente</div>
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={handleRefreshActivity}
-              disabled={activityLoading}
-            >
-              {activityLoading ? 'Consultando…' : 'Actualizar'}
-            </button>
-          </div>
-          {activityError && <div className="notice" style={{ marginTop: 12 }}>{activityError}</div>}
-          {activityLoading && <div style={{ marginTop: 12, color: 'var(--muted)' }}>Consultando actividad…</div>}
-          {!activityLoading && !activityError && activityDisplayItems.length === 0 && (
-            <div style={{ marginTop: 12, color: 'var(--muted)', fontSize: 13 }}>Sin eventos recientes.</div>
-          )}
-          {activityDisplayItems.length > 0 && (
-            <ul style={{ listStyle: 'none', margin: 12, marginTop: 12, padding: 0, display: 'grid', gap: 10 }}>
-              {activityDisplayItems.map(item => (
-                <li key={item.key} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: 18, lineHeight: 1 }}>{item.icon}</span>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{item.title}</div>
-                      {item.detail && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{item.detail}</div>}
-                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{item.dateLabel}</div>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        </div>
+      {error && (
+        <div className="notice">{error}</div>
       )}
 
-      <div className="grid">
-        {items.map((u) => (
-          <div key={u.date} className="card">
-            <div className="h2">{u.title}</div>
-            <div style={{color:'#8b8b8b'}}>{u.date}</div>
-            <p>{u.body}</p>
+      {!error && !groupedItems.length && (
+        <Card style={{ textAlign: 'center' }}>
+          <div style={{ fontFamily: 'Raleway, sans-serif', fontWeight: 700, fontSize: 18 }}>Sin movimientos recientes</div>
+          <div className="help" style={{ marginTop: 4 }}>
+            No hay actualizaciones registradas para <strong>{slug}</strong> en las últimas commits.
           </div>
-        ))}
-      </div>
+        </Card>
+      )}
+
+      {groupedItems.map((group) => (
+        <section key={group.key} style={{ display: 'grid', gap: 12 }}>
+          <h2 className="h2" style={{ marginBottom: 0 }}>{group.label}</h2>
+          <div style={{ display: 'grid', gap: 12 }}>
+            {group.items.map((item) => (
+              <Card key={item.id}>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                    <span className="badge" style={{ background: '#f1e8fb', color: 'var(--purple)' }}>
+                      {typeLabel(item.type)}
+                    </span>
+                    <span className="help" style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      {item.repo}
+                    </span>
+                  </div>
+                  <div style={{ fontFamily: 'Raleway, sans-serif', fontWeight: 700, fontSize: 18 }}>
+                    {item.title || typeLabel(item.type)}
+                  </div>
+                  {item.path ? (
+                    <div className="help" style={{ fontFamily: 'Lato, sans-serif' }}>
+                      {item.path}
+                    </div>
+                  ) : null}
+                </div>
+                <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 8 }}>
+                  <div className="help">{item.actor || 'Desconocido'}</div>
+                  <div className="help">
+                    {(() => {
+                      const date = item?.ts ? new Date(item.ts) : null
+                      if (!date || Number.isNaN(date.getTime())) return 'Fecha desconocida'
+                      return timeFormatter.format(date)
+                    })()}
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   )
 }
