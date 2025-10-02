@@ -73,6 +73,31 @@ async function githubErrorMessage(response) {
   return message;
 }
 
+function normalizePath(rawPath) {
+  return rawPath
+    .trim()
+    .replace(/\\+/g, "/")
+    .replace(/\/+/g, "/")
+    .replace(/^\/+|\/+$/g, "");
+}
+
+async function githubRequest(url, options) {
+  const response = await fetch(url, options);
+  if (response.status === 401 || response.status === 403 || response.status === 422) {
+    let message = "GitHub upload error";
+    try {
+      const json = await response.json();
+      if (json?.message) {
+        message = `GitHub upload error: ${json.message}`;
+      }
+    } catch {
+      // ignore
+    }
+    throw httpError(500, message);
+  }
+  return response;
+}
+
 export async function handler(event) {
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method Not Allowed" };
@@ -166,7 +191,7 @@ export async function handler(event) {
     // Obtener sha si el archivo ya existe (para update)
     let sha;
     try {
-      const metadataResp = await fetch(`${baseUrl}?ref=${encodeURIComponent(DOCS_BRANCH)}`, {
+      const metadataResp = await githubRequest(`${baseUrl}?ref=${encodeURIComponent(DOCS_BRANCH)}`, {
         method: "GET",
         headers: authHeaders,
       });
@@ -183,12 +208,12 @@ export async function handler(event) {
       } else if ([401, 403, 422].includes(metadataResp.status)) {
         throw httpError(500, await githubErrorMessage(metadataResp));
       } else {
-        throw httpError(500, "GitHub metadata error");
+        throw httpError(500, "GitHub upload error");
       }
     } catch (err) {
       if (err.statusCode === 404) throw err;
       if (err.statusCode) throw err;
-      throw httpError(500, "GitHub metadata error");
+      throw httpError(500, "GitHub upload error");
     }
 
     const putBody = {
@@ -198,7 +223,7 @@ export async function handler(event) {
     };
     if (sha) putBody.sha = sha;
 
-    const putResp = await fetch(baseUrl, {
+    const putResp = await githubRequest(baseUrl, {
       method: "PUT",
       headers: { ...authHeaders, "Content-Type": "application/json" },
       body: JSON.stringify(putBody),
