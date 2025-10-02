@@ -1,47 +1,43 @@
 import { json, text } from './_lib/utils.mjs'
 import { repoEnv, getFile } from './_lib/github.mjs'
 
-const GH_API = 'https://api.github.com'
 const SAFE_SEGMENT = /^[a-zA-Z0-9._ -]+$/
-const CATEGORY_WHITELIST = new Set([
-  'NDA',
-  'Propuestas',
-  'Modelos financieros',
-  'Contratos',
-  'LOIs',
-  'Sustento fiscal',
-  'Mitigación de riesgos',
-  'Procesos'
-])
+const GH_API = 'https://api.github.com'
 
-function sanitizeSegment(value, label){
-  const str = typeof value === 'string' ? value.trim() : ''
-  if (!str) throw text(400, `${label} requerido`)
-  if (!SAFE_SEGMENT.test(str)) throw text(400, `${label} inválido`)
-  return str
+function sanitizeSegment(value, label, { lower = false } = {}) {
+  const raw = typeof value === 'string' ? value.trim() : ''
+  if (!raw) throw text(400, `${label} requerido`)
+  const comparable = raw
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+  if (!SAFE_SEGMENT.test(comparable)) {
+    throw text(400, `${label} inválido`)
+  }
+  return lower ? raw.toLowerCase() : raw
 }
 
-async function github(path, { method = 'GET', body } = {}){
+function repoParts(repo) {
+  const [owner, name] = String(repo).split('/')
+  return { owner, name }
+}
+
+async function github(path, init) {
   const token = process.env.GITHUB_TOKEN
   const res = await fetch(`${GH_API}${path}`, {
-    method,
+    ...init,
     headers: {
       'Authorization': `Bearer ${token}`,
       'Accept': 'application/vnd.github+json',
-      'User-Agent': 'netlify-fns'
-    },
-    body: body ? JSON.stringify(body) : undefined
+      'User-Agent': 'netlify-fns',
+      'Content-Type': 'application/json',
+      ...init?.headers
+    }
   })
-  if (!res.ok){
-    const txt = await res.text()
-    throw text(res.status, `GitHub ${res.status}: ${txt}`)
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw text(res.status, `GitHub ${res.status}: ${body}`)
   }
   return res.json()
-}
-
-function repoParts(repo){
-  const [owner, name] = String(repo).split('/')
-  return { owner, name }
 }
 
 export async function handler(event){
@@ -61,31 +57,19 @@ export async function handler(event){
     let payload
     try{
       payload = JSON.parse(event.body || '{}')
-    }catch(error){
+    }catch(_){
       return text(400, 'JSON inválido')
     }
 
     const category = sanitizeSegment(payload.category, 'category')
-    const investor = sanitizeSegment(payload.investor, 'investor').toLowerCase()
+    const investor = sanitizeSegment(payload.investor, 'investor', { lower: true })
     const filename = sanitizeSegment(payload.filename, 'filename')
 
-    if (CATEGORY_WHITELIST.size && !CATEGORY_WHITELIST.has(category)){
-      return text(400, 'Categoría no permitida')
-    }
-
-    const publicInvestor = typeof process.env.PUBLIC_INVESTOR_SLUG === 'string'
-      ? process.env.PUBLIC_INVESTOR_SLUG.trim().toLowerCase()
-      : ''
-
-    if (publicInvestor && investor !== publicInvestor){
-      return text(403, 'Investor inválido')
-    }
-
-    const relPath = `${category}/${investor}/${filename}`
+    const fullPath = `${category}/${investor}/${filename}`
 
     let file
     try{
-      file = await getFile(repo, relPath, branch)
+      file = await getFile(repo, fullPath, branch)
     }catch(error){
       const message = error && error.message ? error.message : String(error)
       if (message.includes('GitHub 404')){
@@ -95,20 +79,20 @@ export async function handler(event){
     }
 
     const { owner, name } = repoParts(repo)
-    const encodedPath = encodeURIComponent(relPath)
-    const commitMessage = `docs: delete ${category}/${investor}/${filename}`
+    const encodedPath = encodeURIComponent(fullPath)
+    const commitMessage = `docs: delete ${fullPath}`
 
     await github(`/repos/${owner}/${name}/contents/${encodedPath}`, {
       method: 'DELETE',
-      body: {
+      body: JSON.stringify({
         message: commitMessage,
         sha: file.sha,
         branch,
         committer: {
           name: 'Dealroom Bot',
-          email: 'bot@finsolar.local'
+          email: 'bot@dealroom.local'
         }
-      }
+      })
     })
 
     return json(200, { ok: true })
@@ -116,7 +100,7 @@ export async function handler(event){
     if (error && typeof error.statusCode === 'number' && error.body){
       return error
     }
-    const status = error && error.statusCode ? error.statusCode : 500
+    const status = error?.statusCode || error?.status || 500
     const message = error && error.message ? error.message : 'Error interno'
     return text(status, message)
   }

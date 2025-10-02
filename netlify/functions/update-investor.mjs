@@ -21,7 +21,7 @@ export async function handler(event){
     }
 
     const body = JSON.parse(event.body || '{}')
-    const slug = typeof body.slug === 'string' ? body.slug.trim() : ''
+    const slug = typeof body.slug === 'string' ? body.slug.trim().toLowerCase() : ''
     if (!slug){
       return json(400, { ok: false, error: "Missing required field 'slug'" })
     }
@@ -65,8 +65,24 @@ export async function handler(event){
       }
     }
 
+    const updates = {}
+    for (const [key, value] of Object.entries(body)){
+      if (key === 'slug' || key === 'deadlines' || key === 'id') continue
+      if (key === 'name' && typeof value === 'string'){
+        updates.name = value.trim()
+        continue
+      }
+      if (key === 'status' && typeof value === 'string'){
+        updates.status = value.trim()
+        continue
+      }
+      updates[key] = value
+    }
+
     const updatedInvestor = {
       ...current,
+      ...updates,
+      id: slug,
       deadlines: mergedDeadlines,
       updatedAt: new Date().toISOString()
     }

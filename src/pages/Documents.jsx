@@ -19,6 +19,7 @@ export default function Documents(){
   const [deletingFile, setDeletingFile] = useState(null)
 
   const fetchDocs = useCallback(async (category) => {
+    if (!investorId) return []
     const res = await api.listDocs({ category, investor: investorId })
     const files = Array.isArray(res?.files) ? res.files : []
     return files

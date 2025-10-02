@@ -1,43 +1,62 @@
 import { ok, text } from './_lib/utils.mjs'
 import { repoEnv, listDir } from './_lib/github.mjs'
 
-function publicInvestorId(){
-  const raw = typeof process.env.PUBLIC_INVESTOR_SLUG === 'string'
-    ? process.env.PUBLIC_INVESTOR_SLUG.trim().toLowerCase()
-    : ''
-  return raw || 'femsa'
+const SAFE_SEGMENT = /^[a-zA-Z0-9._ -]+$/
+
+function sanitizeSegment(value, label, { lower = false } = {}){
+  const raw = typeof value === 'string' ? value.trim() : ''
+  if (!raw) throw text(400, `${label} requerido`)
+  const comparable = raw
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+  if (!SAFE_SEGMENT.test(comparable)){
+    throw text(400, `${label} inválido`)
+  }
+  return lower ? raw.toLowerCase() : raw
 }
 
 export async function handler(event){
   try{
-    const category = (event.queryStringParameters && event.queryStringParameters.category) || 'NDA'
-    const investorParam = event.queryStringParameters
-      && (event.queryStringParameters.investor ?? event.queryStringParameters.slug)
-    const requested = typeof investorParam === 'string' ? investorParam.trim().toLowerCase() : ''
-    const investorId = requested || publicInvestorId()
+    const params = event.queryStringParameters || {}
+    const category = sanitizeSegment(params.category || 'NDA', 'category')
+    const investor = sanitizeSegment(params.investor ?? params.slug, 'investor', { lower: true })
 
-    const repo = repoEnv('DOCS_REPO', '')
-    const branch = process.env.DOCS_BRANCH || 'main'
-
-    if (!repo || !process.env.GITHUB_TOKEN){
-      return ok({ files: [] })
+    const repo = repoEnv('DOCS_REPO', '').trim()
+    const branch = (process.env.DOCS_BRANCH || 'main').trim()
+    if (!repo || !branch || !process.env.GITHUB_TOKEN){
+      return text(500, 'DOCS_REPO/DOCS_BRANCH/GITHUB_TOKEN no configurados')
     }
 
-    const basePath = `${category}/${investorId}`
-    let list = []
+    const basePath = `${category}/${investor}`
+    let entries = []
     try{
-      const items = await listDir(repo, basePath, branch)
-      list = items.filter(x => x.type === 'file').map(x => ({
-        name: x.name,
-        path: `${basePath}/${x.name}`,
-        size: x.size || 0
-      }))
-    }catch(_){
-      list = []
+      const res = await listDir(repo, basePath, branch)
+      if (Array.isArray(res)){
+        entries = res.filter(item => item && item.type === 'file')
+      }else if (res && res.type === 'file'){
+        entries = [res]
+      }
+    }catch(error){
+      const message = error && error.message ? error.message : String(error)
+      if (!message.includes('GitHub 404')){
+        throw error
+      }
+      entries = []
     }
-    return ok({ files: list })
-  }catch(err){
-    const status = err.statusCode || 500
-    return text(status, err.message)
+
+    const files = entries.map(entry => ({
+      name: entry.name,
+      path: `${basePath}/${entry.name}`,
+      size: entry.size || 0
+    }))
+
+    return ok({ files })
+  }catch(error){
+    if (error && typeof error.statusCode === 'number' && error.body){
+      return error
+    }
+    const status = error?.statusCode || error?.status || 500
+    const message = error && error.message ? error.message : 'Error interno'
+    return text(status, message)
   }
 }

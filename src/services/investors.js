@@ -1,32 +1,57 @@
-// src/services/investors.js
-// Capa simple para CRUD de inversionistas vía Netlify Functions
+const JSON_CT = 'application/json'
 
-async function call(fn, { method = 'POST', body } = {}) {
-  const res = await fetch(`/.netlify/functions/${fn}`, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '');
-    throw new Error(`${fn} failed (${res.status}): ${txt}`);
+async function request(path, { method = 'GET', body, query } = {}) {
+  let url = `/.netlify/functions/${path}`
+  if (query && typeof query === 'object') {
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(query)) {
+      if (value === undefined || value === null) continue
+      params.set(key, String(value))
+    }
+    const qs = params.toString()
+    if (qs) url += `?${qs}`
   }
-  const ct = res.headers.get('content-type') || '';
-  if (ct.includes('application/json')) return res.json();
-  return null;
+
+  const headers = {}
+  const init = { method, headers }
+
+  const hasBody = body !== undefined && method !== 'GET' && method !== 'HEAD'
+  if (hasBody) {
+    headers['Content-Type'] = JSON_CT
+    init.body = JSON.stringify(body)
+  }
+
+  const res = await fetch(url, init)
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '')
+    throw new Error(`${path} failed (${res.status}): ${txt}`)
+  }
+
+  const contentType = res.headers.get('content-type') || ''
+  if (contentType.includes('application/json')) {
+    return res.json()
+  }
+  return null
 }
+
+const normalizeSlug = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '')
 
 export async function getInvestor(id) {
-  if (!id) throw new Error('id requerido');
-  return call('get-investor', { method: 'POST', body: { id } });
+  const slug = normalizeSlug(id)
+  if (!slug) throw new Error('id requerido')
+  return request('get-investor', { method: 'GET', query: { id: slug } })
 }
 
-export async function updateInvestor({ id, name, status }) {
-  if (!id) throw new Error('id requerido');
-  return call('update-investor', { method: 'POST', body: { id, name, status } });
+export async function updateInvestor(payload) {
+  const slug = normalizeSlug(payload?.id ?? payload?.slug)
+  if (!slug) throw new Error('id requerido')
+  const body = { ...payload, slug }
+  delete body.id
+  return request('update-investor', { method: 'POST', body })
 }
 
 export async function deleteInvestor(id) {
-  if (!id) throw new Error('id requerido');
-  return call('delete-investor', { method: 'POST', body: { id } });
+  const slug = normalizeSlug(id)
+  if (!slug) throw new Error('id requerido')
+  return request('delete-investor', { method: 'POST', body: { id: slug } })
 }

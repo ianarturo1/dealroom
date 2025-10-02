@@ -1,25 +1,33 @@
 import { json, text } from './_lib/utils.mjs'
 import { repoEnv, getFile, putFile } from './_lib/github.mjs'
 
-const publicInvestorId = () => {
-  const raw = typeof process.env.PUBLIC_INVESTOR_SLUG === 'string'
-    ? process.env.PUBLIC_INVESTOR_SLUG.trim().toLowerCase()
-    : ''
-  return raw || 'femsa'
-}
+const SAFE_SEGMENT = /^[a-zA-Z0-9._ -]+$/
 
-const formatTimestamp = (date = new Date()) => {
-  const pad = (value) => String(value).padStart(2, '0')
-  return [
-    date.getFullYear(),
-    pad(date.getMonth() + 1),
-    pad(date.getDate())
-  ].join('') + '-' + [pad(date.getHours()), pad(date.getMinutes()), pad(date.getSeconds())].join('')
+const normalizeForTest = (value) => value
+  .normalize('NFD')
+  .replace(/\p{Diacritic}/gu, '')
+
+function sanitizeSegment(value, label, { lower = false } = {}) {
+  const raw = typeof value === 'string' ? value.trim() : ''
+  if (!raw) throw text(400, `${label} requerido`)
+  const comparable = normalizeForTest(raw)
+  if (!SAFE_SEGMENT.test(comparable)) {
+    throw text(400, `${label} inválido`)
+  }
+  return lower ? raw.toLowerCase() : raw
 }
 
 const isGitHubNotFound = (error) => {
   const message = String(error && error.message ? error.message : error)
   return message.includes('GitHub 404')
+}
+
+const timestampSuffix = () => {
+  const now = new Date()
+  const pad = (value) => String(value).padStart(2, '0')
+  const date = [now.getFullYear(), pad(now.getMonth() + 1), pad(now.getDate())].join('')
+  const time = [pad(now.getHours()), pad(now.getMinutes()), pad(now.getSeconds())].join('')
+  return `${date}-${time}`
 }
 
 export async function handler(event){
@@ -28,32 +36,37 @@ export async function handler(event){
       return text(405, 'Method not allowed')
     }
 
-    const repo = repoEnv('DOCS_REPO', '')
-    const branch = process.env.DOCS_BRANCH || 'main'
+    const repo = repoEnv('DOCS_REPO', '').trim()
+    const branch = (process.env.DOCS_BRANCH || 'main').trim()
     const token = process.env.GITHUB_TOKEN
-    if (!repo || !token){
-      return text(500, 'DOCS_REPO/GITHUB_TOKEN no configurados')
+    if (!repo || !branch || !token){
+      return text(500, 'DOCS_REPO/DOCS_BRANCH/GITHUB_TOKEN no configurados')
     }
 
-    const body = JSON.parse(event.body || '{}')
-    const category = (body.path || '').toString().trim().replace(/^\/+|\/+$/g, '')
-    const fileName = (body.filename || '').toString().trim()
-    const contentBase64 = (body.contentBase64 || '').toString().trim()
-    const investorInput = typeof body.investor === 'string'
-      ? body.investor.trim().toLowerCase()
-      : (typeof body.slug === 'string' ? body.slug.trim().toLowerCase() : '')
-    const investorId = investorInput || publicInvestorId()
+    let body
+    try{
+      body = JSON.parse(event.body || '{}')
+    }catch(_){
+      return text(400, 'JSON inválido')
+    }
+
+    const category = sanitizeSegment(body.path ?? body.category, 'category')
+    const investor = sanitizeSegment(body.investor ?? body.slug, 'investor', { lower: true })
+    const filename = sanitizeSegment(body.filename, 'filename')
+    const contentBase64 = typeof body.contentBase64 === 'string' ? body.contentBase64.trim() : ''
+    if (!contentBase64){
+      return text(400, 'contentBase64 requerido')
+    }
+
     const strategy = typeof body.strategy === 'string' ? body.strategy : undefined
 
-    if (!category || !fileName || !contentBase64){
-      return text(400, 'Faltan datos (path, filename, contentBase64)')
-    }
+    const basePath = `${category}/${investor}`
+    const originalPath = `${basePath}/${filename}`
 
-    const originalPath = `${category}/${investorId}/${fileName}`
     let existing = null
-    try {
+    try{
       existing = await getFile(repo, originalPath, branch)
-    } catch (error) {
+    }catch(error){
       if (!isGitHubNotFound(error)) throw error
     }
 
@@ -65,21 +78,17 @@ export async function handler(event){
       })
     }
 
+    let finalFilename = filename
     let finalPath = originalPath
-    let finalFileName = fileName
-    let renamed = false
 
     if (existing && strategy === 'rename'){
-      const dotIndex = fileName.lastIndexOf('.')
-      const base = dotIndex > -1 ? fileName.slice(0, dotIndex) : fileName
-      const ext = dotIndex > -1 ? fileName.slice(dotIndex) : ''
-      finalFileName = `${base}_${formatTimestamp()}${ext}`
-      finalPath = `${category}/${investorId}/${finalFileName}`
-      renamed = true
-    }
+      const dotIndex = filename.lastIndexOf('.')
+      const baseName = dotIndex >= 0 ? filename.slice(0, dotIndex) : filename
+      const extension = dotIndex >= 0 ? filename.slice(dotIndex) : ''
+      finalFilename = `${baseName}_${timestampSuffix()}${extension}`
+      finalPath = `${basePath}/${finalFilename}`
 
-    if (renamed){
-      try {
+      try{
         const renamedExisting = await getFile(repo, finalPath, branch)
         if (renamedExisting){
           return json(409, {
@@ -88,32 +97,34 @@ export async function handler(event){
             path: finalPath
           })
         }
-      } catch (error) {
+      }catch(error){
         if (!isGitHubNotFound(error)) throw error
       }
     }
 
-    const commitMessageSuffix = renamed ? ' (auto-rename)' : ''
-    const commitMessage = `docs(${investorId}): upload ${category}/${finalFileName}${commitMessageSuffix}`
+    const commitMessage = `docs: upload ${category}/${investor}/${finalFilename}`
 
-    await putFile(repo, finalPath, contentBase64, commitMessage, undefined, branch)
+    await putFile(
+      repo,
+      finalPath,
+      contentBase64,
+      commitMessage,
+      existing && !strategy ? existing.sha : undefined,
+      branch
+    )
 
     return json(200, {
       ok: true,
       path: finalPath,
-      renamed,
-      fileName: finalFileName
+      renamed: Boolean(existing && strategy === 'rename'),
+      fileName: finalFilename
     })
   }catch(error){
-    const status = error.statusCode || 500
-    const message = String(error && error.message ? error.message : error)
-    if (status === 409){
-      return json(409, {
-        error: 'FILE_EXISTS',
-        message,
-        path: error.path || ''
-      })
+    if (error && typeof error.statusCode === 'number' && error.body){
+      return error
     }
+    const status = error?.statusCode || error?.status || 500
+    const message = error && error.message ? error.message : 'Error interno'
     return text(status, message)
   }
 }
