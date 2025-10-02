@@ -66,5 +66,9 @@ export const api = {
   },
   async listActivity(){
     return req('/.netlify/functions/list-activity')
+  },
+  async listUpdates(params){
+    const q = new URLSearchParams(params || {}).toString()
+    return req(`/.netlify/functions/updates${q ? `?${q}` : ''}`)
   }
 }
