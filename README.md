@@ -158,3 +158,5 @@ npm run build # genera /dist
 1. Crear un inversionista desde `/admin` y verificar los commits en `data/investor-index.json` y `data/investors/<slug>.json`.
 2. Abrir el enlace público que devuelve la función (`/#/?investor=<slug>`) y comprobar que el dashboard muestra la información del nuevo slug.
 3. Subir un archivo en `/documents` para validar que se versiona dentro de la carpeta `<Categoría>/<slug>/` en el repo de documentos.
+4. Build trigger: <hoy 01/oct/2025>
+
