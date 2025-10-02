@@ -3,6 +3,7 @@ import { api } from '../lib/api'
 import { useInvestorProfile } from '../lib/investor'
 import { DOCUMENT_SECTIONS_ORDER } from '../constants/documents'
 import { useToast } from '../lib/toast'
+import { deleteDoc } from '../services/docs'
 import { modalBackdropStyle, modalCardStyle, modalButtonRowStyle } from '../components/modalStyles'
 
 export default function Documents(){
@@ -15,6 +16,7 @@ export default function Documents(){
   const showToast = useToast()
   const [pendingUpload, setPendingUpload] = useState(null)
   const [renamePrompt, setRenamePrompt] = useState(null)
+  const [busy, setBusy] = useState(null)
 
   const fetchDocs = useCallback(async (category) => {
     const res = await api.listDocs({ category, investor: investorId })
@@ -164,6 +166,22 @@ export default function Documents(){
 
   const renameBusy = renamePrompt ? uploadingCategory === renamePrompt.category : false
 
+  const handleDelete = useCallback(async (category, file) => {
+    if (!file) return
+    if (!window.confirm(`¿Eliminar "${file.name}"? Esta acción no se puede deshacer.`)) return
+    const busyKey = `${category}/${file.name}`
+    try{
+      setBusy(busyKey)
+      await deleteDoc({ category, investor: investorId, filename: file.name })
+      await refreshCategory(category)
+    }catch(err){
+      const message = err?.message || err || 'Error desconocido'
+      window.alert(`Error al eliminar: ${message}`)
+    }finally{
+      setBusy(null)
+    }
+  }, [investorId, refreshCategory])
+
   return (
     <>
     <div className="container">
@@ -217,6 +235,15 @@ export default function Documents(){
                           >
                             Descargar
                           </a>
+                          <button
+                            type="button"
+                            className="btn secondary"
+                            style={{ marginLeft: 8 }}
+                            onClick={() => handleDelete(category, d)}
+                            disabled={busy === `${category}/${d.name}`}
+                          >
+                            {busy === `${category}/${d.name}` ? 'Eliminando…' : 'Eliminar'}
+                          </button>
                         </td>
                       </tr>
                     ))}
