@@ -1,117 +1,94 @@
-import { json, text } from './_lib/utils.mjs'
-import { repoEnv, getFile, putFile } from './_lib/github.mjs'
+// netlify/functions/upload-doc.mjs
+import { Octokit } from "octokit";
 
-const publicSlug = () => {
-  const raw = typeof process.env.PUBLIC_INVESTOR_SLUG === 'string'
-    ? process.env.PUBLIC_INVESTOR_SLUG.trim().toLowerCase()
-    : ''
-  return raw || 'femsa'
+function reqJson(event) {
+  try { return JSON.parse(event.body || "{}"); } catch { return {}; }
 }
 
-const formatTimestamp = (date = new Date()) => {
-  const pad = (value) => String(value).padStart(2, '0')
-  return [
-    date.getFullYear(),
-    pad(date.getMonth() + 1),
-    pad(date.getDate())
-  ].join('') + '-' + [pad(date.getHours()), pad(date.getMinutes()), pad(date.getSeconds())].join('')
+function getEnv(name, required = true) {
+  const val = process.env[name];
+  if (required && (!val || !val.trim())) {
+    throw new Error(`Missing env ${name}`);
+  }
+  return val;
 }
 
-const isGitHubNotFound = (error) => {
-  const message = String(error && error.message ? error.message : error)
-  return message.includes('GitHub 404')
+function sanitizeSegment(s) {
+  // Solo letras, números, guiones y espacios puntuales
+  return String(s || "").replace(/[^A-Za-z0-9._ -]/g, "").trim();
 }
 
-export async function handler(event){
-  try{
-    if (event.httpMethod && event.httpMethod !== 'POST'){
-      return text(405, 'Method not allowed')
+function ensureSlugAllowed(inputSlug) {
+  const publicSlug = process.env.PUBLIC_INVESTOR_SLUG;
+  if (publicSlug && publicSlug.trim()) {
+    if (inputSlug !== publicSlug) {
+      throw new Error(`Slug not allowed: ${inputSlug}`);
+    }
+    return publicSlug;
+  }
+  return inputSlug; // fallback si no hay PUBLIC_INVESTOR_SLUG
+}
+
+export async function handler(event) {
+  if (event.httpMethod !== "POST") {
+    return { statusCode: 405, body: "Method Not Allowed" };
+  }
+
+  try {
+    const { category, slug, filename, contentBase64 } = reqJson(event);
+
+    if (!category || !slug || !filename || !contentBase64) {
+      return { statusCode: 400, body: "Missing category/slug/filename/contentBase64" };
     }
 
-    const repo = repoEnv('DOCS_REPO', '')
-    const branch = process.env.DOCS_BRANCH || 'main'
-    const token = process.env.GITHUB_TOKEN
-    if (!repo || !token){
-      return text(500, 'DOCS_REPO/GITHUB_TOKEN no configurados')
-    }
+    const safeCategory = sanitizeSegment(category);
+    const safeSlug = ensureSlugAllowed(sanitizeSegment(slug));
+    const safeFilename = sanitizeSegment(filename);
 
-    const body = JSON.parse(event.body || '{}')
-    const category = (body.path || '').toString().trim().replace(/^\/+|\/+$/g, '')
-    const fileName = (body.filename || '').toString().trim()
-    const contentBase64 = (body.contentBase64 || '').toString().trim()
-    const slugInput = typeof body.slug === 'string' ? body.slug.trim().toLowerCase() : ''
-    const slug = slugInput || publicSlug()
-    const strategy = typeof body.strategy === 'string' ? body.strategy : undefined
+    const path = `${safeCategory}/${safeSlug}/${safeFilename}`;
 
-    if (!category || !fileName || !contentBase64){
-      return text(400, 'Faltan datos (path, filename, contentBase64)')
-    }
+    const DOCS_REPO = getEnv("DOCS_REPO");
+    const DOCS_BRANCH = getEnv("DOCS_BRANCH");
+    const GITHUB_TOKEN = getEnv("GITHUB_TOKEN");
 
-    const originalPath = `${category}/${slug}/${fileName}`
-    let existing = null
+    // Validar que el base64 sea decodificable
+    let binary;
     try {
-      existing = await getFile(repo, originalPath, branch)
-    } catch (error) {
-      if (!isGitHubNotFound(error)) throw error
+      binary = Buffer.from(contentBase64, "base64");
+      if (!binary || !binary.length) throw new Error("decoded empty");
+    } catch (e) {
+      return { statusCode: 400, body: `Invalid base64: ${e.message}` };
     }
 
-    if (existing && strategy !== 'rename'){
-      return json(409, {
-        error: 'FILE_EXISTS',
-        message: 'File already exists in that category',
-        path: originalPath
-      })
+    const octokit = new Octokit({ auth: GITHUB_TOKEN });
+
+    // Obtener sha si el archivo ya existe (para update)
+    let sha;
+    try {
+      const [owner, repo] = DOCS_REPO.split("/");
+      const { data } = await octokit.repos.getContent({ owner, repo, path, ref: DOCS_BRANCH });
+      // Puede venir como objeto (file) o array (dir). Queremos file.
+      if (!Array.isArray(data) && data.sha) sha = data.sha;
+    } catch {
+      // Si 404, es nuevo; continuar sin sha
     }
 
-    let finalPath = originalPath
-    let finalFileName = fileName
-    let renamed = false
+    const [owner, repo] = DOCS_REPO.split("/");
+    await octokit.repos.createOrUpdateFileContents({
+      owner,
+      repo,
+      path,
+      message: `chore(docs): upload ${path}`,
+      content: binary.toString("base64"), // GitHub API exige base64
+      branch: DOCS_BRANCH,
+      sha,
+    });
 
-    if (existing && strategy === 'rename'){
-      const dotIndex = fileName.lastIndexOf('.')
-      const base = dotIndex > -1 ? fileName.slice(0, dotIndex) : fileName
-      const ext = dotIndex > -1 ? fileName.slice(dotIndex) : ''
-      finalFileName = `${base}_${formatTimestamp()}${ext}`
-      finalPath = `${category}/${slug}/${finalFileName}`
-      renamed = true
-    }
-
-    if (renamed){
-      try {
-        const renamedExisting = await getFile(repo, finalPath, branch)
-        if (renamedExisting){
-          return json(409, {
-            error: 'FILE_EXISTS',
-            message: 'File already exists in that category',
-            path: finalPath
-          })
-        }
-      } catch (error) {
-        if (!isGitHubNotFound(error)) throw error
-      }
-    }
-
-    const commitMessageSuffix = renamed ? ' (auto-rename)' : ''
-    const commitMessage = `docs(${slug}): upload ${category}/${finalFileName}${commitMessageSuffix}`
-
-    await putFile(repo, finalPath, contentBase64, commitMessage, undefined, branch)
-
-    return json(200, {
-      ok: true,
-      path: finalPath,
-      renamed,
-      fileName: finalFileName
-    })
-  }catch(error){
-    const status = error.statusCode || 500
-    const message = String(error && error.message ? error.message : error)
-    if (status === 409){
-      return json(409, {
-        error: 'FILE_EXISTS',
-        message,
-        path: error.path || ''
-      })
-    }
-    return text(status, message)
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ ok: true, path }),
+    };
+  } catch (err) {
+    return { statusCode: 500, body: `upload-doc error: ${err.message}` };
   }
 }
