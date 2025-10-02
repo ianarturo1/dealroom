@@ -52,13 +52,37 @@ const createEmptyProject = () => ({
   empresa: '',
   imageUrl: '',
   notes: '',
-  loi_template: ''
+  loi_template: '',
+  slug: ''
 })
 
 const parseNumber = (value) => {
   if (value === null || value === undefined || value === '') return null
   const num = Number(value)
   return Number.isNaN(num) ? null : num
+}
+
+const normalizeSlugValue = (value) => {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+const ensureUniqueSlug = (baseSlug, used) => {
+  const safeBase = baseSlug || 'proyecto'
+  let candidate = safeBase
+  let suffix = 2
+  while (used.has(candidate)){
+    candidate = `${safeBase}-${suffix}`
+    suffix += 1
+  }
+  return candidate
 }
 
 const normalizeSlug = (value) => (value || '').trim().toLowerCase()
@@ -331,7 +355,8 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     empresa: typeof project.empresa === 'string' ? project.empresa : '',
     imageUrl: typeof project.imageUrl === 'string' ? project.imageUrl : '',
     notes: project.notes || '',
-    loi_template: project.loi_template || ''
+    loi_template: project.loi_template || '',
+    slug: typeof project.slug === 'string' ? project.slug : ''
   })
 
   useEffect(() => {
@@ -553,6 +578,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
   const sanitizeProjects = () => {
     const seen = new Set()
+    const usedSlugs = new Set()
     const sanitized = projectList.map((project, index) => {
       const id = (project.id || '').trim()
       if (!id) throw new Error(`El proyecto ${index + 1} requiere un ID`)
@@ -601,6 +627,14 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       if (notes) base.notes = notes
       const loiTemplate = (project.loi_template || '').trim()
       if (loiTemplate) base.loi_template = loiTemplate
+
+      const manualSlug = normalizeSlugValue(project.slug)
+      const slugFromName = normalizeSlugValue(name)
+      const slugFromId = normalizeSlugValue(id)
+      const slugBase = manualSlug || slugFromName || slugFromId || `proyecto-${index + 1}`
+      const slug = ensureUniqueSlug(slugBase, usedSlugs)
+      usedSlugs.add(slug)
+      base.slug = slug
 
       return base
     })
