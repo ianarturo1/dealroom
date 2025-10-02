@@ -1,6 +1,11 @@
 // netlify/functions/upload-doc.mjs
 import { Buffer } from "node:buffer";
-import { Octokit } from "octokit";
+
+function httpError(statusCode, message) {
+  const err = new Error(message);
+  err.statusCode = statusCode;
+  return err;
+}
 
 function httpError(statusCode, message) {
   const err = new Error(message);
@@ -74,27 +79,70 @@ export async function handler(event) {
       throw httpError(400, `Invalid base64: ${e.message}`);
     }
 
-    const octokit = new Octokit({ auth: GITHUB_TOKEN });
+    const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+    const baseUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}`;
+    const authHeaders = {
+      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Accept: "application/vnd.github.v3+json",
+    };
 
     // Obtener sha si el archivo ya existe (para update)
     let sha;
     try {
-      const { data } = await octokit.repos.getContent({ owner, repo, path, ref: DOCS_BRANCH });
-      // Puede venir como objeto (file) o array (dir). Queremos file.
-      if (!Array.isArray(data) && data.sha) sha = data.sha;
-    } catch {
-      // Si 404, es nuevo; continuar sin sha
+      const metadataResp = await fetch(`${baseUrl}?ref=${encodeURIComponent(DOCS_BRANCH)}`, {
+        method: "GET",
+        headers: authHeaders,
+      });
+
+      if (metadataResp.status === 200) {
+        const metadata = await metadataResp.json();
+        if (!Array.isArray(metadata) && metadata?.type === "file" && metadata?.sha) {
+          sha = metadata.sha;
+        } else {
+          throw httpError(404, "File not found");
+        }
+      } else if (metadataResp.status === 404) {
+        // Archivo nuevo, continuar sin sha
+      } else if (metadataResp.status === 401 || metadataResp.status === 403) {
+        throw httpError(500, "GitHub auth error");
+      } else {
+        throw httpError(500, "GitHub metadata error");
+      }
+    } catch (err) {
+      if (err.statusCode === 404) throw err;
+      if (err.statusCode) throw err;
+      throw httpError(500, "GitHub metadata error");
     }
 
-    await octokit.repos.createOrUpdateFileContents({
-      owner,
-      repo,
-      path,
+    const putBody = {
       message: `chore(docs): upload ${path}`,
-      content: binary.toString("base64"), // GitHub API exige base64
+      content: binary.toString("base64"),
       branch: DOCS_BRANCH,
-      sha,
+    };
+    if (sha) putBody.sha = sha;
+
+    const putResp = await fetch(baseUrl, {
+      method: "PUT",
+      headers: { ...authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify(putBody),
     });
+
+    if (putResp.status !== 200 && putResp.status !== 201) {
+      if (putResp.status === 401 || putResp.status === 403) {
+        throw httpError(500, "GitHub auth error");
+      }
+
+      let errorMessage = "GitHub upload error";
+      try {
+        const errorJson = await putResp.json();
+        if (errorJson?.message) {
+          errorMessage = errorJson.message;
+        }
+      } catch {
+        // ignore JSON parse errors
+      }
+      throw httpError(500, errorMessage);
+    }
 
     return {
       statusCode: 200,
