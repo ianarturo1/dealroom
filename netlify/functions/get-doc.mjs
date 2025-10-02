@@ -1,6 +1,12 @@
 // netlify/functions/get-doc.mjs
 import { Octokit } from "octokit";
 
+function httpError(statusCode, message) {
+  const err = new Error(message);
+  err.statusCode = statusCode;
+  return err;
+}
+
 function getEnv(name, required = true) {
   const val = process.env[name];
   if (required && (!val || !val.trim())) {
@@ -17,7 +23,7 @@ function ensureSlugAllowed(inputSlug) {
   const publicSlug = process.env.PUBLIC_INVESTOR_SLUG;
   if (publicSlug && publicSlug.trim()) {
     if (inputSlug !== publicSlug) {
-      throw new Error(`Slug not allowed: ${inputSlug}`);
+      throw httpError(403, "Slug not allowed");
     }
     return publicSlug;
   }
@@ -43,12 +49,14 @@ export async function handler(event) {
   try {
     const params = event.queryStringParameters || {};
     const category = sanitizeSegment(params.category);
-    const slug = ensureSlugAllowed(sanitizeSegment(params.slug));
+    const sanitizedSlug = sanitizeSegment(params.slug);
     const filename = sanitizeSegment(params.filename);
 
-    if (!category || !slug || !filename) {
-      return { statusCode: 400, body: "Missing category/slug/filename" };
+    if (!category || !sanitizedSlug || !filename) {
+      throw httpError(400, "Missing category/slug/filename");
     }
+
+    const slug = ensureSlugAllowed(sanitizedSlug);
 
     const path = `${category}/${slug}/${filename}`;
 
@@ -60,13 +68,31 @@ export async function handler(event) {
     const [owner, repo] = DOCS_REPO.split("/");
 
     // Traer contenido en base64 desde GitHub
-    const { data } = await octokit.repos.getContent({ owner, repo, path, ref: DOCS_BRANCH });
-    if (Array.isArray(data) || !data.content) {
-      return { statusCode: 404, body: "File not found or invalid type" };
+    let metadata;
+    try {
+      ({ data: metadata } = await octokit.repos.getContent({ owner, repo, path, ref: DOCS_BRANCH }));
+    } catch (err) {
+      if (err?.status === 404) {
+        throw httpError(404, "File not found");
+      }
+      throw err;
     }
 
-    // data.content viene en base64 según GitHub
-    const base64 = data.content.replace(/\n/g, "");
+    if (Array.isArray(metadata) || metadata.type !== "file" || !metadata.sha) {
+      throw httpError(404, "File not found");
+    }
+
+    const { data: blob } = await octokit.request("GET /repos/{owner}/{repo}/git/blobs/{file_sha}", {
+      owner,
+      repo,
+      file_sha: metadata.sha,
+    });
+
+    if (!blob || blob.encoding !== "base64" || !blob.content) {
+      throw httpError(500, "Invalid blob");
+    }
+
+    const base64 = blob.content.replace(/\n/g, "");
     const contentType = guessContentType(filename);
 
     return {
@@ -81,6 +107,8 @@ export async function handler(event) {
       isBase64Encoded: true,
     };
   } catch (err) {
-    return { statusCode: 500, body: `get-doc error: ${err.message}` };
+    const statusCode = err.statusCode || 500;
+    const message = statusCode === 500 ? "get-doc error" : err.message;
+    return { statusCode, body: message };
   }
 }
