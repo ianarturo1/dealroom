@@ -1,6 +1,8 @@
 // netlify/functions/upload-doc.mjs
 import { Buffer } from "node:buffer";
 
+const ALLOWED_SEGMENT = /^[A-Za-z0-9._() \-]+$/;
+
 function httpError(statusCode, message) {
   const err = new Error(message);
   err.statusCode = statusCode;
@@ -19,23 +21,56 @@ function getEnv(name, required = true) {
   return val;
 }
 
-function sanitizeSegment(s) {
-  return String(s || "")
-    .normalize("NFKC")
-    .replace(/[^\p{L}\p{N}._() \-]/gu, "")
-    .trim();
+function normalizeSegment(name, value) {
+  if (value === undefined || value === null) {
+    return "";
+  }
+
+  const str = String(value).trim();
+  if (!str) {
+    return "";
+  }
+
+  if (!ALLOWED_SEGMENT.test(str)) {
+    throw httpError(400, `Invalid ${name}`);
+  }
+
+  return str;
 }
 
-function ensureSlugAllowed(inputSlug) {
-  const publicSlugRaw = process.env.PUBLIC_INVESTOR_SLUG;
-  const envSlug = sanitizeSegment(publicSlugRaw);
-  if (envSlug) {
-    if (inputSlug.toLowerCase() !== envSlug.toLowerCase()) {
-      throw httpError(403, "Slug not allowed");
-    }
-    return envSlug.toLowerCase();
+function ensureSlugAllowed(slug) {
+  const envSlugRaw = process.env.PUBLIC_INVESTOR_SLUG;
+  if (!envSlugRaw) {
+    return slug;
   }
-  return inputSlug.toLowerCase(); // fallback si no hay PUBLIC_INVESTOR_SLUG
+
+  const envSlug = String(envSlugRaw).trim();
+  if (!envSlug) {
+    return slug;
+  }
+
+  if (!ALLOWED_SEGMENT.test(envSlug)) {
+    return slug;
+  }
+
+  if (slug.toLowerCase() !== envSlug.toLowerCase()) {
+    throw httpError(403, "Slug not allowed");
+  }
+
+  return envSlug;
+}
+
+async function githubErrorMessage(response) {
+  let message = "GitHub upload error";
+  try {
+    const data = await response.json();
+    if (data?.message) {
+      message = `${message}: ${data.message}`;
+    }
+  } catch {
+    // ignore JSON parse errors
+  }
+  return message;
 }
 
 export async function handler(event) {
@@ -45,40 +80,81 @@ export async function handler(event) {
 
   try {
     const body = reqJson(event);
-    let { category, slug, filename, contentBase64 } = body;
-    if (!category && body?.path){
-      category = body.path;
+
+    const rawPath = typeof body.path === "string" ? body.path : "";
+    const rawContentBase64 = typeof body.contentBase64 === "string" ? body.contentBase64 : "";
+
+    if (!rawContentBase64.trim()) {
+      throw httpError(400, "Missing contentBase64");
     }
 
-    if (!category || !slug || !filename || !contentBase64) {
-      throw httpError(400, "Missing category/slug/filename/contentBase64");
+    let category = "";
+    let slug = "";
+    let filename = "";
+
+    if (rawPath.trim()) {
+      const segments = rawPath
+        .replace(/\\/g, "/")
+        .split("/")
+        .map((segment) => segment.trim())
+        .filter((segment) => segment.length > 0);
+
+      if (segments.length !== 3) {
+        throw httpError(400, "Missing category/slug/filename");
+      }
+
+      category = normalizeSegment("category", segments[0]);
+      slug = normalizeSegment("slug", segments[1]);
+      filename = normalizeSegment("filename", segments[2]);
+    } else {
+      category = normalizeSegment("category", body.category);
+      slug = normalizeSegment("slug", body.slug);
+      filename = normalizeSegment("filename", body.filename);
+
+      if (!category || !slug || !filename) {
+        throw httpError(400, "Missing category/slug/filename");
+      }
     }
 
-    const safeCategory = sanitizeSegment(category);
-    const safeFilename = sanitizeSegment(filename);
-    const sanitizedSlug = sanitizeSegment(slug);
-
-    if (!safeCategory || !sanitizedSlug || !safeFilename) {
-      throw httpError(400, "Invalid category/slug/filename");
+    if (!category || !slug || !filename) {
+      throw httpError(400, "Missing category/slug/filename");
     }
 
-    const safeSlug = ensureSlugAllowed(sanitizedSlug);
+    slug = ensureSlugAllowed(slug);
 
-    const path = `${safeCategory}/${safeSlug}/${safeFilename}`;
+    const path = `${category}/${slug}/${filename}`;
+
+    const base64Body = rawContentBase64
+      .trim()
+      .replace(/^data:.*?;base64,/i, "")
+      .replace(/\s+/g, "");
+
+    if (!base64Body) {
+      throw httpError(400, "Invalid base64");
+    }
+
+    let binary;
+    try {
+      binary = Buffer.from(base64Body, "base64");
+    } catch {
+      throw httpError(400, "Invalid base64");
+    }
+
+    if (!binary || !binary.length) {
+      throw httpError(400, "Invalid base64");
+    }
+
+    const normalizedBase64 = binary.toString("base64");
+    const base64NoPad = normalizedBase64.replace(/=+$/g, "");
+    const inputNoPad = base64Body.replace(/=+$/g, "");
+    if (!base64Body || base64NoPad !== inputNoPad) {
+      throw httpError(400, "Invalid base64");
+    }
 
     const DOCS_REPO = getEnv("DOCS_REPO");
     const DOCS_BRANCH = getEnv("DOCS_BRANCH");
     const GITHUB_TOKEN = getEnv("GITHUB_TOKEN");
     const [owner, repo] = DOCS_REPO.split("/");
-
-    // Validar que el base64 sea decodificable
-    let binary;
-    try {
-      binary = Buffer.from(contentBase64, "base64");
-      if (!binary || !binary.length) throw new Error("decoded empty");
-    } catch (e) {
-      throw httpError(400, `Invalid base64: ${e.message}`);
-    }
 
     const encodedPath = path.split("/").map(encodeURIComponent).join("/");
     const baseUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}`;
@@ -104,8 +180,8 @@ export async function handler(event) {
         }
       } else if (metadataResp.status === 404) {
         // Archivo nuevo, continuar sin sha
-      } else if (metadataResp.status === 401 || metadataResp.status === 403) {
-        throw httpError(500, "GitHub auth error");
+      } else if ([401, 403, 422].includes(metadataResp.status)) {
+        throw httpError(500, await githubErrorMessage(metadataResp));
       } else {
         throw httpError(500, "GitHub metadata error");
       }
@@ -117,7 +193,7 @@ export async function handler(event) {
 
     const putBody = {
       message: `chore(docs): upload ${path}`,
-      content: binary.toString("base64"),
+      content: normalizedBase64,
       branch: DOCS_BRANCH,
     };
     if (sha) putBody.sha = sha;
@@ -127,22 +203,12 @@ export async function handler(event) {
       headers: { ...authHeaders, "Content-Type": "application/json" },
       body: JSON.stringify(putBody),
     });
-
     if (putResp.status !== 200 && putResp.status !== 201) {
-      if (putResp.status === 401 || putResp.status === 403) {
-        throw httpError(500, "GitHub auth error");
+      if ([401, 403, 422].includes(putResp.status)) {
+        throw httpError(500, await githubErrorMessage(putResp));
       }
 
-      let errorMessage = "GitHub upload error";
-      try {
-        const errorJson = await putResp.json();
-        if (errorJson?.message) {
-          errorMessage = errorJson.message;
-        }
-      } catch {
-        // ignore JSON parse errors
-      }
-      throw httpError(500, errorMessage);
+      throw httpError(500, await githubErrorMessage(putResp));
     }
 
     return {
@@ -151,7 +217,7 @@ export async function handler(event) {
     };
   } catch (err) {
     const statusCode = err.statusCode || 500;
-    const message = statusCode === 500 ? "upload-doc error" : err.message;
+    const message = err.message || "upload-doc error";
     return { statusCode, body: message };
   }
 }
