@@ -64,6 +64,14 @@ export const api = {
     const qs = params.toString()
     return `/.netlify/functions/get-doc${qs ? `?${qs}` : ''}`
   },
+  docDownloadUrl({ category, slug, filename }){
+    const params = new URLSearchParams()
+    if (category) params.set('category', category)
+    if (slug) params.set('slug', slug)
+    if (filename || filename === '') params.set('filename', String(filename))
+    const qs = params.toString()
+    return `/.netlify/functions/get-doc${qs ? `?${qs}` : ''}`
+  },
   async listActivity(){
     return req('/.netlify/functions/list-activity')
   }
