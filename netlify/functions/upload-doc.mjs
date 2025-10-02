@@ -21,8 +21,8 @@ function getEnv(name, required = true) {
 }
 
 function sanitizeSegment(s) {
-  // Solo letras, números, guiones y espacios puntuales
-  return String(s || "").replace(/[^A-Za-z0-9._ -]/g, "").trim();
+  // Solo letras, números, guiones, paréntesis y espacios puntuales
+  return String(s || "").replace(/[^A-Za-z0-9._() -]/g, "").trim();
 }
 
 function ensureSlugAllowed(inputSlug) {
