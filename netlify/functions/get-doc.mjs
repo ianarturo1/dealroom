@@ -68,13 +68,31 @@ export async function handler(event) {
     const [owner, repo] = DOCS_REPO.split("/");
 
     // Traer contenido en base64 desde GitHub
-    const { data } = await octokit.repos.getContent({ owner, repo, path, ref: DOCS_BRANCH });
-    if (Array.isArray(data) || data.type !== "file" || !data.content) {
+    let metadata;
+    try {
+      ({ data: metadata } = await octokit.repos.getContent({ owner, repo, path, ref: DOCS_BRANCH }));
+    } catch (err) {
+      if (err?.status === 404) {
+        throw httpError(404, "File not found");
+      }
+      throw err;
+    }
+
+    if (Array.isArray(metadata) || metadata.type !== "file" || !metadata.sha) {
       throw httpError(404, "File not found");
     }
 
-    // data.content viene en base64 según GitHub
-    const base64 = data.content.replace(/\n/g, "");
+    const { data: blob } = await octokit.request("GET /repos/{owner}/{repo}/git/blobs/{file_sha}", {
+      owner,
+      repo,
+      file_sha: metadata.sha,
+    });
+
+    if (!blob || blob.encoding !== "base64" || !blob.content) {
+      throw httpError(500, "Invalid blob");
+    }
+
+    const base64 = blob.content.replace(/\r?\n/g, "");
     const contentType = guessContentType(filename);
 
     return {
