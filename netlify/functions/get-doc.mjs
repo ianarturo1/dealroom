@@ -16,7 +16,9 @@ function getEnv(name, required = true) {
 }
 
 function sanitizeSegment(s) {
-  return String(s || "").replace(/[^A-Za-z0-9._ -]/g, "").trim();
+  return String(s || "")
+    .replace(/[^A-Za-z0-9._ \-()]/g, "")
+    .trim();
 }
 
 function ensureSlugAllowed(inputSlug) {
