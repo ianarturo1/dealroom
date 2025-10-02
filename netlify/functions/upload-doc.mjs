@@ -1,6 +1,12 @@
 // netlify/functions/upload-doc.mjs
 import { Octokit } from "octokit";
 
+function httpError(statusCode, message) {
+  const err = new Error(message);
+  err.statusCode = statusCode;
+  return err;
+}
+
 function reqJson(event) {
   try { return JSON.parse(event.body || "{}"); } catch { return {}; }
 }
@@ -22,7 +28,7 @@ function ensureSlugAllowed(inputSlug) {
   const publicSlug = process.env.PUBLIC_INVESTOR_SLUG;
   if (publicSlug && publicSlug.trim()) {
     if (inputSlug !== publicSlug) {
-      throw new Error(`Slug not allowed: ${inputSlug}`);
+      throw httpError(403, "Slug not allowed");
     }
     return publicSlug;
   }
@@ -38,12 +44,18 @@ export async function handler(event) {
     const { category, slug, filename, contentBase64 } = reqJson(event);
 
     if (!category || !slug || !filename || !contentBase64) {
-      return { statusCode: 400, body: "Missing category/slug/filename/contentBase64" };
+      throw httpError(400, "Missing category/slug/filename/contentBase64");
     }
 
     const safeCategory = sanitizeSegment(category);
-    const safeSlug = ensureSlugAllowed(sanitizeSegment(slug));
     const safeFilename = sanitizeSegment(filename);
+    const sanitizedSlug = sanitizeSegment(slug);
+
+    if (!safeCategory || !sanitizedSlug || !safeFilename) {
+      throw httpError(400, "Invalid category/slug/filename");
+    }
+
+    const safeSlug = ensureSlugAllowed(sanitizedSlug);
 
     const path = `${safeCategory}/${safeSlug}/${safeFilename}`;
 
@@ -57,7 +69,7 @@ export async function handler(event) {
       binary = Buffer.from(contentBase64, "base64");
       if (!binary || !binary.length) throw new Error("decoded empty");
     } catch (e) {
-      return { statusCode: 400, body: `Invalid base64: ${e.message}` };
+      throw httpError(400, `Invalid base64: ${e.message}`);
     }
 
     const octokit = new Octokit({ auth: GITHUB_TOKEN });
@@ -89,6 +101,8 @@ export async function handler(event) {
       body: JSON.stringify({ ok: true, path }),
     };
   } catch (err) {
-    return { statusCode: 500, body: `upload-doc error: ${err.message}` };
+    const statusCode = err.statusCode || 500;
+    const message = statusCode === 500 ? "upload-doc error" : err.message;
+    return { statusCode, body: message };
   }
 }
