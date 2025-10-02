@@ -1,9 +1,40 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useInvestorProfile } from '../lib/investor'
 import { DOCUMENT_SECTIONS_ORDER } from '../constants/documents'
 import { useToast } from '../lib/toast'
 import { modalBackdropStyle, modalCardStyle, modalButtonRowStyle } from '../components/modalStyles'
+
+const HASH_QUERY_REGEX = /\?/;
+
+function extractSlugFromHash(hash){
+  if (!hash || !HASH_QUERY_REGEX.test(hash)) return ''
+  const query = hash.slice(hash.indexOf('?') + 1)
+  if (!query) return ''
+  const params = new URLSearchParams(query)
+  const candidate = params.get('investor')
+  return candidate ? candidate.trim().toLowerCase() : ''
+}
+
+function toBase64(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result
+      if (typeof result !== 'string'){
+        reject(new Error('No se pudo leer el archivo'))
+        return
+      }
+      const commaIndex = result.indexOf(',')
+      const base64 = (commaIndex >= 0 ? result.slice(commaIndex + 1) : result).trim()
+      resolve(base64)
+    }
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo'))
+    reader.onabort = () => reject(new Error('No se pudo leer el archivo'))
+    reader.readAsDataURL(file)
+  })
+}
 
 export default function Documents(){
   const [docsByCategory, setDocsByCategory] = useState({})
@@ -11,16 +42,45 @@ export default function Documents(){
   const [error, setError] = useState(null)
   const [uploadingCategory, setUploadingCategory] = useState(null)
   const [hasLoaded, setHasLoaded] = useState(false)
+  const [selectedFiles, setSelectedFiles] = useState({})
   const { investorId } = useInvestorProfile()
+  const location = useLocation()
   const showToast = useToast()
   const [pendingUpload, setPendingUpload] = useState(null)
   const [renamePrompt, setRenamePrompt] = useState(null)
 
+  const envSlug = useMemo(() => {
+    const raw = import.meta.env.VITE_PUBLIC_INVESTOR_ID
+    return typeof raw === 'string' ? raw.trim().toLowerCase() : ''
+  }, [])
+
+  const searchSlug = useMemo(() => {
+    const search = location.search || ''
+    if (!search) return ''
+    const params = new URLSearchParams(search)
+    const candidate = params.get('investor')
+    return candidate ? candidate.trim().toLowerCase() : ''
+  }, [location.search])
+
+  const hashSlug = useMemo(() => extractSlugFromHash(location.hash), [location.hash])
+
+  const resolvedSlug = useMemo(() => searchSlug || hashSlug || envSlug || '', [searchSlug, hashSlug, envSlug])
+
+  const effectiveSlug = useMemo(() => (resolvedSlug || investorId || '').trim().toLowerCase(), [resolvedSlug, investorId])
+
+  const buildDownloadUrl = useCallback((category, slug, filename) => {
+    const params = new URLSearchParams()
+    params.set('category', category)
+    params.set('slug', slug)
+    params.set('filename', filename)
+    return `/.netlify/functions/get-doc?${params.toString()}`
+  }, [])
+
   const fetchDocs = useCallback(async (category) => {
-    const res = await api.listDocs({ category, slug: investorId })
+    const res = await api.listDocs({ category, slug: effectiveSlug })
     const files = Array.isArray(res?.files) ? res.files : []
     return files
-  }, [investorId])
+  }, [effectiveSlug])
 
   const refreshCategory = useCallback(async (category) => {
     const files = await fetchDocs(category)
@@ -72,17 +132,12 @@ export default function Documents(){
   const performUpload = useCallback(async (uploadInfo, options = {}) => {
     if (!uploadInfo) return null
     setError(null)
-    setUploadingCategory(uploadInfo.category)
     try{
       const payload = {
-        path: `${uploadInfo.category}`,
-        filename: uploadInfo.filename,
-        contentBase64: uploadInfo.base64,
+        category: uploadInfo.category,
         slug: uploadInfo.slug,
-        message: uploadInfo.message
-      }
-      if (options.strategy === 'rename'){
-        payload.strategy = 'rename'
+        filename: uploadInfo.filename,
+        contentBase64: uploadInfo.base64
       }
       const response = await api.uploadDoc(payload)
       await refreshCategory(uploadInfo.category)
@@ -91,6 +146,7 @@ export default function Documents(){
         : 'Documento subido.'
       showToast(successMsg, { tone: 'success' })
       uploadInfo.form?.reset?.()
+      setSelectedFiles((prev) => ({ ...prev, [uploadInfo.category]: null }))
       setPendingUpload(null)
       setRenamePrompt(null)
       return response
@@ -105,61 +161,75 @@ export default function Documents(){
       setError(message)
       showToast(message, { tone: 'error', duration: 5000 })
       return null
-    }finally{
-      setUploadingCategory(null)
     }
   }, [refreshCategory, showToast])
 
-  const handleUpload = useCallback((category) => (e) => {
+  const handleUpload = useCallback((category) => async (e) => {
     e.preventDefault()
     setError(null)
     setPendingUpload(null)
     setRenamePrompt(null)
     const form = e.target
-    const fileInput = form.file
-    const file = fileInput && fileInput.files ? fileInput.files[0] : null
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = async () => {
-      try{
-        const result = typeof reader.result === 'string' ? reader.result : ''
-        const base64 = result.includes(',') ? result.split(',')[1] : result
-        if (!base64) throw new Error('No se pudo leer el archivo')
-        await performUpload({
-          category,
-          filename: file.name,
-          base64,
-          slug: investorId,
-          message: `Upload ${file.name} from Dealroom UI`,
-          form
-        })
-      }catch(err){
-        const message = err?.message || 'No se pudo leer el archivo'
-        setError(message)
-        showToast(message, { tone: 'error', duration: 5000 })
-        setUploadingCategory(null)
-      }
+    const selectedFile = selectedFiles[category] || (form.file && form.file.files ? form.file.files[0] : null)
+
+    if (!selectedFile){
+      const message = 'Selecciona un archivo antes de subir.'
+      setError(message)
+      showToast(message, { tone: 'warning', duration: 4000 })
+      return
     }
-    reader.onerror = () => {
-      const message = 'No se pudo leer el archivo'
+
+    const slug = resolvedSlug
+    if (!slug){
+      const message = 'No se detectó el inversionista (slug). Abre el panel con ?investor=<slug> o configura VITE_PUBLIC_INVESTOR_ID.'
+      setError(message)
+      showToast(message, { tone: 'error', duration: 6000 })
+      return
+    }
+
+    setUploadingCategory(category)
+    try{
+      const base64 = await toBase64(selectedFile)
+      if (!base64){
+        throw new Error('El archivo está vacío o no se pudo convertir.')
+      }
+      await performUpload({
+        category,
+        filename: selectedFile.name,
+        base64,
+        slug,
+        form
+      })
+    }catch(err){
+      const message = err?.message || 'No se pudo leer el archivo'
       setError(message)
       showToast(message, { tone: 'error', duration: 5000 })
+    }finally{
       setUploadingCategory(null)
     }
-    reader.readAsDataURL(file)
-  }, [investorId, performUpload, showToast])
+  }, [selectedFiles, resolvedSlug, performUpload, showToast])
 
   const handleConfirmRename = useCallback(async () => {
     if (!pendingUpload){
       setRenamePrompt(null)
       return
     }
-    await performUpload(pendingUpload, { strategy: 'rename' })
+    setUploadingCategory(pendingUpload.category)
+    try{
+      await performUpload(pendingUpload, { strategy: 'rename' })
+    }finally{
+      setUploadingCategory(null)
+    }
   }, [pendingUpload, performUpload])
 
   const handleCancelRename = useCallback(() => {
     setPendingUpload(null)
     setRenamePrompt(null)
+  }, [])
+
+  const handleFileChange = useCallback((category) => (event) => {
+    const file = event.target && event.target.files ? event.target.files[0] : null
+    setSelectedFiles((prev) => ({ ...prev, [category]: file || null }))
   }, [])
 
   const renameBusy = renamePrompt ? uploadingCategory === renamePrompt.category : false
@@ -189,8 +259,18 @@ export default function Documents(){
                   style={{ padding: 16, borderBottom: '1px solid #f0f0f0' }}
                   aria-busy={isUploading}
                 >
-                  <input name="file" type="file" className="input" disabled={isUploading} />
-                  <button className="btn" type="submit" disabled={isUploading}>
+                  <input
+                    name="file"
+                    type="file"
+                    className="input"
+                    disabled={isUploading}
+                    onChange={handleFileChange(category)}
+                  />
+                  <button
+                    className="btn"
+                    type="submit"
+                    disabled={isUploading || !selectedFiles[category]}
+                  >
                     {isUploading ? 'Subiendo…' : 'Subir'}
                   </button>
                 </form>
@@ -203,15 +283,23 @@ export default function Documents(){
                     </tr>
                   </thead>
                   <tbody>
-                    {docs.map((d) => (
-                      <tr key={d.path}>
-                        <td>{d.name}</td>
-                        <td>{(d.size / 1024).toFixed(1)} KB</td>
-                        <td>
-                          <a className="btn secondary" href={api.downloadDocPath(d.path)}>Descargar</a>
-                        </td>
-                      </tr>
-                    ))}
+                    {docs.map((d) => {
+                      const parts = (d.path || '').split('/').filter(Boolean)
+                      const slugFromPath = parts.length >= 2 ? parts[1] : ''
+                      const docSlug = slugFromPath || effectiveSlug
+                      const downloadUrl = docSlug
+                        ? buildDownloadUrl(category, docSlug, d.name)
+                        : '#'
+                      return (
+                        <tr key={d.path}>
+                          <td>{d.name}</td>
+                          <td>{(d.size / 1024).toFixed(1)} KB</td>
+                          <td>
+                            <a className="btn secondary" href={downloadUrl}>Descargar</a>
+                          </td>
+                        </tr>
+                      )
+                    })}
                     {docs.length === 0 && hasLoaded && !loading && (
                       <tr>
                         <td colSpan="3">No hay documentos aún.</td>
