@@ -70,7 +70,22 @@ export default function Updates(){
     try{
       const res = await api.listInvestors()
       const items = Array.isArray(res?.investors) ? res.investors : []
-      setInvestorList(items)
+      const normalized = items
+        .map(item => {
+          const id = typeof item?.id === 'string' && item.id.trim()
+            ? item.id.trim().toLowerCase()
+            : (typeof item?.slug === 'string' ? item.slug.trim().toLowerCase() : '')
+          if (!id) return null
+          return {
+            ...item,
+            id,
+            name: item?.name || '',
+            email: item?.email || '',
+            status: item?.status || ''
+          }
+        })
+        .filter(Boolean)
+      setInvestorList(normalized)
     }catch(error){
       setInvestorList([])
       setInvestorListError(error.message)
@@ -109,20 +124,20 @@ export default function Updates(){
       try{
         const entries = await Promise.all(investorList.map(async (item) => {
           try{
-            const data = await api.getInvestor(item.slug)
-            return [item.slug, data]
+            const data = await api.getInvestor(item.id)
+            return [item.id, data]
           }catch(error){
-            return [item.slug, { __error: error.message }]
+            return [item.id, { __error: error.message }]
           }
         }))
         if (!active) return
         const nextMap = {}
         const errors = []
-        for (const [slug, data] of entries){
+        for (const [id, data] of entries){
           if (data && !data.__error){
-            nextMap[slug] = data
+            nextMap[id] = data
           }else if (data && data.__error){
-            errors.push(`${slug}: ${data.__error}`)
+            errors.push(`${id}: ${data.__error}`)
           }
         }
         setInvestorDetailsMap(nextMap)
@@ -167,12 +182,12 @@ export default function Updates(){
           for (const investor of investorList){
             if (!active) return
             try{
-              const res = await api.listDocs({ category, slug: investor.slug })
+              const res = await api.listDocs({ category, investor: investor.id })
               const files = Array.isArray(res?.files) ? res.files : []
-              categoryData[investor.slug] = { files, error: null }
+              categoryData[investor.id] = { files, error: null }
             }catch(error){
               const message = error.message || 'Error desconocido'
-              categoryData[investor.slug] = { files: [], error: message }
+              categoryData[investor.id] = { files: [], error: message }
               const lower = message.toLowerCase()
               if (lower.includes('github_token') || lower.includes('no configurado') || lower.includes('500 ')){
                 throw error
@@ -227,7 +242,7 @@ export default function Updates(){
   const investorNameBySlug = useMemo(() => {
     const map = {}
     investorList.forEach(item => {
-      map[item.slug] = item.name || item.slug
+      map[item.id] = item.name || item.id
     })
     return map
   }, [investorList])
@@ -260,9 +275,9 @@ export default function Updates(){
     const thresholdMs = deadlineThreshold * 24 * 60 * 60 * 1000
     const now = new Date()
     const items = []
-    Object.entries(investorDetailsMap).forEach(([slug, detail]) => {
+    Object.entries(investorDetailsMap).forEach(([id, detail]) => {
       const deadlines = detail?.deadlines || {}
-      const investorName = detail?.name || investorNameBySlug[slug] || slug
+      const investorName = detail?.name || investorNameBySlug[id] || id
       Object.entries(deadlines).forEach(([label, value]) => {
         if (!value) return
         if (!/loi/i.test(label) && !/firma/i.test(label)) return
@@ -275,7 +290,7 @@ export default function Updates(){
           const formattedDate = shortDateFormatter.format(date)
           const docTarget = resolveDeadlineDocTarget(label)
           items.push({
-            slug,
+            id,
             label,
             date: value,
             days,
@@ -298,12 +313,12 @@ export default function Updates(){
     return DASHBOARD_DOC_CATEGORIES.map(category => {
       const categoryData = docInventories[category] || {}
       const missing = investorList.reduce((acc, investor) => {
-        const entry = categoryData[investor.slug]
+        const entry = categoryData[investor.id]
         const files = Array.isArray(entry?.files) ? entry.files : []
         if (!files.length){
           acc.push({
-            slug: investor.slug,
-            name: investor.name || investor.slug,
+            id: investor.id,
+            name: investor.name || investor.id,
             error: entry?.error || null
           })
         }
@@ -311,14 +326,14 @@ export default function Updates(){
       }, [])
       let folderTarget = null
       for (const investor of investorList){
-        const entry = categoryData[investor.slug]
+        const entry = categoryData[investor.id]
         const files = Array.isArray(entry?.files) ? entry.files : []
         if (files.length){
-          folderTarget = { slug: investor.slug, file: files[0] }
+          folderTarget = { id: investor.id, file: files[0] }
           break
         }
       }
-      const fallbackSlug = missing.length ? missing[0].slug : (investorList[0]?.slug || DEFAULT_INVESTOR_ID)
+      const fallbackSlug = missing.length ? missing[0].id : (investorList[0]?.id || DEFAULT_INVESTOR_ID)
       return {
         category,
         missing,
@@ -332,7 +347,7 @@ export default function Updates(){
 
   const activityDisplayItems = useMemo(() => {
     return activityItems.map((event, index) => {
-      const slug = event?.slug || ''
+      const slug = event?.id || ''
       const investorName = slug ? (investorNameBySlug[slug] || slug) : ''
       let icon = '•'
       let title = event?.message || 'Actividad'
@@ -341,12 +356,12 @@ export default function Updates(){
         case 'investor-created':
           icon = '🆕'
           title = 'Nuevo inversionista'
-          detail = investorName || event?.slug || ''
+          detail = investorName || event?.id || ''
           break
         case 'investor-deleted':
           icon = '🗑️'
           title = 'Inversionista eliminado'
-          detail = investorName || event?.slug || ''
+          detail = investorName || event?.id || ''
           break
         case 'doc-uploaded':
           icon = '📄'
@@ -387,14 +402,14 @@ export default function Updates(){
   const handleRefreshDocInventories = () => setDocRefreshKey(value => value + 1)
   const handleRefreshActivity = () => setActivityRefreshKey(value => value + 1)
 
-  const navigateToDocsSection = useCallback((category, slug, target) => {
+  const navigateToDocsSection = useCallback((category, id, target) => {
     const safeCategory = DOC_REDIRECT_CATEGORIES.includes(category)
       ? category
       : DEFAULT_DOC_REDIRECT_CATEGORY
-    const safeSlug = normalizeSlug(slug) || DEFAULT_INVESTOR_ID
+    const safeId = normalizeSlug(id) || DEFAULT_INVESTOR_ID
     const safeTarget = target || 'upload'
     if (typeof window !== 'undefined'){
-      const payload = { category: safeCategory, slug: safeSlug, target: safeTarget, ts: Date.now() }
+      const payload = { category: safeCategory, id: safeId, slug: safeId, target: safeTarget, ts: Date.now() }
       try{ window.sessionStorage.setItem('adminDocsRedirect', JSON.stringify(payload)) }catch(_error){}
     }
     navigate('/admin')
@@ -493,7 +508,7 @@ export default function Updates(){
                   ? 'Vence hoy'
                   : `Vence en ${item.days} día${item.days === 1 ? '' : 's'}`)
                 return (
-                  <li key={`${item.slug}-${item.label}`} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                  <li key={`${item.id}-${item.label}`} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                       <div>
                         <div style={{ fontWeight: 600 }}>{item.investorName}</div>
@@ -507,7 +522,7 @@ export default function Updates(){
                           className="btn secondary"
                           onClick={() => navigateToDocsSection(
                             item.docTarget.category,
-                            item.slug,
+                            item.id,
                             item.docTarget.target || 'upload'
                           )}
                         >
@@ -582,7 +597,7 @@ export default function Updates(){
                       <button
                         type="button"
                         className="btn secondary"
-                        onClick={() => navigateToDocsSection(summary.category, (summary.folderTarget && summary.folderTarget.slug) || summary.fallbackSlug, 'folder')}
+                        onClick={() => navigateToDocsSection(summary.category, (summary.folderTarget && summary.folderTarget.id) || summary.fallbackSlug, 'folder')}
                         disabled={disabledFolder}
                       >
                         Carpeta

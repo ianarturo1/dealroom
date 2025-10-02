@@ -1,5 +1,5 @@
-import { ok, text } from './_lib/utils.mjs'
-import { repoEnv, listDir } from './_lib/github.mjs'
+import { json, text } from './_lib/utils.mjs'
+import { repoEnv, getFile, deleteFile } from './_lib/github.mjs'
 
 const SAFE_SEGMENT = /^[a-zA-Z0-9._ -]+$/
 
@@ -16,7 +16,7 @@ function sanitizeSegment(value, label, { lowercase = false } = {}){
 
 export async function handler(event){
   try{
-    if (event.httpMethod && event.httpMethod !== 'GET'){
+    if (event.httpMethod && event.httpMethod !== 'POST'){
       return text(405, 'Method not allowed')
     }
 
@@ -28,44 +28,45 @@ export async function handler(event){
       return text(500, 'DOCS_REPO/DOCS_BRANCH/GITHUB_TOKEN no configurados')
     }
 
-    const params = event.queryStringParameters || {}
-    const category = sanitizeSegment(params.category || 'NDA', 'category')
-    const investor = sanitizeSegment(
-      params.investor ?? params.slug,
-      'investor',
-      { lowercase: true }
-    )
-
-    const basePath = `${category}/${investor}`
-
-    let items
+    let payload
     try{
-      items = await listDir(repo, basePath, branch)
+      payload = JSON.parse(event.body || '{}')
+    }catch(_err){
+      return text(400, 'JSON inválido')
+    }
+
+    const category = sanitizeSegment(payload.category, 'category')
+    const investor = sanitizeSegment(payload.investor, 'investor', { lowercase: true })
+    const filename = sanitizeSegment(payload.filename, 'filename')
+
+    const relPath = `${category}/${investor}/${filename}`
+
+    let file
+    try{
+      file = await getFile(repo, relPath, branch)
     }catch(error){
       const message = String(error && error.message ? error.message : error)
       if (message.includes('GitHub 404')){
-        return ok({ files: [] })
+        return text(404, 'Archivo no encontrado')
       }
       throw error
     }
 
-    const files = Array.isArray(items)
-      ? items
-          .filter((item) => item && item.type === 'file')
-          .map((item) => ({
-            name: item.name,
-            path: `${basePath}/${item.name}`,
-            size: typeof item.size === 'number' ? item.size : 0
-          }))
-      : []
+    await deleteFile(
+      repo,
+      relPath,
+      `docs: delete ${category}/${investor}/${filename}`,
+      file?.sha,
+      branch
+    )
 
-    return ok({ files })
+    return json(200, { ok: true })
   }catch(error){
     if (error && typeof error.statusCode === 'number' && error.body){
       return error
     }
     const status = error && (error.statusCode || error.status) ? (error.statusCode || error.status) : 500
-    const message = error && error.message ? error.message : 'Error inesperado'
+    const message = error && error.message ? error.message : 'Error interno'
     return text(status, message)
   }
 }

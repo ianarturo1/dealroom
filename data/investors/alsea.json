@@ -1,10 +1,10 @@
 {
   "id": "alsea",
   "name": "Alsea",
-  "status": "Ajustes técnicos",
+  "status": "LOI",
   "deadlines": {
     "LOI": "2025-10-15",
-    "Firma": "2025-11-07"
+    "Firma": "2025-10-29"
   },
   "metrics": {
     "fiscalCapitalInvestment": 60000000,
@@ -19,6 +19,5 @@
     "investorsActive": 12,
     "dealsAccelerated": 38,
     "nps": 72
-  },
-  "updatedAt": "2025-10-01T15:56:13.935Z"
+  }
 }
