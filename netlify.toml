@@ -6,6 +6,7 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+  external_node_modules = ["octokit"]
   included_files = ["data/**"]
 
 [[redirects]]

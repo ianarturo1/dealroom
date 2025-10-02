@@ -12,6 +12,29 @@ function trimString(value){
   return String(value).trim()
 }
 
+function normalizeSlugValue(value){
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+function ensureUniqueSlug(baseSlug, used){
+  const safeBase = baseSlug || 'proyecto'
+  let candidate = safeBase
+  let suffix = 2
+  while (used.has(candidate)){
+    candidate = `${safeBase}-${suffix}`
+    suffix += 1
+  }
+  return candidate
+}
+
 function parseOptionalNumber(project, field, label){
   const id = project.id || `#${project.__index}`
   const raw = trimString(project[field])
@@ -33,14 +56,6 @@ function normalizeProject(project, index){
   const working = { ...project, __index: index + 1 }
   const id = trimString(working.id)
   if (!id) throw new Error(`Proyecto ${index + 1} requiere un id`)
-  const slugRaw = trimString(working.slug)
-  if (!slugRaw){
-    throw new Error(`Proyecto ${id} requiere un slug`)
-  }
-  const slug = slugRaw.toLowerCase()
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)){
-    throw new Error(`Proyecto ${id} tiene slug inválido`)
-  }
   const name = trimString(working.name)
   if (!name) throw new Error(`Proyecto ${id} requiere nombre`)
   const client = trimString(working.client)
@@ -52,6 +67,11 @@ function normalizeProject(project, index){
   if (imageUrl && !/^https?:\/\//i.test(imageUrl)){
     throw new Error(`Proyecto ${id} tiene Imagen (URL) inválida`)
   }
+
+  const manualSlug = normalizeSlugValue(working.slug)
+  const slugFromName = normalizeSlugValue(name)
+  const slugFromId = normalizeSlugValue(id)
+  const slug = manualSlug || slugFromName || slugFromId || `proyecto-${index + 1}`
 
   const normalized = { id, slug, name, status }
 
@@ -94,16 +114,11 @@ export async function handler(event){
     const normalized = list.map((item, index) => normalizeProject(item, index))
 
     const ids = new Set()
-    const slugs = new Set()
     for (const project of normalized){
       if (ids.has(project.id)){
         return text(400, `ID duplicado: ${project.id}`)
       }
       ids.add(project.id)
-      if (slugs.has(project.slug)){
-        return text(400, `Slug duplicado: ${project.slug}`)
-      }
-      slugs.add(project.slug)
     }
 
     const repo = repoEnv('CONTENT_REPO', '')
@@ -114,14 +129,37 @@ export async function handler(event){
 
     const path = 'data/projects.json'
     let sha
+    let existing = []
     try {
       const file = await getFile(repo, path, branch)
       sha = file.sha
+      if (file.content){
+        const decoded = Buffer.from(file.content, 'base64').toString('utf8')
+        const parsed = JSON.parse(decoded || '[]')
+        if (Array.isArray(parsed)){
+          existing = parsed
+        }
+      }
     }catch(error){
       const msg = String(error && error.message || '')
       if (!msg.includes('404')){
         throw error
       }
+    }
+
+    const incomingSlugSet = new Set(normalized.map(item => item.slug).filter(Boolean))
+    const usedSlugs = new Set()
+    for (const item of existing){
+      const slug = typeof item?.slug === 'string' ? item.slug : ''
+      if (slug && !incomingSlugSet.has(slug)){
+        usedSlugs.add(slug)
+      }
+    }
+
+    for (const project of normalized){
+      const finalSlug = ensureUniqueSlug(project.slug, usedSlugs)
+      usedSlugs.add(finalSlug)
+      project.slug = finalSlug
     }
 
     const contentBase64 = Buffer.from(JSON.stringify(normalized, null, 2)).toString('base64')
