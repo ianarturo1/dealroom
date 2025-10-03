@@ -1,9 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { api } from '../lib/api'
+import { api } from '@/lib/api'
 import { useInvestorProfile } from '../lib/investor'
 import { DOCUMENT_SECTIONS_ORDER } from '../constants/documents'
 import { useToast } from '../lib/toast'
-import { modalBackdropStyle, modalCardStyle, modalButtonRowStyle } from '../components/modalStyles'
 
 export default function Documents(){
   const [docsByCategory, setDocsByCategory] = useState({})
@@ -15,12 +14,11 @@ export default function Documents(){
   const normalizedInvestorId = useMemo(() => (investorId || '').trim().toLowerCase(), [investorId])
   const alseaSlug = 'alsea'
   const isAlseaContext = normalizedInvestorId === alseaSlug
-  const isDocsBackendFlagOn = import.meta.env?.VITE_DOCS_BACKEND_ALSEA === 'on'
-  const isAlseaFeatureEnabled = isAlseaContext && isDocsBackendFlagOn
   const slugForDocs = useMemo(() => (isAlseaContext ? alseaSlug : investorId), [alseaSlug, investorId, isAlseaContext])
   const showToast = useToast()
-  const [pendingUpload, setPendingUpload] = useState(null)
-  const [renamePrompt, setRenamePrompt] = useState(null)
+  const [selectedFiles, setSelectedFiles] = useState({})
+  const [uploadInputKeys, setUploadInputKeys] = useState({})
+  const [downloadingDocId, setDownloadingDocId] = useState(null)
 
   const fetchDocs = useCallback(async (category) => {
     const res = await api.listDocs({ category, slug: slugForDocs })
@@ -75,132 +73,79 @@ export default function Documents(){
     loadAll()
   }, [loadAll])
 
-  const performUpload = useCallback(async (uploadInfo, options = {}) => {
-    if (!uploadInfo || !uploadInfo.file) return null
+  const handleFileChange = useCallback((category, file) => {
+    setSelectedFiles(prev => ({ ...prev, [category]: file }))
     setError(null)
-    setUploadingCategory(uploadInfo.category)
-    const file = uploadInfo.file
-    const rawSlug = uploadInfo.slug || ''
-    const slug = rawSlug.toLowerCase()
-    const filename = uploadInfo.filename || (file && file.name) || ''
-    try{
-      if (!slug){
-        throw new Error('Slug no disponible para la carga')
-      }
-      if (!file){
-        throw new Error('Selecciona un archivo para subir')
-      }
-      if (!filename){
-        throw new Error('El archivo no tiene nombre válido')
-      }
-      const formData = new FormData()
-      formData.set('slug', slug)
-      formData.set('category', uploadInfo.category)
-      formData.set('filename', filename)
-      formData.append('file', file, filename)
-      if (options.strategy === 'rename'){
-        formData.set('strategy', 'rename')
-      }
-      const uploadOptions = isAlseaFeatureEnabled ? { endpoint: '/.netlify/functions/upload-doc' } : undefined
-      const response = await api.uploadDoc(formData, uploadOptions)
-      await refreshCategory(uploadInfo.category)
-      const successMsg = options.strategy === 'rename'
-        ? 'Documento subido con sufijo automático.'
-        : 'Documento subido.'
-      showToast(successMsg, { tone: 'success' })
-      uploadInfo.form?.reset?.()
-      setPendingUpload(null)
-      setRenamePrompt(null)
-      return response
-    }catch(err){
-      if (err?.status === 409 && err?.data?.error === 'FILE_EXISTS' && options.strategy !== 'rename'){
-        const normalizedSlug = slug || rawSlug
-        const safeFilename = filename || uploadInfo.filename || ''
-        const fallbackPath = `data/docs/${normalizedSlug}/${uploadInfo.category}/${safeFilename}`
-        setPendingUpload(uploadInfo)
-        setRenamePrompt({ path: err.data?.path || fallbackPath, category: uploadInfo.category })
-        return null
-      }
-      const code = err?.data?.code
-      let message = err?.message || 'No se pudo subir el archivo'
-      if (code === 'MissingField' && err?.data?.field){
-        message = `Falta ${err.data.field}`
-      }else if (code === 'ForbiddenSlug'){
-        message = 'Solo se permiten cargas para Alsea'
-      }else if (code === 'EmptyFile'){
-        message = 'El archivo está vacío'
-      }else if (code === 'FILE_TOO_LARGE_FOR_GITHUB'){
-        message = 'El archivo supera el límite de 25 MB'
-      }else if (code === 'Disabled'){
-        message = 'El backend documental no está disponible'
-      }
-      setError(message)
-      showToast(message, { tone: 'error', duration: 5000 })
-      return null
-    }finally{
-      setUploadingCategory(null)
-    }
-  }, [isAlseaFeatureEnabled, refreshCategory, showToast])
+  }, [])
 
-  const makeDownloadUrl = useCallback((category, file, options = {}) => {
-    const disposition = options.disposition === 'inline' ? 'inline' : 'attachment'
-    const safeCategory = (category || '').trim()
-    const filename = (file?.name || file?.filename || file?.path || '').trim()
-    if (isAlseaFeatureEnabled){
-      const params = new URLSearchParams()
-      params.set('slug', alseaSlug)
-      if (safeCategory) params.set('category', safeCategory)
-      if (filename) params.set('filename', filename)
-      params.set('disposition', disposition)
-      const qs = params.toString()
-      return `/.netlify/functions/download-file${qs ? `?${qs}` : ''}`
-    }
-    if (file?.path){
-      return api.downloadDocPath(file.path, { disposition })
-    }
-    const targetSlug = slugForDocs || ''
-    return api.docDownloadUrl({ category: safeCategory, slug: targetSlug, filename, disposition })
-  }, [alseaSlug, api, isAlseaFeatureEnabled, slugForDocs])
-
-  const handleUpload = useCallback((category) => async (e) => {
-    e.preventDefault()
-    setError(null)
-    setPendingUpload(null)
-    setRenamePrompt(null)
-    const form = e.target
-    const fileInput = form.file
-    const file = fileInput && fileInput.files ? fileInput.files[0] : null
+  const uploadCategory = useCallback(async (category) => {
+    const file = selectedFiles[category]
     if (!file) return
-    const uploadSlug = slugForDocs
-    if (!uploadSlug){
+
+    if (!slugForDocs){
       const message = 'Slug no disponible para la carga'
       setError(message)
       showToast(message, { tone: 'error', duration: 5000 })
       return
     }
-    await performUpload({
-      category,
-      filename: file.name,
-      file,
-      slug: uploadSlug,
-      form
-    })
-  }, [performUpload, showToast, slugForDocs])
 
-  const handleConfirmRename = useCallback(async () => {
-    if (!pendingUpload){
-      setRenamePrompt(null)
+    try{
+      setUploadingCategory(category)
+      setError(null)
+      await api.uploadDocument({
+        slug: slugForDocs,
+        category,
+        file
+      })
+      await refreshCategory(category)
+      showToast('Documento subido.', { tone: 'success' })
+    }catch(err){
+      const message = err?.message || 'Error al subir'
+      setError(message)
+      showToast(message, { tone: 'error', duration: 5000 })
+    }finally{
+      setUploadingCategory(null)
+      setSelectedFiles(prev => ({ ...prev, [category]: null }))
+      setUploadInputKeys(prev => ({ ...prev, [category]: (prev[category] || 0) + 1 }))
+    }
+  }, [refreshCategory, selectedFiles, showToast, slugForDocs])
+
+  const handleUpload = useCallback((category) => async (e) => {
+    e.preventDefault()
+    await uploadCategory(category)
+  }, [uploadCategory])
+
+  const handleDownload = useCallback(async (category, doc, docKey) => {
+    if (!slugForDocs){
+      const message = 'Slug no disponible para la descarga'
+      showToast(message, { tone: 'error', duration: 5000 })
       return
     }
-    await performUpload(pendingUpload, { strategy: 'rename' })
-  }, [pendingUpload, performUpload])
 
-  const handleCancelRename = useCallback(() => {
-    setPendingUpload(null)
-    setRenamePrompt(null)
-  }, [])
+    const fallbackName = (doc?.path || '').split('/').filter(Boolean).pop()
+    const filename = (doc?.filename || doc?.name || fallbackName || '').trim()
 
-  const renameBusy = renamePrompt ? uploadingCategory === renamePrompt.category : false
+    if (!filename){
+      const message = 'Nombre de archivo no disponible'
+      showToast(message, { tone: 'error', duration: 5000 })
+      return
+    }
+
+    try{
+      setDownloadingDocId(docKey)
+      await api.downloadDocument({
+        slug: slugForDocs,
+        category,
+        filename,
+        disposition: doc?.canPreview ? 'inline' : 'attachment'
+      })
+    }catch(err){
+      const message = err?.message || 'No se pudo descargar el archivo'
+      showToast(message, { tone: 'error', duration: 5000 })
+    }finally{
+      setDownloadingDocId(null)
+    }
+  }, [showToast, slugForDocs])
 
   return (
     <>
@@ -216,6 +161,7 @@ export default function Documents(){
       <div style={{ marginTop: 12, display: 'grid', gap: 24 }}>
         {DOCUMENT_SECTIONS_ORDER.map((category) => {
           const docs = docsByCategory[category] || []
+          const selectedFile = selectedFiles[category] || null
           const isUploading = uploadingCategory === category
           return (
             <section key={category}>
@@ -227,9 +173,16 @@ export default function Documents(){
                   style={{ padding: 16, borderBottom: '1px solid #f0f0f0' }}
                   aria-busy={isUploading}
                 >
-                  <input name="file" type="file" className="input" disabled={isUploading} />
-                  <button className="btn" type="submit" disabled={isUploading}>
-                    {isUploading ? 'Subiendo…' : 'Subir'}
+                  <input
+                    key={uploadInputKeys[category] || 0}
+                    name="file"
+                    type="file"
+                    className="input"
+                    disabled={isUploading}
+                    onChange={(e) => handleFileChange(category, e.target.files?.[0] || null)}
+                  />
+                  <button className="btn" type="submit" disabled={isUploading || !selectedFile}>
+                    {isUploading ? 'Subiendo…' : 'Subir archivo'}
                   </button>
                 </form>
                 <table className="table" style={{ margin: 0 }}>
@@ -253,14 +206,20 @@ export default function Documents(){
                       const sizeLabel = sizeBytes > 0 ? `${(sizeBytes / 1024).toFixed(1)} KB` : '0.0 KB'
                       const slugForKey = slugForDocs || normalizedInvestorId || investorId || 'default'
                       const key = d.path || `${category}/${slugForKey}/${filename}`
-                      const canPreview = Boolean(d?.canPreview)
-                      const href = makeDownloadUrl(category, { ...d, name: filename }, { disposition: canPreview ? 'inline' : 'attachment' })
+                      const isDownloading = downloadingDocId === key
                       return (
                         <tr key={key}>
                           <td>{filename}</td>
                           <td>{sizeLabel}</td>
                           <td>
-                            <a className="btn secondary" href={href}>Descargar</a>
+                            <button
+                              type="button"
+                              className="btn secondary"
+                              onClick={() => handleDownload(category, d, key)}
+                              disabled={isDownloading}
+                            >
+                              {isDownloading ? 'Descargando…' : 'Descargar'}
+                            </button>
                           </td>
                         </tr>
                       )
@@ -283,38 +242,6 @@ export default function Documents(){
         })}
       </div>
     </div>
-    {renamePrompt && (
-      <div style={modalBackdropStyle} role="dialog" aria-modal="true" aria-labelledby="doc-rename-modal">
-        <div style={modalCardStyle}>
-          <div className="h2" id="doc-rename-modal" style={{ marginTop: 0 }}>Archivo duplicado</div>
-          <p style={{ marginTop: 8, color: 'var(--muted)', fontSize: 14 }}>
-            Ya existe un archivo con ese nombre. ¿Quieres subirlo con un sufijo automático?
-          </p>
-          <p style={{ fontSize: 13 }}>
-            <code>{renamePrompt.path}</code>
-          </p>
-          <div style={modalButtonRowStyle}>
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={handleCancelRename}
-              disabled={renameBusy}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              className="btn"
-              onClick={handleConfirmRename}
-              disabled={renameBusy}
-              aria-busy={renameBusy}
-            >
-              {renameBusy ? 'Subiendo…' : 'Renombrar y subir'}
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
     </>
   )
 }
