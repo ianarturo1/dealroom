@@ -1,79 +1,83 @@
-// netlify/functions/get-doc.mjs
-import { getGithubFileBinary } from "./lib/storage.mjs";
-import { json, binary, getUrlAndParams } from './_shared/http.mjs';
+import { getFileBuffer } from './_shared/github.mjs'
+import { binary, badRequest, errorJson, getUrlAndParams, methodNotAllowed, notFound } from './_shared/http.mjs'
+import { ensureSlugAllowed } from './_shared/slug.mjs'
 
-const FF = process.env.DOCS_BACKEND_ALSEA === "on";
-
-const SAFE = /^[\p{L}\p{N}._\-\s()&+,]{1,160}$/u;
-const BAD = /(\.\.)|(\/)|(\\)|(%2e)|(%2f)|(%5c)/i;
-
-function safe(v, field) {
-  const s = String(v || "").trim();
-  if (!s) throw Object.assign(new Error("MissingParam"), { code: "MissingParam", field });
-  if (s.length > 160) throw Object.assign(new Error("BadRequest"), { code: "BadRequest", field });
-  if (!SAFE.test(s) || BAD.test(s)) throw Object.assign(new Error("BadRequest"), { code: "BadRequest", field });
-  return s;
-}
-function guess(ext) {
-  const e = (ext || "").toLowerCase();
-  if (e === "pdf") return "application/pdf";
-  if (["png","jpg","jpeg","gif","webp"].includes(e)) return `image/${e==="jpg"?"jpeg":e}`;
-  if (e === "txt") return "text/plain";
-  if (e === "csv") return "text/csv";
-  if (["xls","xlsx"].includes(e)) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-  if (["doc","docx"].includes(e)) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-  if (e === "zip") return "application/zip";
-  return "application/octet-stream";
+function guessContentType(filename) {
+  const extension = filename.split('.').pop()?.toLowerCase()
+  if (extension === 'pdf') return 'application/pdf'
+  if (extension === 'png') return 'image/png'
+  if (extension === 'jpg' || extension === 'jpeg') return 'image/jpeg'
+  return 'application/octet-stream'
 }
 
-export default async function handler(request, context) {
+function sanitizeSegment(value, field) {
+  const segment = value?.trim()
+  if (!segment) {
+    const error = new Error(`Missing ${field}`)
+    error.statusCode = 400
+    throw error
+  }
+  if (segment.includes('..') || segment.includes('/') || segment.includes('\')) {
+    const error = new Error(`Invalid ${field}`)
+    error.statusCode = 400
+    throw error
+  }
+  return segment
+}
+
+export default async function handler(request) {
+  if (request.method && request.method.toUpperCase() !== 'GET') {
+    return methodNotAllowed(['GET'])
+  }
+
   try {
-    if (request.method !== "GET") return json({ ok:false, code:"MethodNotAllowed" }, { status: 405 });
+    const { params } = getUrlAndParams(request)
+    const slugParam = params.get('slug')
+    const categoryParam = params.get('category')
+    const filenameParam = params.get('filename')
+    const dispositionParam = params.get('disposition')
 
-    const { params } = getUrlAndParams(request);
-    const slug = safe((params.get("slug") || "").toLowerCase(), "slug");
-    const category = safe(params.get("category"), "category");
-    const filename = safe(params.get("filename"), "filename");
+    if (!slugParam) return badRequest('Missing slug')
+    if (!categoryParam) return badRequest('Missing category')
+    if (!filenameParam) return badRequest('Missing filename')
 
-    // Aislar Alsea si está activado el flag
-    if (FF && slug !== "alsea") return json({ ok:false, code:"ForbiddenSlug" }, { status: 403 });
+    const slug = ensureSlugAllowed(slugParam.trim())
+    const category = sanitizeSegment(categoryParam, 'category')
+    const filename = sanitizeSegment(filenameParam, 'filename')
 
-    // Content disposition (por compat: default attachment)
-    const disposition = (((params.get("disposition") || "attachment").toLowerCase()) === "inline") ? "inline" : "attachment";
+    const disposition = dispositionParam?.toLowerCase() === 'inline' ? 'inline' : 'attachment'
+    const path = `docs/${slug}/${category}/${filename}`
 
-    // 1) Intentar path NUEVO (Dealroom unificado)
-    let buffer, size;
-    let path = `data/docs/${slug}/${category}/${filename}`;
+    let buffer
     try {
-      ({ buffer, size } = await getGithubFileBinary({ path }));
-    } catch (e) {
-      // 2) Fallback a path LEGACY (por si tu UI vieja aún lo usa)
-      if (String(e?.message) !== "NotFound" && e?.status !== 404) throw e;
-      const legacyPath = `${category}/${slug}/${filename}`;
-      ({ buffer, size } = await getGithubFileBinary({ path: legacyPath }));
-      path = legacyPath;
+      buffer = await getFileBuffer(path)
+    } catch (error) {
+      if (error?.status === 404 || error?.statusCode === 404) {
+        return notFound('File not found')
+      }
+      throw error
     }
 
-    if (!buffer?.length) return json({ ok:false, code:"CorruptFile" }, { status: 400 });
+    if (!buffer || buffer.length === 0) {
+      return badRequest('Empty file')
+    }
 
-    const ext = filename.split(".").pop();
-    const mimetype = guess(ext);
+    const contentType = guessContentType(filename)
 
     return binary(buffer, {
       filename,
-      contentType: mimetype,
+      contentType,
       disposition,
-      headers: {
-        "Access-Control-Allow-Origin": process.env.CORS_ORIGIN || "*",
-        ...(size ? { "Content-Length": String(size) } : {})
-      }
-    });
+    })
+  } catch (error) {
+    if (error?.message === 'ForbiddenSlug' || error?.statusCode === 403 || error?.status === 403) {
+      return errorJson('ForbiddenSlug', 403)
+    }
 
-  } catch (err) {
-    const code = err?.code || err?.statusCode || err?.status || err?.message || "DownloadError";
-    if (code === "MissingParam" || code === "BadRequest") return json({ ok:false, code, field: err?.field }, { status: 400 });
-    if (code === 404 || code === "NotFound") return json({ ok:false, code:"NotFound" }, { status: 404 });
-    if (String(err?.message || "").startsWith("MissingEnv")) return json({ ok:false, code:"MissingEnv", msg: err.message }, { status: 500 });
-    return json({ ok:false, code:"DownloadError", msg: String(err?.message || err) }, { status: 500 });
+    if (error?.statusCode === 400 || error?.status === 400) {
+      return badRequest(error.message || 'Bad Request')
+    }
+
+    return errorJson('Internal error', 500)
   }
 }
