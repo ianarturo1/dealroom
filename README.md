@@ -75,9 +75,11 @@ VITE_PUBLIC_INVESTOR_ID=femsa
 
 ## 5) Flujo de documentos (solo GitHub + Netlify)
 
-- **Listar:** `/.netlify/functions/list-docs?category=NDA` devuelve archivos en `NDA/<slug>/`.
+- **Listar:** `/.netlify/functions/list-docs?category=NDA` devuelve archivos en `data/docs/<slug>/<Categoría>/`.
 - **Subir:** UI de `/documents` llama `upload-doc` → commit al repo de documentos.
-- **Descargar:** `get-doc` entrega el archivo desde GitHub siempre que pertenezca al slug público configurado.
+- **Descargar:** `download-file` entrega el archivo desde GitHub (inline o attachment) para el slug permitido.
+  - Valida que la metadata de GitHub reporte tamaño > 0 y que el binario descargado tenga contenido antes de regresarlo al navegador.
+  - Responde con `code: EmptyFile` si se detecta un archivo vacío o corrupto para que la UI lo muestre claramente.
 - **Auditoría:** el historial de cambios queda en GitHub (quién y qué).
 
 Cada proyecto activo define su propio `slug` en `data/projects.json`; los botones “Ver documentos” en `/projects` generan enlaces `/#/documents?investor=<slug>` que cargan exclusivamente los archivos de esa carpeta (`<Categoría>/<slug>/`). Así se evita mezclar documentos entre proyectos.
@@ -85,14 +87,14 @@ Cada proyecto activo define su propio `slug` en `data/projects.json`; los botone
 > Sugerencia: estructura de carpetas en el repo de docs
 >
 > ```
-> NDA/<slug>/*.pdf
-> Propuestas/<slug>/*.pdf
-> Modelos financieros/<slug>/*.xlsx
-> Contratos/<slug>/*.docx
-> LOIs/<slug>/*.pdf
-> Sustento fiscal/<slug>/*.pdf
-> Mitigación de riesgos/<slug>/*.pdf
-> Procesos/<slug>/*.pdf
+> data/docs/<slug>/NDA/*.pdf
+> data/docs/<slug>/Propuestas/*.pdf
+> data/docs/<slug>/Modelos financieros/*.xlsx
+> data/docs/<slug>/Contratos/*.docx
+> data/docs/<slug>/LOIs/*.pdf
+> data/docs/<slug>/Sustento fiscal/*.pdf
+> data/docs/<slug>/Mitigación de riesgos/*.pdf
+> data/docs/<slug>/Procesos/*.pdf
 > ```
 
 ---
@@ -128,7 +130,7 @@ Cada proyecto activo define su propio `slug` en `data/projects.json`; los botone
 - **Datos públicos**: todo el contenido queda expuesto sin autenticación. Usa repos y datos que puedas compartir públicamente.
 - **Slug fijo**: las funciones solo permiten leer/escribir dentro del slug configurado (`PUBLIC_INVESTOR_SLUG`). Cambia ese valor para publicar otro inversionista.
 - **Notificaciones**: el PRD pedía notificaciones; con la restricción "solo GitHub y Netlify" se implementa **feed interno + ICS**. Para email/slack necesitarías un servicio externo. Alternativa mínima: los **commits** en GitHub ya notifican a los watchers (equipo interno).
-- **Uploads**: quedan auditablemente versionados en GitHub. Si el tamaño de archivos crece, considera Git LFS (también solo GitHub).
+- **Uploads**: quedan auditablemente versionados en GitHub. Se valida que el base64 generado para subir coincida con el peso original y se rechaza cualquier nombre con traversal (`..`, `/`, `\`). Si el tamaño de archivos crece, considera Git LFS (también solo GitHub).
 
 ---
 
