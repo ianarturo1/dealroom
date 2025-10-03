@@ -2,6 +2,8 @@ import { getFileBuffer } from './_shared/github.mjs'
 import { binary, badRequest, errorJson, getUrlAndParams, methodNotAllowed, notFound } from './_shared/http.mjs'
 import { ensureSlugAllowed } from './_shared/slug.mjs'
 
+const cors = { 'Access-Control-Allow-Origin': process.env.CORS_ORIGIN || '*' }
+
 function guessContentType(filename) {
   const extension = filename.split('.').pop()?.toLowerCase()
   if (extension === 'pdf') return 'application/pdf'
@@ -26,8 +28,22 @@ function sanitizeSegment(value, field) {
 }
 
 export default async function handler(request) {
-  if (request.method && request.method.toUpperCase() !== 'GET') {
-    return methodNotAllowed(['GET'])
+  const method = request.method?.toUpperCase()
+
+  if (method === 'OPTIONS') {
+    const headers = new Headers(cors)
+    headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS')
+    const requestedHeaders = request.headers.get('Access-Control-Request-Headers')
+    if (requestedHeaders) {
+      headers.set('Access-Control-Allow-Headers', requestedHeaders)
+    } else {
+      headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    }
+    return new Response(null, { status: 204, headers })
+  }
+
+  if (method && method !== 'GET') {
+    return methodNotAllowed(['GET'], { headers: cors })
   }
 
   try {
@@ -37,9 +53,9 @@ export default async function handler(request) {
     const filenameParam = params.get('filename')
     const dispositionParam = params.get('disposition')
 
-    if (!slugParam) return badRequest('Missing slug')
-    if (!categoryParam) return badRequest('Missing category')
-    if (!filenameParam) return badRequest('Missing filename')
+    if (!slugParam) return badRequest('Missing slug', {}, { headers: cors })
+    if (!categoryParam) return badRequest('Missing category', {}, { headers: cors })
+    if (!filenameParam) return badRequest('Missing filename', {}, { headers: cors })
 
     const slug = ensureSlugAllowed(slugParam.trim())
     const category = sanitizeSegment(categoryParam, 'category')
@@ -53,13 +69,13 @@ export default async function handler(request) {
       buffer = await getFileBuffer(path)
     } catch (error) {
       if (error?.status === 404 || error?.statusCode === 404) {
-        return notFound('File not found')
+        return notFound('File not found', {}, { headers: cors })
       }
       throw error
     }
 
     if (!buffer || buffer.length === 0) {
-      return badRequest('Empty file')
+      return badRequest('Empty file', {}, { headers: cors })
     }
 
     const contentType = guessContentType(filename)
@@ -68,16 +84,17 @@ export default async function handler(request) {
       filename,
       contentType,
       disposition,
+      headers: cors,
     })
   } catch (error) {
     if (error?.message === 'ForbiddenSlug' || error?.statusCode === 403 || error?.status === 403) {
-      return errorJson('ForbiddenSlug', 403)
+      return errorJson('ForbiddenSlug', 403, {}, { headers: cors })
     }
 
     if (error?.statusCode === 400 || error?.status === 400) {
-      return badRequest(error.message || 'Bad Request')
+      return badRequest(error.message || 'Bad Request', {}, { headers: cors })
     }
 
-    return errorJson('Internal error', 500)
+    return errorJson('Internal error', 500, {}, { headers: cors })
   }
 }
