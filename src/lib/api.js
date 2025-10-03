@@ -4,6 +4,38 @@ function isFormData(body) {
   return typeof FormData !== 'undefined' && body instanceof FormData;
 }
 
+function looksLikeBinaryResponse(contentType, contentDisposition) {
+  const ct = (contentType || '').toLowerCase();
+  const cd = (contentDisposition || '').toLowerCase();
+  if (cd && /attachment|filename\*=|filename=/i.test(cd)) return true;
+  if (!ct) return false;
+  if (ct.includes('application/json')) return false;
+  if (ct.startsWith('text/')) return false;
+  if (ct.includes('charset=')) return false;
+  if (ct.includes('application/javascript') || ct.includes('application/xml') || ct.includes('application/xhtml')) return false;
+  if (ct.includes('multipart/form-data') || ct.includes('application/x-www-form-urlencoded')) return false;
+  const binaryHints = [
+    'application/pdf',
+    'application/octet-stream',
+    'application/zip',
+    'application/x-zip-compressed',
+    'application/msword',
+    'application/vnd.ms-excel',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats',
+    'application/vnd.ms-',
+    'application/vnd.oasis.opendocument',
+    'application/vnd.apple',
+    'application/vnd.adobe',
+    'wordprocessingml',
+    'spreadsheetml',
+    'presentationml'
+  ];
+  if (binaryHints.some((hint) => ct.includes(hint))) return true;
+  if (ct.startsWith('image/') || ct.startsWith('audio/') || ct.startsWith('video/')) return true;
+  return false;
+}
+
 async function req(path, { method = 'GET', body, headers = {} } = {}) {
   const init = { method, headers: { ...headers } };
 
@@ -19,6 +51,17 @@ async function req(path, { method = 'GET', body, headers = {} } = {}) {
   const url = resolveUrl(path);
   const res = await fetch(url, init);
   const ct = res.headers.get('content-type') || '';
+  const cd = res.headers.get('content-disposition') || '';
+  if (res.ok && looksLikeBinaryResponse(ct, cd)) {
+    const error = new Error('La respuesta parece binaria. Usa api.downloadDocument() o un enlace directo para descargas.');
+    error.code = 'UNSUPPORTED_BINARY_RESPONSE';
+    error.status = res.status;
+    error.statusText = res.statusText;
+    error.url = url;
+    error.contentType = ct;
+    error.contentDisposition = cd;
+    throw error;
+  }
   const isJson = ct.includes('application/json');
   const payload = isJson
     ? await res.json().catch(() => null)
