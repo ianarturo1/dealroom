@@ -680,22 +680,21 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   }
 
   const performDocUpload = useCallback(async (uploadInfo, options = {}) => {
-    if (!uploadInfo) return null
+    if (!uploadInfo || !uploadInfo.file) return null
     setDocsError(null)
     setDocsNotice(null)
     setDocsWorking(true)
     try{
-      const payload = {
-        path: `${uploadInfo.category}`,
-        filename: uploadInfo.filename,
-        contentBase64: uploadInfo.base64,
-        slug: uploadInfo.slug,
-        message: uploadInfo.message
-      }
+      const formData = new FormData()
+      formData.set('slug', uploadInfo.slug)
+      formData.set('category', uploadInfo.category)
+      formData.set('filename', uploadInfo.filename)
+      if (uploadInfo.message) formData.set('message', uploadInfo.message)
       if (options.strategy === 'rename'){
-        payload.strategy = 'rename'
+        formData.set('strategy', 'rename')
       }
-      const response = await api.uploadDoc(payload)
+      formData.set('file', uploadInfo.file, uploadInfo.filename)
+      const response = await api.uploadDoc(formData)
       const successMsg = options.strategy === 'rename'
         ? 'Archivo subido con sufijo automático.'
         : 'Archivo subido.'
@@ -708,7 +707,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       return response
     }catch(error){
       if (error?.status === 409 && error?.data?.error === 'FILE_EXISTS' && options.strategy !== 'rename'){
-        const fallbackPath = `${uploadInfo.category}/${uploadInfo.slug}/${uploadInfo.filename}`
+        const fallbackPath = `data/docs/${uploadInfo.slug}/${uploadInfo.category}/${uploadInfo.filename}`
         setPendingDocUpload(uploadInfo)
         setDocRenamePrompt({
           path: error.data?.path || fallbackPath,
@@ -726,7 +725,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     }
   }, [loadDocs, showToast])
 
-  const handleDocUpload = (e) => {
+  const handleDocUpload = async (e) => {
     e.preventDefault()
     if (docsWorking) return
     setDocsError(null)
@@ -735,35 +734,20 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     const file = form.file.files[0]
     if (!file) return
     const slug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
-    const reader = new FileReader()
-    reader.onload = async () => {
-      try{
-        const result = typeof reader.result === 'string' ? reader.result : ''
-        const base64 = result.includes(',') ? result.split(',')[1] : result
-        if (!base64) throw new Error('No se pudo leer el archivo')
-        await performDocUpload({
-          category: docCategory,
-          filename: file.name,
-          base64,
-          slug,
-          message: `Upload ${file.name} desde Admin`,
-          form
-        })
-      }catch(error){
-        const message = error?.message || 'No se pudo leer el archivo'
-        setDocsError(message)
-        showToast(message, { tone: 'error', duration: 5000 })
-        setDocsWorking(false)
-      }
-    }
-    reader.onerror = () => {
-      const message = 'No se pudo leer el archivo'
-      setDocsWorking(false)
+    try{
+      await performDocUpload({
+        category: docCategory,
+        filename: file.name,
+        slug,
+        message: `Upload ${file.name} desde Admin`,
+        form,
+        file
+      })
+    }catch(error){
+      const message = error?.message || 'No se pudo subir el archivo'
       setDocsError(message)
       showToast(message, { tone: 'error', duration: 5000 })
     }
-    setDocsWorking(true)
-    reader.readAsDataURL(file)
   }
 
   const handleConfirmDocRename = useCallback(async () => {

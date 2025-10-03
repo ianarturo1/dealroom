@@ -9,8 +9,9 @@ export async function handler(event){
   try{
     const body = JSON.parse(event.body || '{}')
     const relPath = cleanPath(body.path || '')
-    if (!relPath) return text(400, 'Falta path')
+    if (!relPath) return text(400, 'Missing path')
     if (relPath.includes('..')) return text(400, 'Ruta inválida')
+    if (!relPath.startsWith('data/docs/alsea/')) return text(403, 'Slug not allowed')
 
     const repo = repoEnv('DOCS_REPO', '')
     const branch = process.env.DOCS_BRANCH || 'main'
