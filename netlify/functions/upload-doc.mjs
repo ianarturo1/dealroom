@@ -1,46 +1,107 @@
-// netlify/functions/upload-doc.mjs
-import { putFileGithub } from "./lib/storage.mjs";
-import { readSingleFileFromFormData, json } from './_shared/http.mjs';
+import { putFileBuffer } from './_shared/github.mjs'
+import { readSingleFileFromFormData, json, badRequest, methodNotAllowed, errorJson } from './_shared/http.mjs'
+import { ensureSlugAllowed } from './_shared/slug.mjs'
 
-const FF = process.env.DOCS_BACKEND_ALSEA === 'on';
-const corsHeaders = () => ({ 'Access-Control-Allow-Origin': process.env.CORS_ORIGIN || '*'});
-function assertFeatureOn(){ if(!FF) throw new Error('Disabled'); }
-function assertAlsea(slug){ if((slug||'').toLowerCase()!=='alsea'){ const e=new Error('ForbiddenSlug'); e.code='ForbiddenSlug'; throw e; } }
-function assertSafe(value, field='field'){ if(!value){ const e=new Error('MissingField'); e.code='MissingField'; e.field=field; throw e; } if(value.length>100){ const e=new Error('BadRequest'); e.code='BadRequest'; throw e; } const ok=/^[a-zA-Z0-9._-]{1,100}$/.test(value); const bad=/(\.{2})|(\/)|(\\)|(%2e)|(%2f)|(%5c)/i.test(value); if(!ok||bad){ const e=new Error('BadRequest'); e.code='BadRequest'; throw e; } }
+const DEFAULT_CONTENT_TYPE = 'application/octet-stream'
 
-export default async function handler(request, context) {
+function sanitizeCategory(value) {
+  const category = (value ?? '').toString().trim()
+  if (!category) {
+    throw new Error('Missing category')
+  }
+  if (/[/\\]/.test(category)) {
+    const error = new Error('Invalid category')
+    error.code = 'BadRequest'
+    throw error
+  }
+  return category
+}
+
+function ensureFilename(file) {
+  const name = file?.name ?? ''
+  const trimmed = name.trim()
+  if (!trimmed) {
+    const error = new Error('Missing file')
+    error.code = 'BadRequest'
+    throw error
+  }
+  if (/[/\\]/.test(trimmed)) {
+    const error = new Error('Invalid filename')
+    error.code = 'BadRequest'
+    throw error
+  }
+  return trimmed
+}
+
+export default async function handler(request) {
+  if (request.method?.toUpperCase() !== 'POST') {
+    return methodNotAllowed(['POST'])
+  }
+
   try {
-    assertFeatureOn();
-    if (request.method !== 'POST') return json({ ok:false, code:'MethodNotAllowed' }, { status: 405, headers: corsHeaders() });
+    const { form, file, buffer } = await readSingleFileFromFormData(request)
 
-    const contentType = request.headers.get('content-type') || '';
-    if (!contentType.includes('multipart/form-data')) return json({ ok:false, code:'BadRequest', msg:'Expected multipart/form-data' }, { status: 400, headers: corsHeaders() });
+    const slugParam = form?.get('slug')
+    if (!slugParam) {
+      return badRequest('Missing slug')
+    }
+    const normalizedSlug = String(slugParam).trim()
+    if (!normalizedSlug) {
+      return badRequest('Missing slug')
+    }
+    const slug = ensureSlugAllowed(normalizedSlug)
 
-    const { form, file, buffer } = await readSingleFileFromFormData(request);
+    const categoryParam = form?.get('category')
+    if (!categoryParam) {
+      return badRequest('Missing category')
+    }
+    let category
+    try {
+      category = sanitizeCategory(categoryParam)
+    } catch (error) {
+      if (error.message === 'Missing category') {
+        return badRequest('Missing category')
+      }
+      if (error.code === 'BadRequest') {
+        return badRequest(error.message)
+      }
+      throw error
+    }
 
-    const slug = String(form.get('slug') || '').toLowerCase();
-    const category = String(form.get('category') || '').trim();
-    const filename = String(form.get('filename') || file?.name || '').trim();
+    if (!file) {
+      return badRequest('Missing file')
+    }
 
-    assertAlsea(slug);
-    assertSafe(slug,'slug'); assertSafe(category,'category'); assertSafe(filename,'filename');
+    let filename
+    try {
+      filename = ensureFilename(file)
+    } catch (error) {
+      if (error.message === 'Missing file' || error.code === 'BadRequest') {
+        return badRequest(error.message)
+      }
+      throw error
+    }
 
-    if (!buffer || !buffer.length) return json({ ok:false, code:'EmptyFile' }, { status: 400, headers: corsHeaders() });
-    const maxBytes = 25 * 1024 * 1024;
-    if (buffer.length > maxBytes) return json({ ok:false, code:'FILE_TOO_LARGE_FOR_GITHUB', msg:'Use almacenamiento alterno' }, { status: 413, headers: corsHeaders() });
+    if (!buffer || buffer.length === 0) {
+      return badRequest('Empty file')
+    }
 
-    const path = `data/docs/${slug}/${category}/${filename}`;
-    const contentBase64 = buffer.toString('base64');
+    const path = `docs/${slug}/${category}/${filename}`
+    const message = `docs(${slug}): upload ${category}/${filename} from Dealroom UI`
+    const contentType = file.type || DEFAULT_CONTENT_TYPE
 
-    const out = await putFileGithub({ path, contentBase64, message:`Upload: ${slug}/${category}/${filename}` });
-    return json({ ok:true, provider:'github', path, ...out }, { headers: corsHeaders() });
+    const result = await putFileBuffer(path, buffer, message, contentType)
+    const commit = result?.data?.commit?.sha ?? result?.data?.commit ?? null
 
-  } catch (err) {
-    const code = err?.code || err?.message || 'UploadError';
-    if (code==='Disabled') return json({ ok:false, code:'Disabled' }, { status: 503, headers: corsHeaders() });
-    if (code==='ForbiddenSlug') return json({ ok:false, code }, { status: 403, headers: corsHeaders() });
-    if (code==='MissingField'||code==='BadRequest') return json({ ok:false, code, field: err?.field }, { status: 400, headers: corsHeaders() });
-    if (String(err?.message||'').startsWith('MissingEnv')) return json({ ok:false, code:'MissingEnv', msg: err.message }, { status: 500, headers: corsHeaders() });
-    return json({ ok:false, code:'UploadError', msg: String(err?.message||err) }, { status: 500, headers: corsHeaders() });
+    return json({ ok: true, slug, category, filename, commit })
+  } catch (error) {
+    if (error?.message === 'ForbiddenSlug' || error?.statusCode === 403 || error?.status === 403) {
+      return errorJson('ForbiddenSlug', 403)
+    }
+
+    const status = error?.statusCode || error?.status || 500
+    const message = status === 500 ? 'Internal error' : error?.message || 'Error'
+    const normalizedStatus = status >= 400 && status < 600 ? status : 500
+    return errorJson(message, normalizedStatus)
   }
 }
