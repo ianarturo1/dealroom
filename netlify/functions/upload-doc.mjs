@@ -14,10 +14,6 @@ export const handler = async (event) => {
     let fileBuf = Buffer.alloc(0);
     let filename = '';
 
-    const rawBody = event.body
-      ? Buffer.from(event.body, event.isBase64Encoded ? 'base64' : 'utf8')
-      : Buffer.alloc(0)
-
     await new Promise((resolve, reject) => {
       const bb = Busboy({ headers: { 'content-type': contentType } });
       bb.on('field', (name, val) => fields[name] = String(val || '').trim());
@@ -27,7 +23,7 @@ export const handler = async (event) => {
       });
       bb.on('finish', resolve);
       bb.on('error', reject);
-      bb.end(rawBody);
+      bb.end(Buffer.from(event.body, event.isBase64Encoded ? 'base64' : 'utf8'));
     });
 
     // Validaciones claras
@@ -39,9 +35,6 @@ export const handler = async (event) => {
     if (slug !== 'alsea') return resp(403, { ok:false, code:'ForbiddenSlug', msg:'Solo Alsea permitido' });
     if (!category) return resp(400, { ok:false, code:'MissingField', field:'category' });
     if (!explicitFilename) return resp(400, { ok:false, code:'MissingField', field:'filename' });
-    if (hasTraversal(category) || hasTraversal(explicitFilename)) {
-      return resp(400, { ok:false, code:'InvalidPath', msg:'Nombre de archivo o categoría inválido' });
-    }
     if (!fileBuf.length) return resp(400, { ok:false, code:'MissingFile' });
 
     // Limite práctico de GitHub (evitar base64 gigante)
@@ -50,13 +43,6 @@ export const handler = async (event) => {
 
     const path = `data/docs/${slug}/${category}/${explicitFilename}`;
     const contentBase64 = fileBuf.toString('base64');
-    const decodedLength = Buffer.from(contentBase64, 'base64').length;
-    if (decodedLength !== fileBuf.length) {
-      console.error('upload-doc.mjs:base64-mismatch', { path, fileBytes: fileBuf.length, decodedLength });
-      return resp(500, { ok:false, code:'Base64EncodingError', msg:'No se pudo preparar el archivo para subirlo' });
-    }
-
-    console.debug('upload-doc.mjs:ready-to-upload', { path, bytes: fileBuf.length });
 
     const out = await putFileGithub({ path, contentBase64, message:`Upload: ${slug}/${category}/${explicitFilename}` });
     return resp(200, { ok:true, provider:'github', path, ...out });
@@ -77,11 +63,4 @@ function resp(statusCode, body) {
     },
     body: JSON.stringify(body)
   };
-}
-
-function hasTraversal(value = '') {
-  if (/[\\/]/.test(value)) return true;
-  if (value === '..') return true;
-  if (value.startsWith('../') || value.startsWith('..\\')) return true;
-  return false;
 }

@@ -36,30 +36,22 @@ export const handler = async (event) => {
     const upstream = await fetch(downloadUrl);
     if (!upstream.ok) return json(404, { ok:false, code:'NotFound' });
 
-    const arrayBuffer = await upstream.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    if (!buffer.length) {
-      console.error('download-file.mjs:empty-buffer', { path, size });
-      return json(502, { ok:false, code:'EmptyFile', msg:'El archivo está vacío o corrupto' });
-    }
-
-    console.debug('download-file.mjs:fetched', { path, size, bufferBytes: buffer.length });
+    const body = upstream.body; // stream
 
     return {
       statusCode: 200,
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Content-Type': mimetype,
-        'Content-Length': String(buffer.length),
+        ...(size ? { 'Content-Length': String(size) } : {}),
         'Content-Disposition': `${disposition}; filename="${filename}"`
       },
-      body: buffer.toString('base64'),
+      body: await streamToBase64(body),
       isBase64Encoded: true
     };
   } catch (err) {
     const msg = String(err?.message || err);
     if (msg === 'NotFound') return json(404, { ok:false, code:'NotFound' });
-    if (msg === 'InvalidMetadata') return json(502, { ok:false, code:'InvalidMetadata', msg:'Metadata inválida en almacenamiento' });
     if (msg.startsWith('MissingEnv')) return json(500, { ok:false, code:'MissingEnv', msg });
     return json(500, { ok:false, code:'DownloadError', msg });
   }
@@ -77,6 +69,18 @@ function guessMime(ext) {
   return 'application/octet-stream';
 }
 
+async function streamToBase64(stream) {
+  const chunks = [];
+  const reader = stream.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  const buf = Buffer.concat(chunks);
+  return buf.toString('base64');
+}
+
 function res(statusCode, msg) { return { statusCode, body: msg }; }
 function json(statusCode, obj) {
   return {
@@ -84,11 +88,4 @@ function json(statusCode, obj) {
     headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' },
     body: JSON.stringify(obj)
   };
-}
-
-function hasTraversal(value = '') {
-  if (/[\\/]/.test(value)) return true;
-  if (value === '..') return true;
-  if (value.startsWith('../') || value.startsWith('..\\')) return true;
-  return false;
 }

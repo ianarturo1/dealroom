@@ -1,19 +1,22 @@
 async function req(path, {method='GET', body, headers} = {}){
   const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
-  const baseHeaders = headers || {}
-  const h = isFormData ? { ...baseHeaders } : Object.assign({
-    'Content-Type': 'application/json'
-  }, baseHeaders)
-  const payload = body
-    ? (isFormData ? body : JSON.stringify(body))
-    : undefined
-  const res = await fetch(path, { method, headers: h, body: payload })
+  const h = Object.assign({}, headers || {})
+  if (!isFormData){
+    h['Content-Type'] = h['Content-Type'] || 'application/json'
+  }
+  const fetchOptions = { method, headers: h }
+  if (body !== undefined){
+    fetchOptions.body = isFormData ? body : JSON.stringify(body)
+  }
+  const res = await fetch(path, fetchOptions)
   const ct = res.headers.get('content-type') || ''
   const isJson = ct.includes('application/json')
   const payload = isJson ? await res.json().catch(() => null) : await res.text().catch(() => '')
   if (!res.ok){
     const message = isJson
-      ? (payload && typeof payload === 'object' ? (payload.message || payload.error || `${res.status} ${res.statusText}`) : `${res.status} ${res.statusText}`)
+      ? (payload && typeof payload === 'object'
+        ? (payload.message || payload.msg || payload.error || payload.code || `${res.status} ${res.statusText}`)
+        : `${res.status} ${res.statusText}`)
       : (typeof payload === 'string' && payload ? payload : `${res.status} ${res.statusText}`)
     const error = new Error(message)
     error.status = res.status
@@ -59,18 +62,48 @@ export const api = {
   calendarIcsUrl(slug){
     return `/.netlify/functions/calendar?slug=${encodeURIComponent(slug)}`
   },
-  downloadDocPath(relPath, { disposition = 'attachment' } = {}){
-    const { category, slug, filename } = parseDocPath(relPath)
-    return category && slug && filename
-      ? api.docDownloadUrl({ category, slug, filename, disposition })
-      : '/.netlify/functions/download-file'
+  downloadDocPath(relPath, options = {}){
+    const disposition = (options && options.disposition) || 'attachment'
+    const normalized = (relPath || '').replace(/^\/+/, '')
+    const parts = normalized.split('/').filter(Boolean)
+    if (parts.length >= 5 && parts[0] === 'data' && parts[1] === 'docs'){
+      const slug = parts[2]
+      const category = parts[3]
+      const filename = parts.slice(4).join('/')
+      return this.docDownloadUrl({ category, slug, filename, disposition })
+    }
+    if (parts.length >= 3){
+      const [category, slug, ...rest] = parts
+      const filename = rest.join('/')
+      if ((slug || '').toLowerCase() === 'alsea'){
+        return this.docDownloadUrl({ category, slug, filename, disposition })
+      }
+    }
+    const legacySlug = parts.length > 1 ? parts[1] : ''
+    const params = new URLSearchParams()
+    if (normalized) params.set('path', normalized)
+    if (legacySlug) params.set('investor', legacySlug)
+    const qs = params.toString()
+    return `/.netlify/functions/get-doc${qs ? `?${qs}` : ''}`
   },
   docDownloadUrl({ category, slug, filename, disposition = 'attachment' }){
+    const normalizedSlug = (slug || '').trim().toLowerCase()
+    const normalizedCategory = (category || '').trim()
+    const normalizedFilename = filename === undefined || filename === null ? '' : String(filename)
+    const safeDisposition = disposition === 'inline' ? 'inline' : 'attachment'
+    if (normalizedSlug === 'alsea'){
+      const params = new URLSearchParams()
+      params.set('slug', 'alsea')
+      if (normalizedCategory) params.set('category', normalizedCategory)
+      if (normalizedFilename) params.set('filename', normalizedFilename)
+      params.set('disposition', safeDisposition)
+      const qs = params.toString()
+      return `/.netlify/functions/download-file${qs ? `?${qs}` : ''}`
+    }
     const params = new URLSearchParams()
+    if (normalizedCategory) params.set('category', normalizedCategory)
     if (slug) params.set('slug', slug)
-    if (category) params.set('category', category)
-    if (filename || filename === '') params.set('filename', String(filename))
-    if (disposition) params.set('disposition', disposition)
+    if (normalizedFilename) params.set('filename', normalizedFilename)
     const qs = params.toString()
     return `/.netlify/functions/download-file${qs ? `?${qs}` : ''}`
   },

@@ -77,15 +77,28 @@ export default function Documents(){
     if (!uploadInfo || !uploadInfo.file) return null
     setError(null)
     setUploadingCategory(uploadInfo.category)
+    const file = uploadInfo.file
+    const rawSlug = uploadInfo.slug || ''
+    const slug = rawSlug.toLowerCase()
+    const filename = uploadInfo.filename || (file && file.name) || ''
     try{
+      if (!slug){
+        throw new Error('Slug no disponible para la carga')
+      }
+      if (!file){
+        throw new Error('Selecciona un archivo para subir')
+      }
+      if (!filename){
+        throw new Error('El archivo no tiene nombre válido')
+      }
       const formData = new FormData()
-      formData.set('slug', uploadInfo.slug)
+      formData.set('slug', slug)
       formData.set('category', uploadInfo.category)
-      formData.set('filename', uploadInfo.filename)
+      formData.set('filename', filename)
+      formData.append('file', file, filename)
       if (options.strategy === 'rename'){
         formData.set('strategy', 'rename')
       }
-      formData.set('file', uploadInfo.file, uploadInfo.filename)
       const response = await api.uploadDoc(formData)
       await refreshCategory(uploadInfo.category)
       const successMsg = options.strategy === 'rename'
@@ -98,12 +111,22 @@ export default function Documents(){
       return response
     }catch(err){
       if (err?.status === 409 && err?.data?.error === 'FILE_EXISTS' && options.strategy !== 'rename'){
-        const fallbackPath = `data/docs/${uploadInfo.slug}/${uploadInfo.category}/${uploadInfo.filename}`
+        const normalizedSlug = slug || rawSlug
+        const safeFilename = filename || uploadInfo.filename || ''
+        const fallbackPath = `data/docs/${normalizedSlug}/${uploadInfo.category}/${safeFilename}`
         setPendingUpload(uploadInfo)
         setRenamePrompt({ path: err.data?.path || fallbackPath, category: uploadInfo.category })
         return null
       }
-      const message = err?.message || 'No se pudo subir el archivo'
+      const code = err?.data?.code
+      let message = err?.message || 'No se pudo subir el archivo'
+      if (code === 'MissingField' && err?.data?.field){
+        message = `Falta ${err.data.field}`
+      }else if (code === 'ForbiddenSlug'){
+        message = 'Solo se permiten cargas para Alsea'
+      }else if (code === 'FILE_TOO_LARGE_FOR_GITHUB'){
+        message = 'El archivo supera el límite de 25 MB'
+      }
       setError(message)
       showToast(message, { tone: 'error', duration: 5000 })
       return null
@@ -131,9 +154,9 @@ export default function Documents(){
     await performUpload({
       category,
       filename: file.name,
+      file,
       slug: uploadSlug,
-      form,
-      file
+      form
     })
   }, [performUpload, showToast, slugForDocs])
 
@@ -203,10 +226,11 @@ export default function Documents(){
                       const sizeLabel = sizeBytes > 0 ? `${(sizeBytes / 1024).toFixed(1)} KB` : '0.0 KB'
                       const slugForKey = slugForDocs || normalizedInvestorId || investorId || 'default'
                       const key = d.path || `${category}/${slugForKey}/${filename}`
-                      const slugForLink = slugForDocs || alseaSlug
-                      const href = d.path
-                        ? api.downloadDocPath(d.path)
-                        : api.docDownloadUrl({ category, slug: slugForLink, filename })
+                      const href = isAlseaContext
+                        ? api.docDownloadUrl({ category, slug: alseaSlug, filename, disposition: 'attachment' })
+                        : (d.path
+                          ? api.downloadDocPath(d.path, { disposition: 'attachment' })
+                          : api.docDownloadUrl({ category, slug: slugForDocs || '', filename, disposition: 'attachment' }))
                       return (
                         <tr key={key}>
                           <td>{filename}</td>

@@ -38,11 +38,6 @@ export async function getGithubRawUrl({ path, branch }) {
 
   const res = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', { owner, repo, path, ref: branchName });
   if (!res?.data?.download_url) throw new Error('NotFound');
-  const size = Number(res?.data?.size ?? 0);
-  if (!Number.isFinite(size)) {
-    console.error('storage:getGithubRawUrl:invalid-size', { path, received: res?.data?.size });
-    throw new Error('InvalidMetadata');
-  }
   // Nota: el raw URL permite streaming con fetch nativo en Node 18
-  return { downloadUrl: res.data.download_url, size };
+  return { downloadUrl: res.data.download_url, size: res.data.size };
 }
