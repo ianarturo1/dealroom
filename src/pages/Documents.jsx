@@ -1,26 +1,27 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { api } from '@/lib/api'
-import { useInvestorProfile } from '../lib/investor'
+import { resolveInvestorSlug } from '@/lib/slug'
 import { DOCUMENT_SECTIONS_ORDER } from '../constants/documents'
 import { useToast } from '../lib/toast'
 
 export default function Documents(){
+  const location = useLocation()
   const [docsByCategory, setDocsByCategory] = useState({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [uploadingCategory, setUploadingCategory] = useState(null)
   const [hasLoaded, setHasLoaded] = useState(false)
-  const { investorId } = useInvestorProfile()
-  const normalizedInvestorId = useMemo(() => (investorId || '').trim().toLowerCase(), [investorId])
-  const alseaSlug = 'alsea'
-  const isAlseaContext = normalizedInvestorId === alseaSlug
-  const slugForDocs = useMemo(() => (isAlseaContext ? alseaSlug : investorId), [alseaSlug, investorId, isAlseaContext])
+  const slugForDocs = useMemo(() => resolveInvestorSlug(), [location.search])
   const showToast = useToast()
   const [selectedFiles, setSelectedFiles] = useState({})
   const [uploadInputKeys, setUploadInputKeys] = useState({})
   const [downloadingDocId, setDownloadingDocId] = useState(null)
 
   const fetchDocs = useCallback(async (category) => {
+    if (!slugForDocs){
+      return []
+    }
     const res = await api.listDocs({ category, slug: slugForDocs })
     const files = Array.isArray(res?.files) ? res.files : []
     return files
@@ -35,6 +36,13 @@ export default function Documents(){
   const loadAll = useCallback(async () => {
     setLoading(true)
     setError(null)
+    if (!slugForDocs){
+      setDocsByCategory({})
+      setLoading(false)
+      setHasLoaded(true)
+      setError('Slug no disponible para consultar documentos')
+      return
+    }
     try{
       const results = await Promise.allSettled(
         DOCUMENT_SECTIONS_ORDER.map(async (category) => {
@@ -67,7 +75,7 @@ export default function Documents(){
       setLoading(false)
       setHasLoaded(true)
     }
-  }, [fetchDocs])
+  }, [fetchDocs, slugForDocs])
 
   useEffect(() => {
     loadAll()
@@ -82,16 +90,12 @@ export default function Documents(){
     const file = selectedFiles[category]
     if (!file) return
 
-    if (!slugForDocs){
-      const message = 'Slug no disponible para la carga'
-      setError(message)
-      showToast(message, { tone: 'error', duration: 5000 })
-      return
-    }
-
     try{
       setUploadingCategory(category)
       setError(null)
+      if (!slugForDocs){
+        throw new Error('Slug no disponible para la carga')
+      }
       await api.uploadDocument({
         slug: slugForDocs,
         category,
@@ -204,7 +208,7 @@ export default function Documents(){
                             ? Math.round(d.sizeKB * 1024)
                             : 0
                       const sizeLabel = sizeBytes > 0 ? `${(sizeBytes / 1024).toFixed(1)} KB` : '0.0 KB'
-                      const slugForKey = slugForDocs || normalizedInvestorId || investorId || 'default'
+                      const slugForKey = slugForDocs || 'default'
                       const key = d.path || `${category}/${slugForKey}/${filename}`
                       const isDownloading = downloadingDocId === key
                       return (
