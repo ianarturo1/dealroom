@@ -10,51 +10,33 @@ export default async function handler(request) {
   try {
     const { params } = getUrlAndParams(request)
     const slugParam = params.get('slug')
-    const categoryParam = params.get('category')
 
     if (!slugParam) {
       return badRequest('Missing slug')
     }
 
-    if (!categoryParam) {
-      return badRequest('Missing category')
-    }
-
     const slug = ensureSlugAllowed(slugParam.trim())
-    const category = categoryParam.trim()
-
-    if (!category) {
-      return badRequest('Missing category')
-    }
-
-    const path = `docs/${slug}/${category}`
+    const path = `docs/${slug}`
 
     let items
     try {
       items = await listRepoPath(path)
     } catch (error) {
       if (error?.status === 404) {
-        return notFound('No files found')
+        return notFound('No categories found')
       }
       throw error
     }
 
-    const files = Array.isArray(items)
-      ? items
-          .filter((item) => item && item.type === 'file')
-          .map((item) => ({
-            filename: item.name,
-            size: item.size ?? 0,
-            sha: item.sha ?? '',
-            path: item.path ?? `${path}/${item.name ?? ''}`,
-          }))
-      : []
+    const categories = items
+      .filter((item) => item && item.type === 'dir')
+      .map((item) => item.name)
 
-    if (!files.length) {
-      return notFound('No files found')
+    if (categories.length === 0) {
+      return notFound('No categories found')
     }
 
-    return json({ ok: true, slug, category, files })
+    return json({ ok: true, slug, categories })
   } catch (error) {
     if (error?.message === 'ForbiddenSlug' || error?.statusCode === 403 || error?.status === 403) {
       return errorJson('ForbiddenSlug', 403)
