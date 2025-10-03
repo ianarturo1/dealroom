@@ -4,10 +4,15 @@
   functions = "netlify/functions"
 
 [functions]
-  directory = "netlify/functions"
   node_bundler = "esbuild"
-  external_node_modules = ["octokit"]
+  external_node_modules = ["octokit", "busboy"]
   included_files = ["data/**"]
+
+[[redirects]]
+  from = "/api/download"
+  to = "/.netlify/functions/download-file"
+  status = 200
+  force = true
 
 [[redirects]]
   from = "/i/:slug"
@@ -20,4 +25,3 @@
   from = "/*"
   to = "/index.html"
   status = 200
-

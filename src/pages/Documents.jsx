@@ -74,20 +74,19 @@ export default function Documents(){
   }, [loadAll])
 
   const performUpload = useCallback(async (uploadInfo, options = {}) => {
-    if (!uploadInfo) return null
+    if (!uploadInfo || !uploadInfo.file) return null
     setError(null)
     setUploadingCategory(uploadInfo.category)
     try{
-      const payload = {
-        category: uploadInfo.category,
-        slug: uploadInfo.slug,
-        filename: uploadInfo.filename,
-        contentBase64: uploadInfo.base64
-      }
+      const formData = new FormData()
+      formData.set('slug', uploadInfo.slug)
+      formData.set('category', uploadInfo.category)
+      formData.set('filename', uploadInfo.filename)
       if (options.strategy === 'rename'){
-        payload.strategy = 'rename'
+        formData.set('strategy', 'rename')
       }
-      const response = await api.uploadDoc(payload)
+      formData.set('file', uploadInfo.file, uploadInfo.filename)
+      const response = await api.uploadDoc(formData)
       await refreshCategory(uploadInfo.category)
       const successMsg = options.strategy === 'rename'
         ? 'Documento subido con sufijo automático.'
@@ -99,7 +98,7 @@ export default function Documents(){
       return response
     }catch(err){
       if (err?.status === 409 && err?.data?.error === 'FILE_EXISTS' && options.strategy !== 'rename'){
-        const fallbackPath = `${uploadInfo.category}/${uploadInfo.slug}/${uploadInfo.filename}`
+        const fallbackPath = `data/docs/${uploadInfo.slug}/${uploadInfo.category}/${uploadInfo.filename}`
         setPendingUpload(uploadInfo)
         setRenamePrompt({ path: err.data?.path || fallbackPath, category: uploadInfo.category })
         return null
@@ -113,7 +112,7 @@ export default function Documents(){
     }
   }, [refreshCategory, showToast])
 
-  const handleUpload = useCallback((category) => (e) => {
+  const handleUpload = useCallback((category) => async (e) => {
     e.preventDefault()
     setError(null)
     setPendingUpload(null)
@@ -122,37 +121,20 @@ export default function Documents(){
     const fileInput = form.file
     const file = fileInput && fileInput.files ? fileInput.files[0] : null
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = async () => {
-      try{
-        const result = typeof reader.result === 'string' ? reader.result : ''
-        const base64 = result.includes(',') ? result.split(',')[1] : result
-        if (!base64) throw new Error('No se pudo leer el archivo')
-        const uploadSlug = slugForDocs
-        if (!uploadSlug){
-          throw new Error('Slug no disponible para la carga')
-        }
-        await performUpload({
-          category,
-          filename: file.name,
-          base64,
-          slug: uploadSlug,
-          form
-        })
-      }catch(err){
-        const message = err?.message || 'No se pudo leer el archivo'
-        setError(message)
-        showToast(message, { tone: 'error', duration: 5000 })
-        setUploadingCategory(null)
-      }
-    }
-    reader.onerror = () => {
-      const message = 'No se pudo leer el archivo'
+    const uploadSlug = slugForDocs
+    if (!uploadSlug){
+      const message = 'Slug no disponible para la carga'
       setError(message)
       showToast(message, { tone: 'error', duration: 5000 })
-      setUploadingCategory(null)
+      return
     }
-    reader.readAsDataURL(file)
+    await performUpload({
+      category,
+      filename: file.name,
+      slug: uploadSlug,
+      form,
+      file
+    })
   }, [performUpload, showToast, slugForDocs])
 
   const handleConfirmRename = useCallback(async () => {
@@ -221,9 +203,10 @@ export default function Documents(){
                       const sizeLabel = sizeBytes > 0 ? `${(sizeBytes / 1024).toFixed(1)} KB` : '0.0 KB'
                       const slugForKey = slugForDocs || normalizedInvestorId || investorId || 'default'
                       const key = d.path || `${category}/${slugForKey}/${filename}`
-                      const href = isAlseaContext
-                        ? api.docDownloadUrl({ category, slug: alseaSlug, filename })
-                        : (d.path ? api.downloadDocPath(d.path) : api.docDownloadUrl({ category, slug: slugForDocs || '', filename }))
+                      const slugForLink = slugForDocs || alseaSlug
+                      const href = d.path
+                        ? api.downloadDocPath(d.path)
+                        : api.docDownloadUrl({ category, slug: slugForLink, filename })
                       return (
                         <tr key={key}>
                           <td>{filename}</td>

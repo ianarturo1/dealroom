@@ -8,32 +8,17 @@ function sanitizeSegment(value){
     .trim()
 }
 
-function normalizeLower(value){
-  return sanitizeSegment(value).toLowerCase()
-}
-
-function defaultSlug(){
-  const envSlug = normalizeLower(process.env.PUBLIC_INVESTOR_SLUG || '')
-  return envSlug || 'femsa'
-}
-
 export async function handler(event){
   try{
     const categoryParam = event.queryStringParameters && event.queryStringParameters.category
     const slugParam = event.queryStringParameters && event.queryStringParameters.slug
     const safeCategory = sanitizeSegment(categoryParam) || 'NDA'
     const requestedSlug = typeof slugParam === 'string' ? sanitizeSegment(slugParam).toLowerCase() : ''
-    const envSlugRaw = sanitizeSegment(process.env.PUBLIC_INVESTOR_SLUG || '')
-    const envSlug = envSlugRaw ? envSlugRaw.toLowerCase() : ''
-
-    let slug = requestedSlug || defaultSlug()
-    if (envSlug){
-      const normalizedEnv = envSlug.toLowerCase()
-      if (requestedSlug && requestedSlug !== normalizedEnv){
-        return text(403, 'Slug not allowed')
-      }
-      slug = envSlug
+    const enforcedSlug = 'alsea'
+    if (requestedSlug && requestedSlug !== enforcedSlug){
+      return text(403, 'Slug not allowed')
     }
+    const slug = enforcedSlug
 
     const repo = repoEnv('DOCS_REPO', '')
     const branch = process.env.DOCS_BRANCH || 'main'
@@ -42,7 +27,7 @@ export async function handler(event){
       return ok({ files: [] })
     }
 
-    const basePath = `${safeCategory}/${slug}`
+    const basePath = `data/docs/${slug}/${safeCategory}`
     let list = []
     try{
       const items = await listDir(repo, basePath, branch)
