@@ -70,12 +70,13 @@ VITE_PUBLIC_INVESTOR_ID=femsa
 ```
 
 > Sin `GITHUB_TOKEN`, el sitio funciona en modo demo (lee `/data` local y no lista documentos).
+> Para habilitar el backend de documentos asegúrate de definir `DOCS_REPO`, `DOCS_BRANCH` y `GITHUB_TOKEN`, y de dejar apagada la bandera `DOCS_BACKEND_ALSEA` (sin definir o distinta de `on`). Puedes fijar un único slug público con `PUBLIC_INVESTOR_SLUG`.
 
 ---
 
 ## 5) Flujo de documentos (solo GitHub + Netlify)
 
-- **Listar:** `/.netlify/functions/list-docs?category=NDA` devuelve archivos en `data/docs/<slug>/<Categoría>/`.
+- **Listar:** `/.netlify/functions/list-docs?category=NDA` busca primero en `<Categoría>/<slug>/` (esquema nuevo) y, si no existe, intenta `data/docs/<slug>/<Categoría>/` (esquema legado). Si ambas rutas existen, combina los archivos sin duplicados.
 - **Subir:** UI de `/documents` llama `upload-doc` → commit al repo de documentos.
 - **Descargar:** `download-file` entrega el archivo desde GitHub (inline o attachment) para el slug permitido.
   - Valida que la metadata de GitHub reporte tamaño > 0 y que el binario descargado tenga contenido antes de regresarlo al navegador.

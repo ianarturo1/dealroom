@@ -1,5 +1,5 @@
 import { listRepoPath } from './_shared/github.mjs'
-import { getUrlAndParams, json, badRequest, notFound, methodNotAllowed, errorJson } from './_shared/http.mjs'
+import { getUrlAndParams, json, badRequest, methodNotAllowed, errorJson } from './_shared/http.mjs'
 import { ensureSlugAllowed } from './_shared/slug.mjs'
 
 export default async function handler(request) {
@@ -27,34 +27,56 @@ export default async function handler(request) {
       return badRequest('Missing category')
     }
 
-    const path = `docs/${slug}/${category}`
+    const primaryPath = `${category}/${slug}`
+    const legacyPath = `data/docs/${slug}/${category}`
 
-    let items
+    const toFileList = (items) =>
+      Array.isArray(items)
+        ? items
+            .filter((item) => item && item.type === 'file')
+            .map((item) => ({
+              name: item.name ?? '',
+              path: item.path ?? '',
+              size: item.size ?? 0,
+              sha: item.sha ?? '',
+            }))
+        : []
+
+    let primaryItems
     try {
-      items = await listRepoPath(path)
+      primaryItems = await listRepoPath(primaryPath)
     } catch (error) {
-      if (error?.status === 404) {
-        return notFound('No files found')
+      if (error?.status !== 404) {
+        throw error
       }
-      throw error
     }
 
-    const files = Array.isArray(items)
-      ? items
-          .filter((item) => item && item.type === 'file')
-          .map((item) => ({
-            filename: item.name,
-            size: item.size ?? 0,
-            sha: item.sha ?? '',
-            path: item.path ?? `${path}/${item.name ?? ''}`,
-          }))
-      : []
-
-    if (!files.length) {
-      return notFound('No files found')
+    let legacyItems
+    try {
+      legacyItems = await listRepoPath(legacyPath)
+    } catch (error) {
+      if (error?.status !== 404) {
+        throw error
+      }
     }
 
-    return json({ ok: true, slug, category, files })
+    const filesMap = new Map()
+
+    for (const file of toFileList(primaryItems)) {
+      if (file.path) {
+        filesMap.set(file.path, file)
+      }
+    }
+
+    for (const file of toFileList(legacyItems)) {
+      if (file.path && !filesMap.has(file.path)) {
+        filesMap.set(file.path, file)
+      }
+    }
+
+    const files = Array.from(filesMap.values())
+
+    return json({ ok: true, files })
   } catch (error) {
     if (error?.message === 'ForbiddenSlug' || error?.statusCode === 403 || error?.status === 403) {
       return errorJson('ForbiddenSlug', 403)
