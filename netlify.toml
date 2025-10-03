@@ -3,11 +3,16 @@
   publish = "dist"
   functions = "netlify/functions"
 
+# Recomendado: fija Node 18 en build (si no lo pones en package.json)
+[build.environment]
+  NODE_VERSION = "18"
+
 [functions]
   node_bundler = "esbuild"
   external_node_modules = ["octokit", "busboy"]
   included_files = ["data/**"]
 
+# Endpoints de funciones primero (antes del SPA fallback)
 [[redirects]]
   from = "/api/download"
   to = "/.netlify/functions/download-file"
@@ -20,13 +25,7 @@
   status = 200
   force = true
 
-[[redirects]]
-  from = "/api/download"
-  to = "/.netlify/functions/download-file"
-  status = 200
-  force = true
-
-# SPA fallback
+# SPA fallback al final
 [[redirects]]
   from = "/*"
   to = "/index.html"
