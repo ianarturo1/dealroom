@@ -683,19 +683,32 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     if (!uploadInfo) return null
     setDocsError(null)
     setDocsNotice(null)
+    const file = uploadInfo.file
+    const slug = (uploadInfo.slug || '').toLowerCase()
+    const filename = uploadInfo.filename || (file && file.name) || ''
     setDocsWorking(true)
     try{
-      const payload = {
-        path: `${uploadInfo.category}`,
-        filename: uploadInfo.filename,
-        contentBase64: uploadInfo.base64,
-        slug: uploadInfo.slug,
-        message: uploadInfo.message
+      if (!slug){
+        throw new Error('Slug no disponible para la carga')
+      }
+      if (!file){
+        throw new Error('Selecciona un archivo para subir')
+      }
+      if (!filename){
+        throw new Error('El archivo no tiene nombre válido')
+      }
+      const formData = new FormData()
+      formData.set('slug', slug)
+      formData.set('category', uploadInfo.category)
+      formData.set('filename', filename)
+      formData.append('file', file, filename)
+      if (uploadInfo.message){
+        formData.set('message', uploadInfo.message)
       }
       if (options.strategy === 'rename'){
-        payload.strategy = 'rename'
+        formData.set('strategy', 'rename')
       }
-      const response = await api.uploadDoc(payload)
+      const response = await api.uploadDoc(formData)
       const successMsg = options.strategy === 'rename'
         ? 'Archivo subido con sufijo automático.'
         : 'Archivo subido.'
@@ -708,7 +721,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       return response
     }catch(error){
       if (error?.status === 409 && error?.data?.error === 'FILE_EXISTS' && options.strategy !== 'rename'){
-        const fallbackPath = `${uploadInfo.category}/${uploadInfo.slug}/${uploadInfo.filename}`
+        const fallbackPath = `data/docs/${slug}/${uploadInfo.category}/${filename}`
         setPendingDocUpload(uploadInfo)
         setDocRenamePrompt({
           path: error.data?.path || fallbackPath,
@@ -717,7 +730,15 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
         })
         return null
       }
-      const message = error?.message || 'No se pudo subir el archivo'
+      const code = error?.data?.code
+      let message = error?.message || 'No se pudo subir el archivo'
+      if (code === 'MissingField' && error?.data?.field){
+        message = `Falta ${error.data.field}`
+      }else if (code === 'ForbiddenSlug'){
+        message = 'Solo se permiten cargas para Alsea'
+      }else if (code === 'FILE_TOO_LARGE_FOR_GITHUB'){
+        message = 'El archivo supera el límite de 25 MB'
+      }
       setDocsError(message)
       showToast(message, { tone: 'error', duration: 5000 })
       return null
@@ -732,38 +753,18 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     setDocsError(null)
     setDocsNotice(null)
     const form = e.target
-    const file = form.file.files[0]
+    const fileInput = form.file
+    const file = fileInput && fileInput.files ? fileInput.files[0] : null
     if (!file) return
     const slug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
-    const reader = new FileReader()
-    reader.onload = async () => {
-      try{
-        const result = typeof reader.result === 'string' ? reader.result : ''
-        const base64 = result.includes(',') ? result.split(',')[1] : result
-        if (!base64) throw new Error('No se pudo leer el archivo')
-        await performDocUpload({
-          category: docCategory,
-          filename: file.name,
-          base64,
-          slug,
-          message: `Upload ${file.name} desde Admin`,
-          form
-        })
-      }catch(error){
-        const message = error?.message || 'No se pudo leer el archivo'
-        setDocsError(message)
-        showToast(message, { tone: 'error', duration: 5000 })
-        setDocsWorking(false)
-      }
-    }
-    reader.onerror = () => {
-      const message = 'No se pudo leer el archivo'
-      setDocsWorking(false)
-      setDocsError(message)
-      showToast(message, { tone: 'error', duration: 5000 })
-    }
-    setDocsWorking(true)
-    reader.readAsDataURL(file)
+    void performDocUpload({
+      category: docCategory,
+      filename: file.name,
+      file,
+      slug,
+      message: `Upload ${file.name} desde Admin`,
+      form
+    })
   }
 
   const handleConfirmDocRename = useCallback(async () => {
@@ -1966,7 +1967,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                               <td style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                                 <a
                                   className="btn secondary"
-                                  href={api.downloadDocPath(file.path)}
+                                  href={api.downloadDocPath(file.path, { disposition: 'inline' })}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                 >
