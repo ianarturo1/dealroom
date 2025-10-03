@@ -1,55 +1,67 @@
-import { repoEnv, listDir } from './_lib/github.mjs'
-import { json, errorJson, getUrlAndParams } from './_shared/http.mjs'
+import { listRepoPath } from './_shared/github.mjs'
+import { getUrlAndParams, json, badRequest, notFound, methodNotAllowed, errorJson } from './_shared/http.mjs'
+import { ensureSlugAllowed } from './_shared/slug.mjs'
 
-function sanitizeSegment(value){
-  return String(value || '')
-    .normalize('NFKC')
-    .replace(/[^\p{L}\p{N}._() \-]/gu, '')
-    .trim()
-}
+export default async function handler(request) {
+  if (request.method && request.method.toUpperCase() !== 'GET') {
+    return methodNotAllowed(['GET'])
+  }
 
-export default async function handler(request, context){
-  try{
+  try {
     const { params } = getUrlAndParams(request)
-    const categoryParam = params.get('category')
     const slugParam = params.get('slug')
-    const safeCategory = sanitizeSegment(categoryParam) || 'NDA'
-    const requestedSlug = typeof slugParam === 'string' ? sanitizeSegment(slugParam).toLowerCase() : ''
-    const enforcedSlug = 'alsea'
-    if (requestedSlug && requestedSlug !== enforcedSlug){
-      return errorJson('Slug not allowed', 403)
-    }
-    const slug = enforcedSlug
+    const categoryParam = params.get('category')
 
-    const repo = repoEnv('DOCS_REPO', '')
-    const branch = process.env.DOCS_BRANCH || 'main'
-
-    if (!repo || !process.env.GITHUB_TOKEN){
-      return json({ files: [] })
+    if (!slugParam) {
+      return badRequest('Missing slug')
     }
 
-    const effectiveSlug = (slug || '').toLowerCase()
-    const fallbackSlug = effectiveSlug || defaultSlug()
-    const basePath = fallbackSlug === 'alsea'
-      ? `data/docs/${fallbackSlug}/${safeCategory}`
-      : `${safeCategory}/${fallbackSlug}`
-    let list = []
-    try{
-      const items = await listDir(repo, basePath, branch)
-      list = items.filter(x => x.type === 'file').map(x => ({
-        name: x.name,
-        filename: x.name,
-        path: `${basePath}/${x.name}`,
-        size: typeof x.size === 'number' ? x.size : 0,
-        sizeBytes: typeof x.size === 'number' ? x.size : 0,
-        sizeKB: typeof x.size === 'number' ? Math.max(0, Math.round(x.size / 1024)) : 0
-      }))
-    }catch(_){
-      list = []
+    if (!categoryParam) {
+      return badRequest('Missing category')
     }
-    return json({ files: list })
-  }catch(err){
-    const status = err.statusCode || 500
-    return errorJson(err.message || 'Internal error', status)
+
+    const slug = ensureSlugAllowed(slugParam.trim())
+    const category = categoryParam.trim()
+
+    if (!category) {
+      return badRequest('Missing category')
+    }
+
+    const path = `docs/${slug}/${category}`
+
+    let items
+    try {
+      items = await listRepoPath(path)
+    } catch (error) {
+      if (error?.status === 404) {
+        return notFound('No files found')
+      }
+      throw error
+    }
+
+    const files = Array.isArray(items)
+      ? items
+          .filter((item) => item && item.type === 'file')
+          .map((item) => ({
+            filename: item.name,
+            size: item.size ?? 0,
+            sha: item.sha ?? '',
+            path: item.path ?? `${path}/${item.name ?? ''}`,
+          }))
+      : []
+
+    if (!files.length) {
+      return notFound('No files found')
+    }
+
+    return json({ ok: true, slug, category, files })
+  } catch (error) {
+    if (error?.message === 'ForbiddenSlug' || error?.statusCode === 403 || error?.status === 403) {
+      return errorJson('ForbiddenSlug', 403)
+    }
+
+    const status = error?.statusCode || error?.status || 500
+    const message = status === 500 ? 'Internal error' : error?.message || 'Error'
+    return errorJson(message, status)
   }
 }
