@@ -1,10 +1,11 @@
-import { ok, text, readLocalJson } from './_lib/utils.mjs'
+import { readLocalJson } from './_lib/utils.mjs'
+import { json, errorJson } from './_shared/http.mjs'
 
-export default async function handler(event, context){
+export default async function handler(request, context){
   try{
     const items = await readLocalJson('data/projects.json')
-    return ok(items)
+    return json(items)
   }catch(err){
-    return text(500, err.message)
+    return errorJson(err.message || 'Internal error')
   }
 }

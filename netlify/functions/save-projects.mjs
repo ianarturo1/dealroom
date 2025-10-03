@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer'
-import { ok, text } from './_lib/utils.mjs'
 import { repoEnv, getFile, putFile } from './_lib/github.mjs'
+import { json, errorJson, badRequest } from './_shared/http.mjs'
 
 const numberFields = [
   { key: 'power_kwp', label: 'potencia (kWp)' },
@@ -106,18 +106,23 @@ function normalizeProject(project, index){
   return normalized
 }
 
-export default async function handler(event, context){
+export default async function handler(request, context){
   try{
-    const body = JSON.parse(event.body || '{}')
+    let body = {}
+    try{
+      body = await request.json()
+    }catch(_){
+      body = {}
+    }
     const list = body.projects
-    if (!Array.isArray(list)) return text(400, '"projects" debe ser un arreglo')
+    if (!Array.isArray(list)) return badRequest('"projects" debe ser un arreglo')
 
     const normalized = list.map((item, index) => normalizeProject(item, index))
 
     const ids = new Set()
     for (const project of normalized){
       if (ids.has(project.id)){
-        return text(400, `ID duplicado: ${project.id}`)
+        return badRequest(`ID duplicado: ${project.id}`)
       }
       ids.add(project.id)
     }
@@ -125,7 +130,7 @@ export default async function handler(event, context){
     const repo = repoEnv('CONTENT_REPO', '')
     const branch = process.env.CONTENT_BRANCH || 'main'
     if (!repo || !process.env.GITHUB_TOKEN){
-      return text(500, 'CONTENT_REPO/GITHUB_TOKEN no configurados')
+      return errorJson('CONTENT_REPO/GITHUB_TOKEN no configurados')
     }
 
     const path = 'data/projects.json'
@@ -166,9 +171,9 @@ export default async function handler(event, context){
     const contentBase64 = Buffer.from(JSON.stringify(normalized, null, 2)).toString('base64')
     const res = await putFile(repo, path, contentBase64, 'Actualizar proyectos vía Dealroom', sha, branch)
 
-    return ok({ ok: true, count: normalized.length, commit: res.commit && res.commit.sha })
+    return json({ ok: true, count: normalized.length, commit: res.commit && res.commit.sha })
   }catch(err){
     const status = err.statusCode || 500
-    return text(status, err.message)
+    return errorJson(err.message || 'Internal error', status)
   }
 }

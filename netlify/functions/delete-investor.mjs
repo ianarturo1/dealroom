@@ -1,5 +1,5 @@
-import { ok, text } from './_lib/utils.mjs'
 import { repoEnv, getFile, putFile, deleteFile, listDir } from './_lib/github.mjs'
+import { json, errorJson, badRequest, notFound, methodNotAllowed } from './_shared/http.mjs'
 
 const INDEX_PATH = 'data/investor-index.json'
 
@@ -49,22 +49,27 @@ async function deleteDirectoryRecursive(repo, path, branch){
   }
 }
 
-export default async function handler(event, context){
-  if (event.httpMethod !== 'POST'){
-    return text(405, 'Method not allowed')
+export default async function handler(request, context){
+  if (request.method !== 'POST'){
+    return methodNotAllowed(['POST'])
   }
 
   try{
-    const body = JSON.parse(event.body || '{}')
+    let body = {}
+    try{
+      body = await request.json()
+    }catch(_){
+      body = {}
+    }
     const slug = normalizeSlug(body.slug)
     if (!slug){
-      return text(400, 'Falta slug de inversionista')
+      return badRequest('Falta slug de inversionista')
     }
 
     const repo = repoEnv('CONTENT_REPO', '')
     const branch = process.env.CONTENT_BRANCH || 'main'
     if (!repo || !process.env.GITHUB_TOKEN){
-      return text(500, 'CONTENT_REPO/GITHUB_TOKEN no configurados')
+      return errorJson('CONTENT_REPO/GITHUB_TOKEN no configurados')
     }
 
     const investorPath = `data/investors/${slug}.json`
@@ -72,14 +77,14 @@ export default async function handler(event, context){
     try{
       investorFile = await getFile(repo, investorPath, branch)
     }catch(_){
-      return text(404, 'Inversionista no encontrado')
+      return notFound('Inversionista no encontrado')
     }
 
     let indexFile
     try{
       indexFile = await getFile(repo, INDEX_PATH, branch)
     }catch(_){
-      return text(500, 'No se pudo obtener investor-index.json')
+      return errorJson('No se pudo obtener investor-index.json')
     }
 
     const { json: indexJson, raw: originalIndexContent } = parseIndex(indexFile.content)
@@ -107,9 +112,9 @@ export default async function handler(event, context){
 
     await deleteFile(repo, investorPath, `Delete investor ${slug} via Dealroom`, investorFile.sha, branch)
 
-    return ok({ ok: true })
+    return json({ ok: true })
   }catch(error){
-    const status = error.statusCode || 500
-    return text(status, error.message)
+    const status = error.statusCode || error.status || 500
+    return errorJson(error.message || 'Internal error', status)
   }
 }

@@ -1,8 +1,8 @@
-import { json } from './_lib/utils.mjs'
 import { repoEnv, getFile, putFile } from './_lib/github.mjs'
 import { decodeIndexContent, buildIndexPayload, normalizeName } from './_lib/investor-index.mjs'
 import { getStageOrder } from '../lib/stages.mjs'
 import { validateDeadlines } from '../lib/validators.mjs'
+import { json, errorJson } from './_shared/http.mjs'
 
 const normalizeSlug = (value) => {
   const base = (value || '').toString().trim()
@@ -28,10 +28,10 @@ const isGitHubNotFound = (error) => {
   return message.includes('GitHub 404')
 }
 
-export default async function handler(event, context){
+export default async function handler(request, context){
   try {
-    if (event.httpMethod && event.httpMethod !== 'POST'){
-      return json(405, { ok: false, error: 'Method not allowed' })
+    if (request.method && request.method !== 'POST'){
+      return json({ ok: false, error: 'Method not allowed' }, { status: 405 })
     }
 
     const { CONTENT_BRANCH = 'main', SITE_URL } = process.env
@@ -39,20 +39,25 @@ export default async function handler(event, context){
     const token = process.env.GITHUB_TOKEN
 
     if (!token || !repo){
-      return json(500, { ok: false, error: 'Missing GitHub configuration' })
+      return errorJson('Missing GitHub configuration')
     }
 
-    const body = JSON.parse(event.body || '{}')
+    let body = {}
+    try{
+      body = await request.json()
+    }catch(_){
+      body = {}
+    }
     const rawName = typeof body.name === 'string' ? body.name : body.companyName
     const name = typeof rawName === 'string' ? rawName.trim() : ''
     if (!name){
-      return json(400, { ok: false, error: "Missing required field 'name'" })
+      return json({ ok: false, error: "Missing required field 'name'" }, { status: 400 })
     }
 
     const rawSlug = typeof body.slug === 'string' ? body.slug : body.id
     const slug = normalizeSlug(rawSlug || name)
     if (!slug){
-      return json(400, { ok: false, error: 'Unable to derive slug from name' })
+      return json({ ok: false, error: 'Unable to derive slug from name' }, { status: 400 })
     }
 
     const investorPath = `data/investors/${slug}.json`
@@ -64,7 +69,7 @@ export default async function handler(event, context){
     }
 
     if (existingInvestor){
-      return json(409, { error: 'INVESTOR_EXISTS', message: 'Investor already exists', slug })
+      return json({ error: 'INVESTOR_EXISTS', message: 'Investor already exists', slug }, { status: 409 })
     }
 
     const indexPath = 'data/investor-index.json'
@@ -86,7 +91,7 @@ export default async function handler(event, context){
     })
 
     if (duplicateInIndex){
-      return json(409, { error: 'INVESTOR_EXISTS', message: 'Investor already exists', slug })
+      return json({ error: 'INVESTOR_EXISTS', message: 'Investor already exists', slug }, { status: 409 })
     }
 
     const extras = { ...body }
@@ -112,7 +117,7 @@ export default async function handler(event, context){
       const order = getStageOrder()
       const validation = validateDeadlines(deadlines, order)
       if (!validation.ok){
-        return json(400, { ok: false, error: validation.error, ...validation.details })
+        return json({ ok: false, error: validation.error, ...validation.details }, { status: 400 })
       }
     }
 
@@ -168,9 +173,9 @@ export default async function handler(event, context){
     const baseSite = (SITE_URL || '').trim().replace(/\/$/, '') || 'https://taxdealroom.netlify.app'
     const link = `${baseSite}/#/?investor=${encodeURIComponent(slug)}`
 
-    return json(200, { ok: true, slug, link })
+    return json({ ok: true, slug, link })
   } catch (error) {
     const message = String(error && error.message ? error.message : error)
-    return json(500, { ok: false, error: message })
+    return errorJson(message || 'Internal error')
   }
 }
