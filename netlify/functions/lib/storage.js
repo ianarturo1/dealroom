@@ -2,15 +2,18 @@
 import { Octokit } from "octokit";
 
 const required = (name, val) => { if (!val) throw new Error(`MissingEnv:${name}`); return val; };
+const getOctokit = () => new Octokit({ auth: required('GITHUB_TOKEN', process.env.GITHUB_TOKEN) });
+const getRepo = () => {
+  const repoFull = required('DOCS_REPO', process.env.DOCS_REPO);
+  const [owner, repo] = repoFull.split('/');
+  return { owner, repo, branch: process.env.DOCS_BRANCH || 'main' };
+};
 
 export async function putFileGithub({ path, contentBase64, message, branch, author }) {
-  const token = required('GITHUB_TOKEN', process.env.GITHUB_TOKEN);
-  const repoFull = required('DOCS_REPO', process.env.DOCS_REPO);
+  const octokit = getOctokit();
+  const { owner, repo } = getRepo();
   const branchName = branch || process.env.DOCS_BRANCH || 'main';
-  const [owner, repo] = repoFull.split('/');
-  const octokit = new Octokit({ auth: token });
 
-  // sha si existe
   let sha;
   try {
     const res = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', { owner, repo, path, ref: branchName });
@@ -29,16 +32,28 @@ export async function putFileGithub({ path, contentBase64, message, branch, auth
   return { ok:true, commitSha: res.data.commit.sha };
 }
 
-export async function getGithubRawUrl({ path, branch }) {
-  const token = required('GITHUB_TOKEN', process.env.GITHUB_TOKEN);
-  const repoFull = required('DOCS_REPO', process.env.DOCS_REPO);
+/**
+ * Nuevo: obtiene el BINARIO del archivo con token (sirve en repo PRIVADO o público)
+ * Retorna { buffer, size }
+ */
+export async function getGithubFileBinary({ path, branch }) {
+  const octokit = getOctokit();
+  const { owner, repo } = getRepo();
   const branchName = branch || process.env.DOCS_BRANCH || 'main';
-  const [owner, repo] = repoFull.split('/');
-  const octokit = new Octokit({ auth: token });
 
-  const res = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', { owner, repo, path, ref: branchName });
-  const url = res?.data?.download_url;
-  const size = res?.data?.size;
-  if (!url) throw new Error('NotFound');
-  return { downloadUrl: url, size };
+  // 1) Metadata para tamaño/existencia
+  const meta = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
+    owner, repo, path, ref: branchName
+  });
+  if (!meta?.data) throw new Error('NotFound');
+  const size = meta.data.size || 0;
+
+  // 2) Contenido RAW autenticado (binario)
+  const raw = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
+    owner, repo, path, ref: branchName,
+    headers: { 'Accept': 'application/vnd.github.raw' }
+  });
+
+  const buffer = Buffer.isBuffer(raw.data) ? raw.data : Buffer.from(raw.data);
+  return { buffer, size };
 }
