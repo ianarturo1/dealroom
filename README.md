@@ -75,9 +75,9 @@ VITE_PUBLIC_INVESTOR_ID=femsa
 
 ## 5) Flujo de documentos (solo GitHub + Netlify)
 
-- **Listar:** `/.netlify/functions/list-docs?category=NDA` devuelve archivos en `NDA/<slug>/`.
+- **Listar:** `/.netlify/functions/list-docs?category=NDA` devuelve archivos en `data/docs/<slug>/<Categoría>/`.
 - **Subir:** UI de `/documents` llama `upload-doc` → commit al repo de documentos.
-- **Descargar:** `get-doc` entrega el archivo desde GitHub siempre que pertenezca al slug público configurado.
+- **Descargar:** `download-file` entrega el archivo desde GitHub (inline o attachment) para el slug permitido.
 - **Auditoría:** el historial de cambios queda en GitHub (quién y qué).
 
 Cada proyecto activo define su propio `slug` en `data/projects.json`; los botones “Ver documentos” en `/projects` generan enlaces `/#/documents?investor=<slug>` que cargan exclusivamente los archivos de esa carpeta (`<Categoría>/<slug>/`). Así se evita mezclar documentos entre proyectos.
@@ -85,14 +85,14 @@ Cada proyecto activo define su propio `slug` en `data/projects.json`; los botone
 > Sugerencia: estructura de carpetas en el repo de docs
 >
 > ```
-> NDA/<slug>/*.pdf
-> Propuestas/<slug>/*.pdf
-> Modelos financieros/<slug>/*.xlsx
-> Contratos/<slug>/*.docx
-> LOIs/<slug>/*.pdf
-> Sustento fiscal/<slug>/*.pdf
-> Mitigación de riesgos/<slug>/*.pdf
-> Procesos/<slug>/*.pdf
+> data/docs/<slug>/NDA/*.pdf
+> data/docs/<slug>/Propuestas/*.pdf
+> data/docs/<slug>/Modelos financieros/*.xlsx
+> data/docs/<slug>/Contratos/*.docx
+> data/docs/<slug>/LOIs/*.pdf
+> data/docs/<slug>/Sustento fiscal/*.pdf
+> data/docs/<slug>/Mitigación de riesgos/*.pdf
+> data/docs/<slug>/Procesos/*.pdf
 > ```
 
 ---

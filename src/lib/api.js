@@ -105,9 +105,29 @@ export const api = {
     if (slug) params.set('slug', slug)
     if (normalizedFilename) params.set('filename', normalizedFilename)
     const qs = params.toString()
-    return `/.netlify/functions/get-doc${qs ? `?${qs}` : ''}`
+    return `/.netlify/functions/download-file${qs ? `?${qs}` : ''}`
   },
   async listActivity(){
     return req('/.netlify/functions/list-activity')
   }
+}
+
+function parseDocPath(relPath){
+  const normalized = (relPath || '').replace(/^\/+/, '')
+  const parts = normalized.split('/').filter(Boolean)
+  if (parts.length >= 4 && parts[0] === 'data' && parts[1] === 'docs'){
+    return {
+      slug: parts[2] || '',
+      category: parts[3] || '',
+      filename: parts.slice(4).join('/') || ''
+    }
+  }
+  if (parts.length >= 3){
+    return {
+      category: parts[0] || '',
+      slug: parts[1] || '',
+      filename: parts.slice(2).join('/') || ''
+    }
+  }
+  return { category: '', slug: '', filename: '' }
 }

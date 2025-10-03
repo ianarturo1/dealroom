@@ -680,7 +680,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   }
 
   const performDocUpload = useCallback(async (uploadInfo, options = {}) => {
-    if (!uploadInfo) return null
+    if (!uploadInfo || !uploadInfo.file) return null
     setDocsError(null)
     setDocsNotice(null)
     const file = uploadInfo.file
@@ -747,7 +747,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     }
   }, [loadDocs, showToast])
 
-  const handleDocUpload = (e) => {
+  const handleDocUpload = async (e) => {
     e.preventDefault()
     if (docsWorking) return
     setDocsError(null)

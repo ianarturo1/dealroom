@@ -9,6 +9,12 @@
   included_files = ["data/**"]
 
 [[redirects]]
+  from = "/api/download"
+  to = "/.netlify/functions/download-file"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/i/:slug"
   to = "/#/?investor=:slug"
   status = 200
@@ -25,4 +31,3 @@
   from = "/*"
   to = "/index.html"
   status = 200
-

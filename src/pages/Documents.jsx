@@ -74,7 +74,7 @@ export default function Documents(){
   }, [loadAll])
 
   const performUpload = useCallback(async (uploadInfo, options = {}) => {
-    if (!uploadInfo) return null
+    if (!uploadInfo || !uploadInfo.file) return null
     setError(null)
     setUploadingCategory(uploadInfo.category)
     const file = uploadInfo.file
