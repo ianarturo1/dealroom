@@ -19,7 +19,7 @@ function sanitizeSegment(value, field) {
     error.statusCode = 400
     throw error
   }
-  if (segment.includes('..') || segment.includes('/') || segment.includes('\')) {
+  if (segment.includes('..') || segment.includes('/') || segment.includes('\\')) {
     const error = new Error(`Invalid ${field}`)
     error.statusCode = 400
     throw error
