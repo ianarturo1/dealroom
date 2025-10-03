@@ -1,3 +1,5 @@
+import { resolveInvestorSlug } from './slug';
+
 const BASE = '/.netlify/functions';
 
 function isFormData(body) {
@@ -127,7 +129,11 @@ function extractFilenameFromContentDisposition(cdHeader, fallback) {
 
 // Descargar documento como Blob y disparar <a download>
 async function downloadDocument({ slug, category, filename, disposition = 'attachment' }){
-  const path = `/.netlify/functions/get-doc?slug=${encodeURIComponent(slug)}&category=${encodeURIComponent(category)}&filename=${encodeURIComponent(filename)}&disposition=${encodeURIComponent(disposition)}`;
+  const resolvedSlug = (slug && String(slug).trim()) || resolveInvestorSlug();
+  if (!resolvedSlug) {
+    throw new Error('Slug no disponible para la descarga');
+  }
+  const path = `/.netlify/functions/get-doc?slug=${encodeURIComponent(resolvedSlug)}&category=${encodeURIComponent(category)}&filename=${encodeURIComponent(filename)}&disposition=${encodeURIComponent(disposition)}`;
   const res = await reqBlob(path, { method: 'GET' });
   const blob = await res.blob();
 
@@ -146,8 +152,12 @@ async function downloadDocument({ slug, category, filename, disposition = 'attac
 
 // Subir documento con FormData
 async function uploadDocument({ slug, category, file }) {
+  const resolvedSlug = (slug && String(slug).trim()) || resolveInvestorSlug();
+  if (!resolvedSlug) {
+    throw new Error('Slug no disponible para la carga');
+  }
   const form = new FormData();
-  form.append('slug', slug);
+  form.append('slug', resolvedSlug);
   form.append('category', category);
   form.append('file', file, file.name);
   return req('/.netlify/functions/upload-doc', { method: 'POST', body: form });
@@ -174,7 +184,12 @@ export const api = {
   },
   getInvestor(slug){ return req(`/.netlify/functions/get-investor${slug ? (`?slug=${encodeURIComponent(slug)}`) : ''}`); },
   listDocs(params){
-    const q = new URLSearchParams(params || {}).toString();
+    const input = { ...(params || {}) };
+    if (!input.slug){
+      const fallbackSlug = resolveInvestorSlug();
+      if (fallbackSlug) input.slug = fallbackSlug;
+    }
+    const q = new URLSearchParams(input).toString();
     return req(`/.netlify/functions/list-docs${q ? (`?${q}`) : ''}`);
   },
   async uploadDoc(info, options = {}){
