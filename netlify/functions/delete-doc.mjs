@@ -5,7 +5,7 @@ function cleanPath(input = ''){
   return String(input).replace(/^\/+|\/+$/g, '')
 }
 
-export async function handler(event){
+export default async function handler(event, context){
   try{
     const body = JSON.parse(event.body || '{}')
     const relPath = cleanPath(body.path || '')

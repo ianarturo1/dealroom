@@ -25,7 +25,7 @@ async function loadInvestor(slug){
   return loadInvestorFromRepo(repo, slug, branch)
 }
 
-export async function handler(event){
+export default async function handler(event, context){
   try {
     if (event.httpMethod && event.httpMethod !== 'GET'){
       return text(405, 'Method not allowed')

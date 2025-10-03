@@ -1,6 +1,6 @@
 // netlify/functions/upload-doc.mjs
 import Busboy from "busboy";
-import { putFileGithub } from "./lib/storage.js";
+import { putFileGithub } from "./lib/storage.mjs";
 
 const FF = process.env.DOCS_BACKEND_ALSEA === 'on';
 function json(statusCode, body){ return { statusCode, headers:{'Access-Control-Allow-Origin':process.env.CORS_ORIGIN||'*','Content-Type':'application/json'}, body: JSON.stringify(body) }; }
@@ -8,7 +8,7 @@ function assertFeatureOn(){ if(!FF) throw new Error('Disabled'); }
 function assertAlsea(slug){ if((slug||'').toLowerCase()!=='alsea'){ const e=new Error('ForbiddenSlug'); e.code='ForbiddenSlug'; throw e; } }
 function assertSafe(value, field='field'){ if(!value){ const e=new Error('MissingField'); e.code='MissingField'; e.field=field; throw e; } if(value.length>100){ const e=new Error('BadRequest'); e.code='BadRequest'; throw e; } const ok=/^[a-zA-Z0-9._-]{1,100}$/.test(value); const bad=/(\.{2})|(\/)|(\\)|(%2e)|(%2f)|(%5c)/i.test(value); if(!ok||bad){ const e=new Error('BadRequest'); e.code='BadRequest'; throw e; } }
 
-export const handler = async (event) => {
+export default async function handler(event, context) {
   try {
     assertFeatureOn();
     if (event.httpMethod !== 'POST') return json(405, { ok:false, code:'MethodNotAllowed' });
@@ -54,4 +54,4 @@ export const handler = async (event) => {
     if (String(err?.message||'').startsWith('MissingEnv')) return json(500, { ok:false, code:'MissingEnv', msg: err.message });
     return json(500, { ok:false, code:'UploadError', msg: String(err?.message||err) });
   }
-};
+}

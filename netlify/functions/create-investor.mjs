@@ -28,7 +28,7 @@ const isGitHubNotFound = (error) => {
   return message.includes('GitHub 404')
 }
 
-export async function handler(event){
+export default async function handler(event, context){
   try {
     if (event.httpMethod && event.httpMethod !== 'POST'){
       return json(405, { ok: false, error: 'Method not allowed' })

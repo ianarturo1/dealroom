@@ -7,8 +7,7 @@
   NODE_VERSION = "18"
 
 [functions]
-  # Importante: no bundlear funciones; ejecutar ESM tal cual
-  node_bundler = "none"
+  node_bundler = "esbuild"
   # Incluye archivos adicionales si tu app los requiere
   included_files = ["data/**"]
 

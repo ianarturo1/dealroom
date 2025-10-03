@@ -13,7 +13,7 @@ DESCRIPTION:${esc(description)}
 END:VEVENT`
 }
 
-export async function handler(event){
+export default async function handler(event, context){
   try{
     const slug = (event.queryStringParameters && event.queryStringParameters.slug) || 'femsa'
     const repo = process.env.CONTENT_REPO
