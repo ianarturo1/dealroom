@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer'
 import { ok, text } from './_lib/utils.mjs'
 import { repoEnv, getFile, putFile } from './_lib/github.mjs'
 
-export async function handler(event){
+export default async function handler(event, context){
   try{
     const body = JSON.parse(event.body || '{}')
     const normalizedId = typeof body.id === 'string'

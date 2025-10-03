@@ -116,7 +116,7 @@ async function loadDocEvents(){
   return events
 }
 
-export async function handler(){
+export default async function handler(event, context){
   try {
     // Si no hay token, no intentamos llamar a GitHub (evita 500 en deploy preview)
     if (!process.env.GITHUB_TOKEN){

@@ -106,7 +106,7 @@ function normalizeProject(project, index){
   return normalized
 }
 
-export async function handler(event){
+export default async function handler(event, context){
   try{
     const body = JSON.parse(event.body || '{}')
     const list = body.projects

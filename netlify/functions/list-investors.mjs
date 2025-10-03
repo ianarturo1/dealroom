@@ -3,7 +3,7 @@ import { decodeIndexContent } from './_lib/investor-index.mjs'
 
 const collator = new Intl.Collator('es', { sensitivity: 'base' })
 
-export async function handler(){
+export default async function handler(event, context){
   try{
     const data = await readLocalJson('data/investor-index.json')
     const { entries } = decodeIndexContent(data)

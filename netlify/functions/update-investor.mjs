@@ -15,7 +15,7 @@ const decodeFileContent = (file) => {
   return Buffer.from(file.content || '', encoding).toString('utf-8')
 }
 
-export async function handler(event){
+export default async function handler(event, context){
   try {
     if (event.httpMethod && event.httpMethod !== 'POST'){
       return json(405, { ok: false, error: 'Method not allowed' })

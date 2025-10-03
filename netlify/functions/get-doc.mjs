@@ -1,5 +1,5 @@
 // netlify/functions/get-doc.mjs
-import { getGithubFileBinary } from "./lib/storage.js";
+import { getGithubFileBinary } from "./lib/storage.mjs";
 
 const FF = process.env.DOCS_BACKEND_ALSEA === "on";
 
@@ -35,7 +35,7 @@ function guess(ext) {
   return "application/octet-stream";
 }
 
-export const handler = async (event) => {
+export default async function handler(event, context) {
   try {
     if (event.httpMethod !== "GET") return json(405, { ok:false, code:"MethodNotAllowed" });
 
@@ -87,4 +87,4 @@ export const handler = async (event) => {
     if (String(err?.message || "").startsWith("MissingEnv")) return json(500, { ok:false, code:"MissingEnv", msg: err.message });
     return json(500, { ok:false, code:"DownloadError", msg: String(err?.message || err) });
   }
-};
+}

@@ -8,7 +8,7 @@ function sanitizeSegment(value){
     .trim()
 }
 
-export async function handler(event){
+export default async function handler(event, context){
   try{
     const categoryParam = event.queryStringParameters && event.queryStringParameters.category
     const slugParam = event.queryStringParameters && event.queryStringParameters.slug

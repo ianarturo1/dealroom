@@ -49,7 +49,7 @@ async function deleteDirectoryRecursive(repo, path, branch){
   }
 }
 
-export async function handler(event){
+export default async function handler(event, context){
   if (event.httpMethod !== 'POST'){
     return text(405, 'Method not allowed')
   }
