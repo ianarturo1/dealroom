@@ -47,8 +47,9 @@ export const api = {
     const q = new URLSearchParams(params || {}).toString()
     return req(`/.netlify/functions/list-docs${q ? ('?'+q) : ''}`)
   },
-  async uploadDoc(info){
-    return req('/.netlify/functions/upload-doc', { method:'POST', body: info })
+  async uploadDoc(info, options = {}){
+    const endpoint = options.endpoint || '/.netlify/functions/upload-doc'
+    return req(endpoint, { method:'POST', body: info })
   },
   async deleteDoc(info){
     return req('/.netlify/functions/delete-doc', { method:'POST', body: info })
@@ -91,7 +92,8 @@ export const api = {
     const normalizedCategory = (category || '').trim()
     const normalizedFilename = filename === undefined || filename === null ? '' : String(filename)
     const safeDisposition = disposition === 'inline' ? 'inline' : 'attachment'
-    if (normalizedSlug === 'alsea'){
+    const isFeatureOn = import.meta.env?.VITE_DOCS_BACKEND_ALSEA === 'on'
+    if (normalizedSlug === 'alsea' && isFeatureOn){
       const params = new URLSearchParams()
       params.set('slug', 'alsea')
       if (normalizedCategory) params.set('category', normalizedCategory)
@@ -105,7 +107,7 @@ export const api = {
     if (slug) params.set('slug', slug)
     if (normalizedFilename) params.set('filename', normalizedFilename)
     const qs = params.toString()
-    return `/.netlify/functions/download-file${qs ? `?${qs}` : ''}`
+    return `/.netlify/functions/get-doc${qs ? `?${qs}` : ''}`
   },
   async listActivity(){
     return req('/.netlify/functions/list-activity')
