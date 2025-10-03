@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer'
-import { ok, text, readLocalJson } from './_lib/utils.mjs'
+import { readLocalJson } from './_lib/utils.mjs'
 import { repoEnv, getFile } from './_lib/github.mjs'
+import { json, errorJson, notFound, methodNotAllowed, getUrlAndParams } from './_shared/http.mjs'
 
 const normalizeSlug = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '')
 
@@ -25,23 +26,24 @@ async function loadInvestor(slug){
   return loadInvestorFromRepo(repo, slug, branch)
 }
 
-export default async function handler(event, context){
+export default async function handler(request, context){
   try {
-    if (event.httpMethod && event.httpMethod !== 'GET'){
-      return text(405, 'Method not allowed')
+    if (request.method && request.method !== 'GET'){
+      return methodNotAllowed(['GET'])
     }
 
-    const querySlug = normalizeSlug(event.queryStringParameters?.slug)
+    const { params } = getUrlAndParams(request)
+    const querySlug = normalizeSlug(params.get('slug'))
     const slug = querySlug || defaultSlug()
     const data = await loadInvestor(slug)
 
-    return ok(data)
+    return json(data)
   } catch (err) {
     const message = String(err && err.message ? err.message : err)
     if (message.includes('ENOENT') || message.includes('GitHub 404')){
-      return text(404, 'Inversionista no encontrado')
+      return notFound('Inversionista no encontrado')
     }
     const status = err.statusCode || 500
-    return text(status, message)
+    return errorJson(message || 'Internal error', status)
   }
 }

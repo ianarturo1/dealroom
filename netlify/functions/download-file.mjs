@@ -1,7 +1,10 @@
 // netlify/functions/download-file.mjs
 import { getGithubFileBinary } from "./lib/storage.mjs";
+import { json, binary } from './_shared/http.mjs';
 
-export default async function handler(event, context) {
+const corsHeaders = () => ({ 'Access-Control-Allow-Origin': process.env.CORS_ORIGIN || '*' });
+
+export default async function handler(request, context) {
   // ...validaciones/slug/disposition/etc...
 
   const path = `data/docs/${slug}/${category}/${filename}`;
@@ -10,17 +13,15 @@ export default async function handler(event, context) {
   // Ahora:
   const { buffer, size } = await getGithubFileBinary({ path });
 
-  if (!buffer?.length) return json(400, { ok:false, code:'CorruptFile' });
+  if (!buffer?.length) return json({ ok:false, code:'CorruptFile' }, { status: 400, headers: corsHeaders() });
 
-  return {
-    statusCode: 200,
+  return binary(buffer, {
+    filename,
+    contentType: mimetype,
+    disposition,
     headers: {
-      'Access-Control-Allow-Origin': process.env.CORS_ORIGIN || '*',
-      'Content-Type': mimetype,
-      ...(size ? { 'Content-Length': String(size) } : {}),
-      'Content-Disposition': `${disposition}; filename="${filename}"`
-    },
-    body: buffer.toString('base64'),
-    isBase64Encoded: true
-  };
+      ...corsHeaders(),
+      ...(size ? { 'Content-Length': String(size) } : {})
+    }
+  });
 }

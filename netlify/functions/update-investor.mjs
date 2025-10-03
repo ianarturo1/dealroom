@@ -1,8 +1,8 @@
 import { Buffer } from 'node:buffer'
-import { json } from './_lib/utils.mjs'
 import { repoEnv, getFile, putFile } from './_lib/github.mjs'
 import { getStageOrder } from '../lib/stages.mjs'
 import { validateDeadlines } from '../lib/validators.mjs'
+import { json, errorJson } from './_shared/http.mjs'
 
 const isGitHubNotFound = (error) => {
   const message = String(error && error.message ? error.message : error)
@@ -15,22 +15,27 @@ const decodeFileContent = (file) => {
   return Buffer.from(file.content || '', encoding).toString('utf-8')
 }
 
-export default async function handler(event, context){
+export default async function handler(request, context){
   try {
-    if (event.httpMethod && event.httpMethod !== 'POST'){
-      return json(405, { ok: false, error: 'Method not allowed' })
+    if (request.method && request.method !== 'POST'){
+      return json({ ok: false, error: 'Method not allowed' }, { status: 405 })
     }
 
-    const body = JSON.parse(event.body || '{}')
+    let body = {}
+    try{
+      body = await request.json()
+    }catch(_){
+      body = {}
+    }
     const slug = typeof body.slug === 'string' ? body.slug.trim() : ''
     if (!slug){
-      return json(400, { ok: false, error: "Missing required field 'slug'" })
+      return json({ ok: false, error: "Missing required field 'slug'" }, { status: 400 })
     }
 
     const repo = repoEnv('CONTENT_REPO', '')
     const branch = process.env.CONTENT_BRANCH || 'main'
     if (!repo || !process.env.GITHUB_TOKEN){
-      return json(500, { ok: false, error: 'Missing GitHub configuration' })
+      return errorJson('Missing GitHub configuration')
     }
 
     const path = `data/investors/${slug}.json`
@@ -40,7 +45,7 @@ export default async function handler(event, context){
       investorFile = await getFile(repo, path, branch)
     } catch (error) {
       if (isGitHubNotFound(error)){
-        return json(404, { ok: false, error: 'Investor not found' })
+        return json({ ok: false, error: 'Investor not found' }, { status: 404 })
       }
       throw error
     }
@@ -62,7 +67,7 @@ export default async function handler(event, context){
       const order = getStageOrder()
       const validation = validateDeadlines(mergedDeadlines, order)
       if (!validation.ok){
-        return json(400, { ok: false, error: validation.error, ...validation.details })
+        return json({ ok: false, error: validation.error, ...validation.details }, { status: 400 })
       }
     }
 
@@ -82,9 +87,9 @@ export default async function handler(event, context){
       branch
     )
 
-    return json(200, { ok: true })
+    return json({ ok: true })
   } catch (error) {
     const message = String(error && error.message ? error.message : error)
-    return json(500, { ok: false, error: message })
+    return errorJson(message || 'Internal error')
   }
 }

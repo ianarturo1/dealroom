@@ -1,5 +1,5 @@
-import { ok, text } from './_lib/utils.mjs'
 import { repoEnv, listDir } from './_lib/github.mjs'
+import { json, errorJson, getUrlAndParams } from './_shared/http.mjs'
 
 function sanitizeSegment(value){
   return String(value || '')
@@ -8,15 +8,16 @@ function sanitizeSegment(value){
     .trim()
 }
 
-export default async function handler(event, context){
+export default async function handler(request, context){
   try{
-    const categoryParam = event.queryStringParameters && event.queryStringParameters.category
-    const slugParam = event.queryStringParameters && event.queryStringParameters.slug
+    const { params } = getUrlAndParams(request)
+    const categoryParam = params.get('category')
+    const slugParam = params.get('slug')
     const safeCategory = sanitizeSegment(categoryParam) || 'NDA'
     const requestedSlug = typeof slugParam === 'string' ? sanitizeSegment(slugParam).toLowerCase() : ''
     const enforcedSlug = 'alsea'
     if (requestedSlug && requestedSlug !== enforcedSlug){
-      return text(403, 'Slug not allowed')
+      return errorJson('Slug not allowed', 403)
     }
     const slug = enforcedSlug
 
@@ -24,7 +25,7 @@ export default async function handler(event, context){
     const branch = process.env.DOCS_BRANCH || 'main'
 
     if (!repo || !process.env.GITHUB_TOKEN){
-      return ok({ files: [] })
+      return json({ files: [] })
     }
 
     const effectiveSlug = (slug || '').toLowerCase()
@@ -46,9 +47,9 @@ export default async function handler(event, context){
     }catch(_){
       list = []
     }
-    return ok({ files: list })
+    return json({ files: list })
   }catch(err){
     const status = err.statusCode || 500
-    return text(status, err.message)
+    return errorJson(err.message || 'Internal error', status)
   }
 }

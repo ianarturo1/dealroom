@@ -1,5 +1,6 @@
-import { text, ok, readLocalJson } from './_lib/utils.mjs'
+import { readLocalJson } from './_lib/utils.mjs'
 import { repoEnv, getFile } from './_lib/github.mjs'
+import { binary, errorJson, getUrlAndParams } from './_shared/http.mjs'
 
 function esc(s){ return (s||'').replace(/[,\\n]/g,' ') }
 function icsEvent(uid, startDate, endDate, summary, description){
@@ -13,9 +14,10 @@ DESCRIPTION:${esc(description)}
 END:VEVENT`
 }
 
-export default async function handler(event, context){
+export default async function handler(request, context){
   try{
-    const slug = (event.queryStringParameters && event.queryStringParameters.slug) || 'femsa'
+    const { params } = getUrlAndParams(request)
+    const slug = (params.get('slug') || 'femsa').trim() || 'femsa'
     const repo = process.env.CONTENT_REPO
     const branch = process.env.CONTENT_BRANCH || 'main'
 
@@ -40,12 +42,12 @@ METHOD:PUBLISH
 ${events}
 END:VCALENDAR`
 
-    return {
-      statusCode: 200,
-      headers: { 'content-type': 'text/calendar', 'content-disposition': `attachment; filename="${slug}.ics"` },
-      body: ics
-    }
+    return binary(ics, {
+      filename: `${slug}.ics`,
+      contentType: 'text/calendar',
+      disposition: 'attachment'
+    })
   }catch(err){
-    return text(500, err.message)
+    return errorJson(err.message || 'Internal error')
   }
 }

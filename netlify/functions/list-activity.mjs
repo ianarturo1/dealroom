@@ -1,5 +1,5 @@
-import { ok, text } from './_lib/utils.mjs'
 import { repoEnv } from './_lib/github.mjs'
+import { json, errorJson } from './_shared/http.mjs'
 
 const GH_API = 'https://api.github.com'
 
@@ -116,11 +116,11 @@ async function loadDocEvents(){
   return events
 }
 
-export default async function handler(event, context){
+export default async function handler(request, context){
   try {
     // Si no hay token, no intentamos llamar a GitHub (evita 500 en deploy preview)
     if (!process.env.GITHUB_TOKEN){
-      return ok({ events: [] })
+      return json({ events: [] })
     }
 
     const [investorEvents, docEvents] = await Promise.all([
@@ -133,8 +133,8 @@ export default async function handler(event, context){
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 25)
 
-    return ok({ events })
+    return json({ events })
   }catch(error){
-    return text(500, error.message)
+    return errorJson(error.message || 'Internal error')
   }
 }

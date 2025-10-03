@@ -1,21 +1,12 @@
 // netlify/functions/get-doc.mjs
 import { getGithubFileBinary } from "./lib/storage.mjs";
+import { json, binary, getUrlAndParams } from './_shared/http.mjs';
 
 const FF = process.env.DOCS_BACKEND_ALSEA === "on";
 
 const SAFE = /^[\p{L}\p{N}._\-\s()&+,]{1,160}$/u;
 const BAD = /(\.\.)|(\/)|(\\)|(%2e)|(%2f)|(%5c)/i;
 
-function json(code, obj) {
-  return {
-    statusCode: code,
-    headers: {
-      "Access-Control-Allow-Origin": process.env.CORS_ORIGIN || "*",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(obj)
-  };
-}
 function safe(v, field) {
   const s = String(v || "").trim();
   if (!s) throw Object.assign(new Error("MissingParam"), { code: "MissingParam", field });
@@ -35,20 +26,20 @@ function guess(ext) {
   return "application/octet-stream";
 }
 
-export default async function handler(event, context) {
+export default async function handler(request, context) {
   try {
-    if (event.httpMethod !== "GET") return json(405, { ok:false, code:"MethodNotAllowed" });
+    if (request.method !== "GET") return json({ ok:false, code:"MethodNotAllowed" }, { status: 405 });
 
-    const q = event.queryStringParameters || {};
-    const slug = safe((q.slug || "").toLowerCase(), "slug");
-    const category = safe(q.category, "category");
-    const filename = safe(q.filename, "filename");
+    const { params } = getUrlAndParams(request);
+    const slug = safe((params.get("slug") || "").toLowerCase(), "slug");
+    const category = safe(params.get("category"), "category");
+    const filename = safe(params.get("filename"), "filename");
 
     // Aislar Alsea si está activado el flag
-    if (FF && slug !== "alsea") return json(403, { ok:false, code:"ForbiddenSlug" });
+    if (FF && slug !== "alsea") return json({ ok:false, code:"ForbiddenSlug" }, { status: 403 });
 
     // Content disposition (por compat: default attachment)
-    const disposition = ((q.disposition || "attachment").toLowerCase() === "inline") ? "inline" : "attachment";
+    const disposition = (((params.get("disposition") || "attachment").toLowerCase()) === "inline") ? "inline" : "attachment";
 
     // 1) Intentar path NUEVO (Dealroom unificado)
     let buffer, size;
@@ -63,28 +54,26 @@ export default async function handler(event, context) {
       path = legacyPath;
     }
 
-    if (!buffer?.length) return json(400, { ok:false, code:"CorruptFile" });
+    if (!buffer?.length) return json({ ok:false, code:"CorruptFile" }, { status: 400 });
 
     const ext = filename.split(".").pop();
     const mimetype = guess(ext);
 
-    return {
-      statusCode: 200,
+    return binary(buffer, {
+      filename,
+      contentType: mimetype,
+      disposition,
       headers: {
         "Access-Control-Allow-Origin": process.env.CORS_ORIGIN || "*",
-        "Content-Type": mimetype,
-        ...(size ? { "Content-Length": String(size) } : {}),
-        "Content-Disposition": `${disposition}; filename="${filename}"`
-      },
-      body: buffer.toString("base64"),
-      isBase64Encoded: true
-    };
+        ...(size ? { "Content-Length": String(size) } : {})
+      }
+    });
 
   } catch (err) {
     const code = err?.code || err?.statusCode || err?.status || err?.message || "DownloadError";
-    if (code === "MissingParam" || code === "BadRequest") return json(400, { ok:false, code, field: err?.field });
-    if (code === 404 || code === "NotFound") return json(404, { ok:false, code:"NotFound" });
-    if (String(err?.message || "").startsWith("MissingEnv")) return json(500, { ok:false, code:"MissingEnv", msg: err.message });
-    return json(500, { ok:false, code:"DownloadError", msg: String(err?.message || err) });
+    if (code === "MissingParam" || code === "BadRequest") return json({ ok:false, code, field: err?.field }, { status: 400 });
+    if (code === 404 || code === "NotFound") return json({ ok:false, code:"NotFound" }, { status: 404 });
+    if (String(err?.message || "").startsWith("MissingEnv")) return json({ ok:false, code:"MissingEnv", msg: err.message }, { status: 500 });
+    return json({ ok:false, code:"DownloadError", msg: String(err?.message || err) }, { status: 500 });
   }
 }
