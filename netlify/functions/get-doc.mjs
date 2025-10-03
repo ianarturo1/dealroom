@@ -1,117 +1,90 @@
 // netlify/functions/get-doc.mjs
-import { Octokit } from "octokit";
+import { getGithubFileBinary } from "./lib/storage.js";
 
-function httpError(statusCode, message) {
-  const err = new Error(message);
-  err.statusCode = statusCode;
-  return err;
+const FF = process.env.DOCS_BACKEND_ALSEA === "on";
+
+const SAFE = /^[\p{L}\p{N}._\-\s()&+,]{1,160}$/u;
+const BAD = /(\.\.)|(\/)|(\\)|(%2e)|(%2f)|(%5c)/i;
+
+function json(code, obj) {
+  return {
+    statusCode: code,
+    headers: {
+      "Access-Control-Allow-Origin": process.env.CORS_ORIGIN || "*",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(obj)
+  };
 }
-
-function getEnv(name, required = true) {
-  const val = process.env[name];
-  if (required && (!val || !val.trim())) {
-    throw new Error(`Missing env ${name}`);
-  }
-  return val;
+function safe(v, field) {
+  const s = String(v || "").trim();
+  if (!s) throw Object.assign(new Error("MissingParam"), { code: "MissingParam", field });
+  if (s.length > 160) throw Object.assign(new Error("BadRequest"), { code: "BadRequest", field });
+  if (!SAFE.test(s) || BAD.test(s)) throw Object.assign(new Error("BadRequest"), { code: "BadRequest", field });
+  return s;
 }
-
-function sanitizeSegment(s) {
-  return String(s || "")
-    .normalize("NFKC")
-    .replace(/[^\p{L}\p{N}._() \-]/gu, "")
-    .trim();
-}
-
-function ensureSlugAllowed(inputSlug) {
-  const envSlug = sanitizeSegment(process.env.PUBLIC_INVESTOR_SLUG || "");
-  if (envSlug) {
-    if (inputSlug.toLowerCase() !== envSlug.toLowerCase()) {
-      throw httpError(403, "Slug not allowed");
-    }
-    return envSlug.toLowerCase();
-  }
-  return inputSlug.toLowerCase();
-}
-
-function guessContentType(filename) {
-  const f = filename.toLowerCase();
-  if (f.endsWith(".pdf")) return "application/pdf";
-  if (f.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-  if (f.endsWith(".xlsx")) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-  if (f.endsWith(".csv")) return "text/csv";
-  if (f.endsWith(".png")) return "image/png";
-  if (f.endsWith(".jpg") || f.endsWith(".jpeg")) return "image/jpeg";
+function guess(ext) {
+  const e = (ext || "").toLowerCase();
+  if (e === "pdf") return "application/pdf";
+  if (["png","jpg","jpeg","gif","webp"].includes(e)) return `image/${e==="jpg"?"jpeg":e}`;
+  if (e === "txt") return "text/plain";
+  if (e === "csv") return "text/csv";
+  if (["xls","xlsx"].includes(e)) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  if (["doc","docx"].includes(e)) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  if (e === "zip") return "application/zip";
   return "application/octet-stream";
 }
 
-export async function handler(event) {
-  if (event.httpMethod !== "GET") {
-    return { statusCode: 405, body: "Method Not Allowed" };
-  }
-
+export const handler = async (event) => {
   try {
-    const params = event.queryStringParameters || {};
-    const category = sanitizeSegment(params.category);
-    const sanitizedSlug = sanitizeSegment(params.slug);
-    const filename = sanitizeSegment(params.filename);
+    if (event.httpMethod !== "GET") return json(405, { ok:false, code:"MethodNotAllowed" });
 
-    if (!category || !sanitizedSlug || !filename) {
-      throw httpError(400, "Missing category/slug/filename");
-    }
+    const q = event.queryStringParameters || {};
+    const slug = safe((q.slug || "").toLowerCase(), "slug");
+    const category = safe(q.category, "category");
+    const filename = safe(q.filename, "filename");
 
-    const slug = ensureSlugAllowed(sanitizedSlug);
+    // Aislar Alsea si está activado el flag
+    if (FF && slug !== "alsea") return json(403, { ok:false, code:"ForbiddenSlug" });
 
-    const path = `${category}/${slug}/${filename}`;
+    // Content disposition (por compat: default attachment)
+    const disposition = ((q.disposition || "attachment").toLowerCase() === "inline") ? "inline" : "attachment";
 
-    const DOCS_REPO = getEnv("DOCS_REPO");
-    const DOCS_BRANCH = getEnv("DOCS_BRANCH");
-    const GITHUB_TOKEN = getEnv("GITHUB_TOKEN");
-
-    const octokit = new Octokit({ auth: GITHUB_TOKEN });
-    const [owner, repo] = DOCS_REPO.split("/");
-
-    // Traer contenido en base64 desde GitHub
-    let metadata;
+    // 1) Intentar path NUEVO (Dealroom unificado)
+    let buffer, size;
+    let path = `data/docs/${slug}/${category}/${filename}`;
     try {
-      ({ data: metadata } = await octokit.repos.getContent({ owner, repo, path, ref: DOCS_BRANCH }));
-    } catch (err) {
-      if (err?.status === 404) {
-        throw httpError(404, "File not found");
-      }
-      throw err;
+      ({ buffer, size } = await getGithubFileBinary({ path }));
+    } catch (e) {
+      // 2) Fallback a path LEGACY (por si tu UI vieja aún lo usa)
+      if (String(e?.message) !== "NotFound" && e?.status !== 404) throw e;
+      const legacyPath = `${category}/${slug}/${filename}`;
+      ({ buffer, size } = await getGithubFileBinary({ path: legacyPath }));
+      path = legacyPath;
     }
 
-    if (Array.isArray(metadata) || metadata.type !== "file" || !metadata.sha) {
-      throw httpError(404, "File not found");
-    }
+    if (!buffer?.length) return json(400, { ok:false, code:"CorruptFile" });
 
-    const { data: blob } = await octokit.request("GET /repos/{owner}/{repo}/git/blobs/{file_sha}", {
-      owner,
-      repo,
-      file_sha: metadata.sha,
-    });
-
-    if (!blob || blob.encoding !== "base64" || !blob.content) {
-      throw httpError(500, "Invalid blob");
-    }
-
-    const base64 = blob.content.replace(/\r?\n/g, "");
-    const contentType = guessContentType(filename);
+    const ext = filename.split(".").pop();
+    const mimetype = guess(ext);
 
     return {
       statusCode: 200,
       headers: {
-        "Content-Type": contentType,
-        "Content-Disposition": `attachment; filename="${filename}"`,
-        // Importante para Netlify: estamos devolviendo base64
-        "Cache-Control": "no-store",
+        "Access-Control-Allow-Origin": process.env.CORS_ORIGIN || "*",
+        "Content-Type": mimetype,
+        ...(size ? { "Content-Length": String(size) } : {}),
+        "Content-Disposition": `${disposition}; filename="${filename}"`
       },
-      body: base64,
-      isBase64Encoded: true,
+      body: buffer.toString("base64"),
+      isBase64Encoded: true
     };
+
   } catch (err) {
-    const statusCode = err.statusCode || 500;
-    const message = statusCode === 500 ? "get-doc error" : err.message;
-    return { statusCode, body: message };
+    const code = err?.code || err?.statusCode || err?.status || err?.message || "DownloadError";
+    if (code === "MissingParam" || code === "BadRequest") return json(400, { ok:false, code, field: err?.field });
+    if (code === 404 || code === "NotFound") return json(404, { ok:false, code:"NotFound" });
+    if (String(err?.message || "").startsWith("MissingEnv")) return json(500, { ok:false, code:"MissingEnv", msg: err.message });
+    return json(500, { ok:false, code:"DownloadError", msg: String(err?.message || err) });
   }
-}
+};
