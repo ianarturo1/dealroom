@@ -27,7 +27,11 @@ export async function handler(event){
       return ok({ files: [] })
     }
 
-    const basePath = `data/docs/${slug}/${safeCategory}`
+    const effectiveSlug = (slug || '').toLowerCase()
+    const fallbackSlug = effectiveSlug || defaultSlug()
+    const basePath = fallbackSlug === 'alsea'
+      ? `data/docs/${fallbackSlug}/${safeCategory}`
+      : `${safeCategory}/${fallbackSlug}`
     let list = []
     try{
       const items = await listDir(repo, basePath, branch)

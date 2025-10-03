@@ -9,7 +9,8 @@ export const handler = async (event) => {
     const slug = (q.slug || '').toLowerCase();
     const category = (q.category || '').trim();
     const filename = (q.filename || '').trim();
-    const disposition = (q.disposition || 'attachment').toLowerCase(); // 'inline' o 'attachment'
+    const requestedDisposition = (q.disposition || 'attachment').toLowerCase(); // 'inline' o 'attachment'
+    const disposition = requestedDisposition === 'inline' ? 'inline' : 'attachment';
 
     if (!slug) return json(400, { ok:false, code:'MissingParam', param:'slug' });
     if (slug !== 'alsea') return json(403, { ok:false, code:'ForbiddenSlug', msg:'Solo Alsea permitido' });

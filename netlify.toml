@@ -20,6 +20,12 @@
   status = 200
   force = true
 
+[[redirects]]
+  from = "/api/download"
+  to = "/.netlify/functions/download-file"
+  status = 200
+  force = true
+
 # SPA fallback
 [[redirects]]
   from = "/*"

@@ -14,10 +14,6 @@ export const handler = async (event) => {
     let fileBuf = Buffer.alloc(0);
     let filename = '';
 
-    const rawBody = event.body
-      ? Buffer.from(event.body, event.isBase64Encoded ? 'base64' : 'utf8')
-      : Buffer.alloc(0)
-
     await new Promise((resolve, reject) => {
       const bb = Busboy({ headers: { 'content-type': contentType } });
       bb.on('field', (name, val) => fields[name] = String(val || '').trim());
@@ -27,7 +23,7 @@ export const handler = async (event) => {
       });
       bb.on('finish', resolve);
       bb.on('error', reject);
-      bb.end(rawBody);
+      bb.end(Buffer.from(event.body, event.isBase64Encoded ? 'base64' : 'utf8'));
     });
 
     // Validaciones claras
