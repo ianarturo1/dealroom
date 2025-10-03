@@ -3,16 +3,16 @@
   publish = "dist"
   functions = "netlify/functions"
 
-# Recomendado: fija Node 18 en build (si no lo pones en package.json)
 [build.environment]
   NODE_VERSION = "18"
 
 [functions]
-  node_bundler = "esbuild"
-  external_node_modules = ["octokit", "busboy"]
+  # Importante: no bundlear funciones; ejecutar ESM tal cual
+  node_bundler = "none"
+  # Incluye archivos adicionales si tu app los requiere
   included_files = ["data/**"]
 
-# Endpoints de funciones primero (antes del SPA fallback)
+# Endpoints de funciones (antes del fallback de SPA)
 [[redirects]]
   from = "/api/download"
   to = "/.netlify/functions/download-file"
