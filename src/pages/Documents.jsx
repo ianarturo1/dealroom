@@ -15,6 +15,8 @@ export default function Documents(){
   const normalizedInvestorId = useMemo(() => (investorId || '').trim().toLowerCase(), [investorId])
   const alseaSlug = 'alsea'
   const isAlseaContext = normalizedInvestorId === alseaSlug
+  const isDocsBackendFlagOn = import.meta.env?.VITE_DOCS_BACKEND_ALSEA === 'on'
+  const isAlseaFeatureEnabled = isAlseaContext && isDocsBackendFlagOn
   const slugForDocs = useMemo(() => (isAlseaContext ? alseaSlug : investorId), [alseaSlug, investorId, isAlseaContext])
   const showToast = useToast()
   const [pendingUpload, setPendingUpload] = useState(null)
@@ -99,7 +101,8 @@ export default function Documents(){
       if (options.strategy === 'rename'){
         formData.set('strategy', 'rename')
       }
-      const response = await api.uploadDoc(formData)
+      const uploadOptions = isAlseaFeatureEnabled ? { endpoint: '/.netlify/functions/upload-doc' } : undefined
+      const response = await api.uploadDoc(formData, uploadOptions)
       await refreshCategory(uploadInfo.category)
       const successMsg = options.strategy === 'rename'
         ? 'Documento subido con sufijo automático.'
@@ -124,8 +127,12 @@ export default function Documents(){
         message = `Falta ${err.data.field}`
       }else if (code === 'ForbiddenSlug'){
         message = 'Solo se permiten cargas para Alsea'
+      }else if (code === 'EmptyFile'){
+        message = 'El archivo está vacío'
       }else if (code === 'FILE_TOO_LARGE_FOR_GITHUB'){
         message = 'El archivo supera el límite de 25 MB'
+      }else if (code === 'Disabled'){
+        message = 'El backend documental no está disponible'
       }
       setError(message)
       showToast(message, { tone: 'error', duration: 5000 })
@@ -133,7 +140,27 @@ export default function Documents(){
     }finally{
       setUploadingCategory(null)
     }
-  }, [refreshCategory, showToast])
+  }, [isAlseaFeatureEnabled, refreshCategory, showToast])
+
+  const makeDownloadUrl = useCallback((category, file, options = {}) => {
+    const disposition = options.disposition === 'inline' ? 'inline' : 'attachment'
+    const safeCategory = (category || '').trim()
+    const filename = (file?.name || file?.filename || file?.path || '').trim()
+    if (isAlseaFeatureEnabled){
+      const params = new URLSearchParams()
+      params.set('slug', alseaSlug)
+      if (safeCategory) params.set('category', safeCategory)
+      if (filename) params.set('filename', filename)
+      params.set('disposition', disposition)
+      const qs = params.toString()
+      return `/.netlify/functions/download-file${qs ? `?${qs}` : ''}`
+    }
+    if (file?.path){
+      return api.downloadDocPath(file.path, { disposition })
+    }
+    const targetSlug = slugForDocs || ''
+    return api.docDownloadUrl({ category: safeCategory, slug: targetSlug, filename, disposition })
+  }, [alseaSlug, api, isAlseaFeatureEnabled, slugForDocs])
 
   const handleUpload = useCallback((category) => async (e) => {
     e.preventDefault()
@@ -226,11 +253,8 @@ export default function Documents(){
                       const sizeLabel = sizeBytes > 0 ? `${(sizeBytes / 1024).toFixed(1)} KB` : '0.0 KB'
                       const slugForKey = slugForDocs || normalizedInvestorId || investorId || 'default'
                       const key = d.path || `${category}/${slugForKey}/${filename}`
-                      const href = isAlseaContext
-                        ? api.docDownloadUrl({ category, slug: alseaSlug, filename, disposition: 'attachment' })
-                        : (d.path
-                          ? api.downloadDocPath(d.path, { disposition: 'attachment' })
-                          : api.docDownloadUrl({ category, slug: slugForDocs || '', filename, disposition: 'attachment' }))
+                      const canPreview = Boolean(d?.canPreview)
+                      const href = makeDownloadUrl(category, { ...d, name: filename }, { disposition: canPreview ? 'inline' : 'attachment' })
                       return (
                         <tr key={key}>
                           <td>{filename}</td>

@@ -679,6 +679,8 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     }
   }
 
+  const docsBackendFlagOn = import.meta.env?.VITE_DOCS_BACKEND_ALSEA === 'on'
+
   const performDocUpload = useCallback(async (uploadInfo, options = {}) => {
     if (!uploadInfo || !uploadInfo.file) return null
     setDocsError(null)
@@ -708,7 +710,9 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       if (options.strategy === 'rename'){
         formData.set('strategy', 'rename')
       }
-      const response = await api.uploadDoc(formData)
+      const isAlsea = slug === 'alsea' && docsBackendFlagOn
+      const uploadOptions = isAlsea ? { endpoint: '/.netlify/functions/upload-doc' } : undefined
+      const response = await api.uploadDoc(formData, uploadOptions)
       const successMsg = options.strategy === 'rename'
         ? 'Archivo subido con sufijo automático.'
         : 'Archivo subido.'
@@ -736,8 +740,12 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
         message = `Falta ${error.data.field}`
       }else if (code === 'ForbiddenSlug'){
         message = 'Solo se permiten cargas para Alsea'
+      }else if (code === 'EmptyFile'){
+        message = 'El archivo está vacío'
       }else if (code === 'FILE_TOO_LARGE_FOR_GITHUB'){
         message = 'El archivo supera el límite de 25 MB'
+      }else if (code === 'Disabled'){
+        message = 'El backend documental no está disponible'
       }
       setDocsError(message)
       showToast(message, { tone: 'error', duration: 5000 })
@@ -745,7 +753,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     }finally{
       setDocsWorking(false)
     }
-  }, [loadDocs, showToast])
+  }, [docsBackendFlagOn, loadDocs, showToast])
 
   const handleDocUpload = async (e) => {
     e.preventDefault()

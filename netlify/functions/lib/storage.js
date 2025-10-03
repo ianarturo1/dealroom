@@ -10,23 +10,23 @@ export async function putFileGithub({ path, contentBase64, message, branch, auth
   const [owner, repo] = repoFull.split('/');
   const octokit = new Octokit({ auth: token });
 
-  // Obtener sha si ya existe
+  // sha si existe
   let sha;
   try {
     const res = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', { owner, repo, path, ref: branchName });
-    sha = res.data.sha;
-  } catch (_) { /* no existe, continuar */ }
+    sha = res?.data?.sha;
+  } catch (_) {}
 
-  // Subir (o actualizar)
   const res = await octokit.request('PUT /repos/{owner}/{repo}/contents/{path}', {
     owner, repo, path,
     message: message || `Upload: ${path}`,
-    content: contentBase64, branch: branchName,
+    content: contentBase64,
+    branch: branchName,
     committer: author || { name: "Dealroom Bot", email: "bot@finsolar.mx" },
-    author: author || { name: "Dealroom Bot", email: "bot@finsolar.mx" },
-    sha
+    author:    author || { name: "Dealroom Bot", email: "bot@finsolar.mx" },
+    ...(sha ? { sha } : {})
   });
-  return { ok: true, commitSha: res.data.commit.sha };
+  return { ok:true, commitSha: res.data.commit.sha };
 }
 
 export async function getGithubRawUrl({ path, branch }) {
@@ -37,7 +37,8 @@ export async function getGithubRawUrl({ path, branch }) {
   const octokit = new Octokit({ auth: token });
 
   const res = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', { owner, repo, path, ref: branchName });
-  if (!res?.data?.download_url) throw new Error('NotFound');
-  // Nota: el raw URL permite streaming con fetch nativo en Node 18
-  return { downloadUrl: res.data.download_url, size: res.data.size };
+  const url = res?.data?.download_url;
+  const size = res?.data?.size;
+  if (!url) throw new Error('NotFound');
+  return { downloadUrl: url, size };
 }
