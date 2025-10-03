@@ -9,16 +9,24 @@ export const handler = async (event) => {
     const slug = (q.slug || '').toLowerCase();
     const category = (q.category || '').trim();
     const filename = (q.filename || '').trim();
-    const requestedDisposition = (q.disposition || 'attachment').toLowerCase(); // 'inline' o 'attachment'
-    const disposition = requestedDisposition === 'inline' ? 'inline' : 'attachment';
+    const disposition = (q.disposition || 'attachment').toLowerCase(); // 'inline' o 'attachment'
 
     if (!slug) return json(400, { ok:false, code:'MissingParam', param:'slug' });
     if (slug !== 'alsea') return json(403, { ok:false, code:'ForbiddenSlug', msg:'Solo Alsea permitido' });
     if (!category) return json(400, { ok:false, code:'MissingParam', param:'category' });
     if (!filename) return json(400, { ok:false, code:'MissingParam', param:'filename' });
+    if (hasTraversal(category) || hasTraversal(filename)) {
+      return json(400, { ok:false, code:'InvalidPath', msg:'Nombre de archivo o categoría inválido' });
+    }
 
     const path = `data/docs/${slug}/${category}/${filename}`;
     const { downloadUrl, size } = await getGithubRawUrl({ path });
+    if (!size || Number(size) <= 0) {
+      console.error('download-file.mjs:github-empty', { path, reportedSize: size });
+      return json(502, { ok:false, code:'EmptyFile', msg:'El archivo no tiene contenido' });
+    }
+
+    console.debug('download-file.mjs:github-metadata', { path, size });
 
     // Detectar mimetype simple por extensión
     const ext = filename.split('.').pop()?.toLowerCase();
