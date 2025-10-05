@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { api } from '@/lib/api'
 import RoleGate from '@/components/RoleGate'
 import { DEFAULT_INVESTOR_ID } from '@/lib/config'
@@ -19,6 +20,8 @@ import { Card } from '@/components/ui/Card'
 import { Section } from '@/components/ui/Section'
 import { FormRow } from '@/components/ui/FormRow'
 import { Toolbar } from '@/components/ui/Toolbar'
+import InvestorSlugPicker from '../components/InvestorSlugPicker'
+import { resolveInvestorSlug, setSlugInHash } from '../lib/slug'
 
 const PORTFOLIO_OPTIONS = [
   { value: 'solarFarms', label: 'Granjas Solares' },
@@ -121,6 +124,7 @@ const deadlinesToRows = (deadlines) => {
 }
 
 export default function Admin({ user }){
+  const location = useLocation()
   const showToast = useToast()
   const defaultName = DEFAULT_INVESTOR_ID === 'femsa'
     ? 'FEMSA'
@@ -159,6 +163,11 @@ export default function Admin({ user }){
   const [invLoading, setInvLoading] = useState(false)
   const [progress, setProgress] = useState(0)
 
+  const [adminSlug, setAdminSlug] = useState(resolveInvestorSlug())
+  useEffect(() => {
+    setAdminSlug(resolveInvestorSlug())
+  }, [location.hash])
+
   const [investorList, setInvestorList] = useState([])
   const [investorSearch, setInvestorSearch] = useState('')
   const [investorListLoading, setInvestorListLoading] = useState(false)
@@ -178,9 +187,7 @@ export default function Admin({ user }){
   const [projectSaveErr, setProjectSaveErr] = useState(null)
   const [projectSaving, setProjectSaving] = useState(false)
 
-  const [docSlugInput, setDocSlugInput] = useState(DEFAULT_INVESTOR_ID)
-  const [docSlug, setDocSlug] = useState(DEFAULT_INVESTOR_ID)
-  const [docCategory, setDocCategory] = useState(DEFAULT_DOC_CATEGORY)
+  const [adminCategory, setAdminCategory] = useState(DEFAULT_DOC_CATEGORY)
   const [docList, setDocList] = useState([])
   const [docsLoading, setDocsLoading] = useState(false)
   const [docsError, setDocsError] = useState(null)
@@ -200,9 +207,9 @@ useEffect(() => {
     const category = DOCUMENT_SECTIONS_ORDER.includes(data?.category) ? data.category : DEFAULT_DOC_CATEGORY;
     const slug = normalizeSlug(data?.slug) || DEFAULT_INVESTOR_ID;
 
-    setDocCategory(category);
-    setDocSlugInput(slug);
-    setDocSlug(slug);
+    setAdminCategory(category);
+    setSlugInHash(slug);
+    setAdminSlug(slug);
 
     window.setTimeout(() => {
       const input = document.getElementById('docs-slug');
@@ -285,7 +292,11 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     setInvestorDeleteErr(null)
     try{
       const res = await api.listInvestors()
-      const items = Array.isArray(res?.investors) ? res.investors : []
+      const items = Array.isArray(res?.items)
+        ? res.items
+        : Array.isArray(res?.investors)
+          ? res.investors
+          : []
       setInvestorList(items)
     }catch(error){
       setInvestorList([])
@@ -379,11 +390,11 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   }, [])
 
   const loadDocs = useCallback(async () => {
-    const slug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
+    const slug = normalizeSlug(adminSlug) || DEFAULT_INVESTOR_ID
     setDocsLoading(true)
     setDocsError(null)
     try{
-      const res = await api.listDocs({ category: docCategory, slug })
+      const res = await api.listDocs({ category: adminCategory, slug })
       setDocList(res.files || [])
     }catch(error){
       setDocList([])
@@ -391,7 +402,11 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     }finally{
       setDocsLoading(false)
     }
-  }, [docCategory, docSlug])
+  }, [adminCategory, adminSlug])
+
+  const handleRefresh = useCallback(() => {
+    void loadDocs()
+  }, [loadDocs])
 
   useEffect(() => {
     loadDocs()
@@ -669,13 +684,13 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     e.preventDefault()
     setDocsNotice(null)
     setDocsError(null)
-    const normalized = normalizeSlug(docSlugInput)
+    const normalized = normalizeSlug(adminSlug)
     const finalSlug = normalized || DEFAULT_INVESTOR_ID
-    setDocSlugInput(finalSlug)
-    if (finalSlug === docSlug){
-      loadDocs()
+    setSlugInHash(finalSlug)
+    if (finalSlug !== adminSlug){
+      setAdminSlug(finalSlug)
     }else{
-      setDocSlug(finalSlug)
+      handleRefresh()
     }
   }
 
@@ -764,9 +779,9 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     const fileInput = form.file
     const file = fileInput && fileInput.files ? fileInput.files[0] : null
     if (!file) return
-    const slug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
+    const slug = normalizeSlug(adminSlug) || DEFAULT_INVESTOR_ID
     void performDocUpload({
-      category: docCategory,
+      category: adminCategory,
       filename: file.name,
       file,
       slug,
@@ -813,7 +828,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const { className: decisionBadgeClass, label: decisionLabel } = getDecisionBadge(decisionDays)
   const normalizedPayloadSlug = normalizeSlug(payload.id)
   const canLoadInvestor = Boolean(normalizedPayloadSlug)
-  const effectiveDocSlug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
+  const effectiveAdminSlug = normalizeSlug(adminSlug) || DEFAULT_INVESTOR_ID
 
   const investorNameBySlug = React.useMemo(() => {
     const map = {}
@@ -982,9 +997,10 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     const normalizedSlug = normalizeSlug(slug) || DEFAULT_INVESTOR_ID
     setDocsNotice(null)
     setDocsError(null)
-    setDocCategory(normalizedCategory)
-    setDocSlugInput(normalizedSlug)
-    setDocSlug(normalizedSlug)
+    setAdminCategory(normalizedCategory)
+    setSlugInHash(normalizedSlug)
+    setAdminSlug(normalizedSlug)
+    handleRefresh()
     if (typeof window !== 'undefined'){
       window.setTimeout(() => {
         if (docsCardRef.current){
@@ -1894,21 +1910,35 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                     </Section>
                     <Section title="Documentos por inversionista" style={{ marginTop: 12 }} ref={docsCardRef}>
                       <form onSubmit={handleDocSlugSubmit} style={{ display: 'grid', gap: 16 }}>
+                        <div style={{ marginBottom: 12 }}>
+                          <InvestorSlugPicker
+                            value={adminSlug}
+                            onChange={(s) => {
+                              setSlugInHash(s)
+                              setAdminSlug(s)
+                              typeof handleRefresh === 'function' && handleRefresh()
+                            }}
+                          />
+                        </div>
                         <div className="grid-2">
                           <FormRow label="Slug del inversionista">
                             <Input
                               id="docs-slug"
-                              value={docSlugInput}
-                              onChange={e => setDocSlugInput(e.target.value)}
+                              value={adminSlug}
+                              onChange={(e) => {
+                                const v = (e.target.value || '').trim().toLowerCase()
+                                setAdminSlug(v)
+                                setSlugInHash(v)
+                              }}
                               placeholder="slug"
                             />
                           </FormRow>
                           <FormRow label="Categoría">
                             <Select
                               id="docs-category"
-                              value={docCategory}
+                              value={adminCategory}
                               onChange={e => {
-                                setDocCategory(e.target.value)
+                                setAdminCategory(e.target.value)
                                 setDocsNotice(null)
                                 setDocsError(null)
                               }}
@@ -1940,7 +1970,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                         </Toolbar>
                       </form>
                       <div className="help" style={{ marginTop: 8 }}>
-                        Gestionando: <code>{docCategory}/{effectiveDocSlug}</code>
+                        Gestionando: <code>{adminCategory}/{effectiveAdminSlug}</code>
                       </div>
                       <form
                         onSubmit={handleDocUpload}
