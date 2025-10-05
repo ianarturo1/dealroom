@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { api } from '@/lib/api'
-import { resolveInvestorSlug } from '@/lib/slug'
+import InvestorSlugPicker from '../components/InvestorSlugPicker'
+import { resolveInvestorSlug } from '../lib/slug'
 import { DOCUMENT_SECTIONS_ORDER } from '../constants/documents'
 import { useToast } from '../lib/toast'
 
@@ -12,6 +13,7 @@ export default function Documents(){
   const [error, setError] = useState(null)
   const [uploadingCategory, setUploadingCategory] = useState(null)
   const [hasLoaded, setHasLoaded] = useState(false)
+  const [selectedSlug, setSelectedSlug] = useState(resolveInvestorSlug())
   const slugForDocs = useMemo(() => resolveInvestorSlug(), [location.search])
   const showToast = useToast()
   const [selectedFiles, setSelectedFiles] = useState({})
@@ -80,6 +82,10 @@ export default function Documents(){
   useEffect(() => {
     loadAll()
   }, [loadAll])
+
+  useEffect(() => {
+    setSelectedSlug(resolveInvestorSlug())
+  }, [location.hash])
 
   const handleFileChange = useCallback((category, file) => {
     setSelectedFiles(prev => ({ ...prev, [category]: file }))
@@ -156,6 +162,13 @@ export default function Documents(){
     <div className="container">
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="h1">Biblioteca de documentos</div>
+        <InvestorSlugPicker
+          value={selectedSlug}
+          onChange={() => {
+            // ya que el picker escribe /#/?slug=<...>, solo recargamos
+            loadAll()
+          }}
+        />
         <button className="btn" onClick={() => loadAll()} disabled={loading}>
           {loading ? 'Actualizando…' : 'Actualizar'}
         </button>
