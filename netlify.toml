@@ -1,5 +1,5 @@
 [build]
-  command   = "npm ci && npm run build"
+  command   = "npm install --no-audit --no-fund && npm run build"
   publish   = "dist"
   functions = "netlify/functions"
 
@@ -10,21 +10,18 @@
   node_bundler  = "esbuild"
   included_files = ["data/**"]
 
-# Endpoints de funciones (si usas esta function, mantenla)
 [[redirects]]
   from   = "/api/download"
   to     = "/.netlify/functions/download-file"
   status = 200
   force  = true
 
-# Atajo de slug legible: /i/alsea -> /#/?slug=alsea
 [[redirects]]
   from   = "/i/:slug"
   to     = "/#/?slug=:slug"
   status = 200
   force  = true
 
-# SPA fallback (última regla)
 [[redirects]]
   from   = "/*"
   to     = "/index.html"
