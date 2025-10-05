@@ -162,6 +162,7 @@ export default function Documents(){
     <div className="container">
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="h1">Biblioteca de documentos</div>
+        {/*
         <InvestorSlugPicker
           value={selectedSlug}
           onChange={() => {
@@ -169,6 +170,7 @@ export default function Documents(){
             loadAll()
           }}
         />
+        */}
         <button className="btn" onClick={() => loadAll()} disabled={loading}>
           {loading ? 'Actualizando…' : 'Actualizar'}
         </button>
