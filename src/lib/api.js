@@ -303,3 +303,49 @@ export async function uploadDoc({ category, slug, file, filename }) {
   return await res.json(); // { ok: true, path, size, ... }
 }
 
+export const listDocs = (...args) => api.listDocs(...args);
+
+export function getDocUrl({ category, slug, filename, disposition = 'attachment' }) {
+  return api.docDownloadUrl({ category, slug, filename, disposition });
+}
+
+export function toErrMessage(res, fallback = 'Error') {
+  if (!res) return fallback;
+  if (typeof res === 'string') {
+    return res || fallback;
+  }
+  if (typeof res === 'object') {
+    const errorFromData = (() => {
+      if (res && typeof res.error === 'string' && res.error.trim()) {
+        return res.error.trim();
+      }
+      if (res && typeof res.message === 'string' && res.message.trim()) {
+        return res.message.trim();
+      }
+      if (res && typeof res.msg === 'string' && res.msg.trim()) {
+        return res.msg.trim();
+      }
+      const data = res.data;
+      if (data && typeof data === 'object') {
+        if (typeof data.error === 'string' && data.error.trim()) {
+          return data.error.trim();
+        }
+        if (typeof data.message === 'string' && data.message.trim()) {
+          return data.message.trim();
+        }
+      }
+      return '';
+    })();
+    if (errorFromData) {
+      return errorFromData;
+    }
+    const status = typeof res.status === 'number' ? res.status : '';
+    const statusText = typeof res.statusText === 'string' ? res.statusText : '';
+    const statusLabel = `${status} ${statusText}`.trim();
+    if (statusLabel) {
+      return statusLabel;
+    }
+  }
+  return fallback;
+}
+
