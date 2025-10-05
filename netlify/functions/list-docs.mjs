@@ -52,7 +52,8 @@ export default async function handler(request) {
   }
 
   try {
-    const res = await octokit.repos.getContent({ owner, repo, path, ref: BRANCH })
+    const gh = octokit.rest ? octokit.rest : octokit
+    const res = await gh.repos.getContent({ owner, repo, path, ref: BRANCH })
     const items = Array.isArray(res.data) ? res.data : []
     const files = items
       .filter((item) => item.type === 'file')
