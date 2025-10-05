@@ -1,84 +1,69 @@
-import { octokit } from './_shared/github.mjs'
+import { Octokit } from 'octokit'
 import { getUrlAndParams, json, methodNotAllowed } from './_shared/http.mjs'
 
 function requiredEnv(name) {
-  const value = (process.env[name] || '').trim()
-  if (!value) {
-    const error = new Error(`Missing env ${name}`)
-    error.status = 500
-    throw error
+  const v = (process.env[name] || '').trim()
+  if (!v) {
+    const e = new Error(`Missing env ${name}`)
+    e.status = 500
+    throw e
   }
-  return value
+  return v
 }
 
 const OWNER_REPO = requiredEnv('DOCS_REPO')
 const BRANCH = requiredEnv('DOCS_BRANCH')
 const ROOT = requiredEnv('DOCS_ROOT_DIR').replace(/^\/+|\/+$/g, '')
 
-function cleanCat(value) {
-  return String(value || '').trim().replace(/^\/+|\/+$/g, '')
-}
+const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN || undefined })
+const gh = octokit.rest ? octokit.rest : octokit
 
-function cleanSlug(value) {
-  return String(value || '').trim().toLowerCase().replace(/^\/+|\/+$/g, '')
-}
+const cleanCat = (s) => String(s || '').trim().replace(/^\/+|\/+$/g, '')
+const cleanSlug = (s) => String(s || '').trim().toLowerCase().replace(/^\/+|\/+$/g, '')
 
 export default async function handler(request) {
-  if (request.method && request.method.toUpperCase() !== 'GET') {
-    return methodNotAllowed(['GET'])
-  }
+  if (request.method?.toUpperCase() !== 'GET') return methodNotAllowed(['GET'])
 
   const { params } = getUrlAndParams(request)
   const category = cleanCat(params.get('category'))
   const slug = cleanSlug(params.get('slug'))
+  if (!category || !slug) return json({ ok: false, error: 'Falta category o slug' }, { status: 400 })
 
-  if (!category || !slug) {
-    return json({ ok: false, error: 'Falta category o slug' }, { status: 400 })
-  }
+  const candidates = [
+    [ROOT, category, slug].filter(Boolean).join('/'),
+    [category, slug].filter(Boolean).join('/'),
+    [ROOT, 'data', 'docs', slug, category].filter(Boolean).join('/'),
+  ]
 
-  const path = [ROOT, category, slug].filter(Boolean).join('/')
   const [owner, repo] = OWNER_REPO.split('/')
-  if (!owner || !repo) {
-    return json(
-      {
-        ok: false,
-        error: 'Configuración inválida de DOCS_REPO',
-        repoUsed: OWNER_REPO,
-        branchUsed: BRANCH,
-        pathTried: path,
-      },
-      { status: 500 },
-    )
-  }
-
-  try {
-    const gh = octokit.rest ? octokit.rest : octokit
-    const res = await gh.repos.getContent({ owner, repo, path, ref: BRANCH })
-    const items = Array.isArray(res.data) ? res.data : []
-    const files = items
-      .filter((item) => item.type === 'file')
-      .map((item) => ({
-        name: item.name,
-        size: item.size,
-        path: item.path,
-        download_url: item.download_url,
-      }))
-
-    return json({ ok: true, repoUsed: OWNER_REPO, branchUsed: BRANCH, pathTried: path, files })
-  } catch (error) {
-    if (error?.status === 404) {
-      return json({ ok: true, repoUsed: OWNER_REPO, branchUsed: BRANCH, pathTried: path, files: [] })
+  for (const path of candidates) {
+    try {
+      const res = await gh.repos.getContent({ owner, repo, path, ref: BRANCH })
+      const items = Array.isArray(res.data) ? res.data : []
+      const files = items
+        .filter((item) => item.type === 'file')
+        .map((item) => ({
+          name: item.name,
+          size: item.size,
+          path: item.path,
+          download_url: item.download_url,
+        }))
+      return json({ ok: true, repoUsed: OWNER_REPO, branchUsed: BRANCH, pathUsed: path, files })
+    } catch (err) {
+      if (err?.status === 404) continue
+      return json(
+        {
+          ok: false,
+          error: err?.message || String(err),
+          status: err?.status || 500,
+          repoUsed: OWNER_REPO,
+          branchUsed: BRANCH,
+          pathTried: path,
+        },
+        { status: err?.status || 500 },
+      )
     }
-
-    return json(
-      {
-        ok: false,
-        error: error?.message || 'Error',
-        repoUsed: OWNER_REPO,
-        branchUsed: BRANCH,
-        pathTried: path,
-      },
-      { status: error?.status || 500 },
-    )
   }
+
+  return json({ ok: true, repoUsed: OWNER_REPO, branchUsed: BRANCH, tried: candidates, files: [] })
 }
