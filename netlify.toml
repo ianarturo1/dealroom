@@ -1,31 +1,31 @@
 [build]
-  command = "npm run build"
-  publish = "dist"
+  command   = "npm ci && npm run build"
+  publish   = "dist"
   functions = "netlify/functions"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "20"
 
 [functions]
-  node_bundler = "esbuild"
-  # Incluye archivos adicionales si tu app los requiere
+  node_bundler  = "esbuild"
   included_files = ["data/**"]
 
-# Endpoints de funciones (antes del fallback de SPA)
+# Endpoints de funciones (si usas esta function, mantenla)
 [[redirects]]
-  from = "/api/download"
-  to = "/.netlify/functions/download-file"
+  from   = "/api/download"
+  to     = "/.netlify/functions/download-file"
   status = 200
-  force = true
+  force  = true
 
+# Atajo de slug legible: /i/alsea -> /#/?slug=alsea
 [[redirects]]
-  from = "/i/:slug"
-  to = "/#/?investor=:slug"
+  from   = "/i/:slug"
+  to     = "/#/?slug=:slug"
   status = 200
-  force = true
+  force  = true
 
-# SPA fallback al final
+# SPA fallback (última regla)
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from   = "/*"
+  to     = "/index.html"
   status = 200
