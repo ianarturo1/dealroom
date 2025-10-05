@@ -196,6 +196,7 @@ export default function Admin({ user }){
   const [listLoading, setListLoading] = useState(false)
   const [listError, setListError] = useState('')
   const [listFiles, setListFiles] = useState([])
+  const [docsMeta, setDocsMeta] = useState(null)
   const [docsError, setDocsError] = useState(null)
   const [docsNotice, setDocsNotice] = useState(null)
   const [docsWorking, setDocsWorking] = useState(false)
@@ -403,19 +404,32 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     if (!hasCategory || !hasSlug){
       setListFiles([])
       setListError('Selecciona categoría y slug')
+      setDocsMeta(null)
       return
     }
     setListLoading(true)
     setListError('')
+    setDocsMeta(null)
     try{
       const res = await apiClient.listDocs({
         category: adminCategory,
         slug,
       })
       setListFiles(Array.isArray(res?.files) ? res.files : [])
+      setDocsMeta({
+        pathTried: res?.pathTried || '',
+        repoUsed: res?.repoUsed || '',
+        branchUsed: res?.branchUsed || '',
+      })
     }catch(error){
       setListFiles([])
       setListError(error?.message || 'No se pudo listar')
+      const meta = error?.data && typeof error.data === 'object' ? error.data : null
+      setDocsMeta(meta ? {
+        pathTried: meta?.pathTried || '',
+        repoUsed: meta?.repoUsed || '',
+        branchUsed: meta?.branchUsed || '',
+      } : null)
     }finally{
       setListLoading(false)
     }
@@ -2020,9 +2034,12 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                       <div className="help" style={{ marginTop: 8 }}>
                         Gestionando: <code>{adminCategory}/{effectiveAdminSlug}</code>
                       </div>
-                      <small style={{ color: '#666' }}>
-                        Carpeta: {`${import.meta.env.VITE_DOCS_ROOT_DIR || 'dealroom'}/${adminCategory || '(cat)'}/${(normalizedAdminSlug || DEFAULT_INVESTOR_ID || '').toLowerCase()}`}
-                      </small>
+                      {docsMeta?.pathTried && (
+                        <small style={{ color: '#666', display: 'block', marginTop: 4 }}>
+                          Carpeta: {docsMeta.pathTried} <br />
+                          Repo: {docsMeta.repoUsed || '—'} — Branch: {docsMeta.branchUsed || '—'}
+                        </small>
+                      )}
                       <form
                         onSubmit={handleDocUpload}
                         style={{ marginTop: 16, display: 'grid', gap: 12 }}

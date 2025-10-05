@@ -1,9 +1,19 @@
 import { octokit } from './_shared/github.mjs'
 import { getUrlAndParams, json, methodNotAllowed } from './_shared/http.mjs'
 
-const OWNER_REPO = process.env.DOCS_REPO || process.env.CONTENT_REPO
-const BRANCH = process.env.DOCS_BRANCH || process.env.CONTENT_BRANCH || 'main'
-const ROOT = (process.env.DOCS_ROOT_DIR || 'dealroom').replace(/^\/+|\/+$/g, '')
+function requiredEnv(name) {
+  const value = (process.env[name] || '').trim()
+  if (!value) {
+    const error = new Error(`Missing env ${name}`)
+    error.status = 500
+    throw error
+  }
+  return value
+}
+
+const OWNER_REPO = requiredEnv('DOCS_REPO')
+const BRANCH = requiredEnv('DOCS_BRANCH')
+const ROOT = requiredEnv('DOCS_ROOT_DIR').replace(/^\/+|\/+$/g, '')
 
 function cleanCat(value) {
   return String(value || '').trim().replace(/^\/+|\/+$/g, '')
@@ -21,22 +31,30 @@ export default async function handler(request) {
   const { params } = getUrlAndParams(request)
   const category = cleanCat(params.get('category'))
   const slug = cleanSlug(params.get('slug'))
+
+  if (!category || !slug) {
+    return json({ ok: false, error: 'Falta category o slug' }, { status: 400 })
+  }
+
   const path = [ROOT, category, slug].filter(Boolean).join('/')
+  const [owner, repo] = OWNER_REPO.split('/')
+  if (!owner || !repo) {
+    return json(
+      {
+        ok: false,
+        error: 'Configuración inválida de DOCS_REPO',
+        repoUsed: OWNER_REPO,
+        branchUsed: BRANCH,
+        pathTried: path,
+      },
+      { status: 500 },
+    )
+  }
 
   try {
-    if (!category || !slug) {
-      return json({ ok: false, error: 'Falta category o slug' }, { status: 400 })
-    }
-
-    if (!OWNER_REPO || !OWNER_REPO.includes('/')) {
-      return json({ ok: false, error: 'Configuración inválida de repositorio', pathTried: path }, { status: 500 })
-    }
-
-    const [owner, repo] = OWNER_REPO.split('/')
-
-    const res = await octokit.rest.repos.getContent({ owner, repo, path, ref: BRANCH })
-    const entries = Array.isArray(res.data) ? res.data : []
-    const files = entries
+    const res = await octokit.repos.getContent({ owner, repo, path, ref: BRANCH })
+    const items = Array.isArray(res.data) ? res.data : []
+    const files = items
       .filter((item) => item.type === 'file')
       .map((item) => ({
         name: item.name,
@@ -45,16 +63,18 @@ export default async function handler(request) {
         download_url: item.download_url,
       }))
 
-    return json({ ok: true, pathTried: path, files })
+    return json({ ok: true, repoUsed: OWNER_REPO, branchUsed: BRANCH, pathTried: path, files })
   } catch (error) {
     if (error?.status === 404) {
-      return json({ ok: true, pathTried: path, files: [] })
+      return json({ ok: true, repoUsed: OWNER_REPO, branchUsed: BRANCH, pathTried: path, files: [] })
     }
 
     return json(
       {
         ok: false,
         error: error?.message || 'Error',
+        repoUsed: OWNER_REPO,
+        branchUsed: BRANCH,
         pathTried: path,
       },
       { status: error?.status || 500 },
