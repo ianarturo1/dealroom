@@ -1,89 +1,63 @@
-import { listRepoPath } from './_shared/github.mjs'
-import { getUrlAndParams, json, badRequest, methodNotAllowed, errorJson } from './_shared/http.mjs'
-import { ensureSlugAllowed } from './_shared/slug.mjs'
+import { octokit } from './_shared/github.mjs'
+import { getUrlAndParams, json, methodNotAllowed } from './_shared/http.mjs'
+
+const OWNER_REPO = process.env.DOCS_REPO || process.env.CONTENT_REPO
+const BRANCH = process.env.DOCS_BRANCH || process.env.CONTENT_BRANCH || 'main'
+const ROOT = (process.env.DOCS_ROOT_DIR || 'dealroom').replace(/^\/+|\/+$/g, '')
+
+function cleanCat(value) {
+  return String(value || '').trim().replace(/^\/+|\/+$/g, '')
+}
+
+function cleanSlug(value) {
+  return String(value || '').trim().toLowerCase().replace(/^\/+|\/+$/g, '')
+}
 
 export default async function handler(request) {
   if (request.method && request.method.toUpperCase() !== 'GET') {
     return methodNotAllowed(['GET'])
   }
 
+  const { params } = getUrlAndParams(request)
+  const category = cleanCat(params.get('category'))
+  const slug = cleanSlug(params.get('slug'))
+  const path = [ROOT, category, slug].filter(Boolean).join('/')
+
   try {
-    const { params } = getUrlAndParams(request)
-    const slugParam = params.get('slug')
-    const categoryParam = params.get('category')
-
-    if (!slugParam) {
-      return badRequest('Missing slug')
+    if (!category || !slug) {
+      return json({ ok: false, error: 'Falta category o slug' }, { status: 400 })
     }
 
-    if (!categoryParam) {
-      return badRequest('Missing category')
+    if (!OWNER_REPO || !OWNER_REPO.includes('/')) {
+      return json({ ok: false, error: 'Configuración inválida de repositorio', pathTried: path }, { status: 500 })
     }
 
-    const slug = ensureSlugAllowed(slugParam.trim())
-    const category = categoryParam.trim()
+    const [owner, repo] = OWNER_REPO.split('/')
 
-    if (!category) {
-      return badRequest('Missing category')
-    }
+    const res = await octokit.rest.repos.getContent({ owner, repo, path, ref: BRANCH })
+    const entries = Array.isArray(res.data) ? res.data : []
+    const files = entries
+      .filter((item) => item.type === 'file')
+      .map((item) => ({
+        name: item.name,
+        size: item.size,
+        path: item.path,
+        download_url: item.download_url,
+      }))
 
-    const primaryPath = `${category}/${slug}`
-    const legacyPath = `data/docs/${slug}/${category}`
-
-    const toFileList = (items) =>
-      Array.isArray(items)
-        ? items
-            .filter((item) => item && item.type === 'file')
-            .map((item) => ({
-              name: item.name ?? '',
-              path: item.path ?? '',
-              size: item.size ?? 0,
-              sha: item.sha ?? '',
-            }))
-        : []
-
-    let primaryItems
-    try {
-      primaryItems = await listRepoPath(primaryPath)
-    } catch (error) {
-      if (error?.status !== 404) {
-        throw error
-      }
-    }
-
-    let legacyItems
-    try {
-      legacyItems = await listRepoPath(legacyPath)
-    } catch (error) {
-      if (error?.status !== 404) {
-        throw error
-      }
-    }
-
-    const filesMap = new Map()
-
-    for (const file of toFileList(primaryItems)) {
-      if (file.path) {
-        filesMap.set(file.path, file)
-      }
-    }
-
-    for (const file of toFileList(legacyItems)) {
-      if (file.path && !filesMap.has(file.path)) {
-        filesMap.set(file.path, file)
-      }
-    }
-
-    const files = Array.from(filesMap.values())
-
-    return json({ ok: true, files })
+    return json({ ok: true, pathTried: path, files })
   } catch (error) {
-    if (error?.message === 'ForbiddenSlug' || error?.statusCode === 403 || error?.status === 403) {
-      return errorJson('ForbiddenSlug', 403)
+    if (error?.status === 404) {
+      return json({ ok: true, pathTried: path, files: [] })
     }
 
-    const status = error?.statusCode || error?.status || 500
-    const message = status === 500 ? 'Internal error' : error?.message || 'Error'
-    return errorJson(message, status)
+    return json(
+      {
+        ok: false,
+        error: error?.message || 'Error',
+        pathTried: path,
+      },
+      { status: error?.status || 500 },
+    )
   }
 }
