@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { api } from '@/lib/api'
+import { api, uploadDoc } from '@/lib/api'
 import RoleGate from '@/components/RoleGate'
 import { DEFAULT_INVESTOR_ID } from '@/lib/config'
 import { resolveDeadlineDocTarget } from '@/lib/deadlines'
@@ -193,6 +193,7 @@ export default function Admin({ user }){
   const [docsError, setDocsError] = useState(null)
   const [docsNotice, setDocsNotice] = useState(null)
   const [docsWorking, setDocsWorking] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [pendingDocUpload, setPendingDocUpload] = useState(null)
   const [docRenamePrompt, setDocRenamePrompt] = useState(null)
 
@@ -225,7 +226,7 @@ useEffect(() => {
 
 // --- REFS Y ESTADOS (mantener de main) ---
 const docsCardRef = React.useRef(null);
-const docsUploadInputRef = React.useRef(null);
+const fileInput = useRef(null);
 const docsTableRef = React.useRef(null);
 
 const [investorDetailsMap, setInvestorDetailsMap] = useState({});
@@ -772,22 +773,45 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
   const handleDocUpload = async (e) => {
     e.preventDefault()
-    if (docsWorking) return
+    if (uploading || docsWorking) return
+    const file = fileInput?.current?.files?.[0]
+    if (!file) return
+    if (!adminCategory || !adminSlug){
+      showToast('Selecciona categoría y slug', { tone: 'warning' })
+      return
+    }
+    const slug = normalizeSlug(adminSlug)
+    if (!slug){
+      showToast('Selecciona categoría y slug', { tone: 'warning' })
+      return
+    }
     setDocsError(null)
     setDocsNotice(null)
-    const form = e.target
-    const fileInput = form.file
-    const file = fileInput && fileInput.files ? fileInput.files[0] : null
-    if (!file) return
-    const slug = normalizeSlug(adminSlug) || DEFAULT_INVESTOR_ID
-    void performDocUpload({
-      category: adminCategory,
-      filename: file.name,
-      file,
-      slug,
-      message: `Upload ${file.name} desde Admin`,
-      form
-    })
+    setDocRenamePrompt(null)
+    setPendingDocUpload(null)
+    setUploading(true)
+    setDocsWorking(true)
+    try {
+      await uploadDoc({
+        category: adminCategory,
+        slug,
+        file,
+        filename: file.name
+      })
+      const successMsg = 'Archivo subido.'
+      setDocsNotice(successMsg)
+      showToast(successMsg, { tone: 'success' })
+      typeof handleRefresh === 'function' && handleRefresh()
+    } catch (error) {
+      console.error('upload error:', error)
+      const message = error?.message || 'No se pudo subir el archivo'
+      setDocsError(message)
+      showToast(message, { tone: 'error', duration: 5000 })
+    } finally {
+      setUploading(false)
+      setDocsWorking(false)
+      if (fileInput?.current) fileInput.current.value = ''
+    }
   }
 
   const handleConfirmDocRename = useCallback(async () => {
@@ -1006,8 +1030,8 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
         if (docsCardRef.current){
           docsCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }
-        if (target === 'upload' && docsUploadInputRef.current){
-          docsUploadInputRef.current.focus()
+        if (target === 'upload' && fileInput.current){
+          fileInput.current.focus()
         }else if (target === 'folder' && docsTableRef.current){
           docsTableRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }
@@ -1977,10 +2001,18 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                         style={{ marginTop: 16, display: 'grid', gap: 12 }}
                         aria-busy={docsWorking}
                       >
-                        <Input name="file" type="file" disabled={docsWorking} ref={docsUploadInputRef} />
+                        <Input
+                          name="file"
+                          type="file"
+                          disabled={docsWorking || uploading}
+                          ref={fileInput}
+                        />
                         <Toolbar>
-                          <Button type="submit" disabled={docsWorking}>
-                            {docsWorking ? 'Subiendo…' : 'Subir'}
+                          <Button
+                            type="submit"
+                            disabled={uploading || docsWorking || !adminSlug || !adminCategory}
+                          >
+                            {uploading ? 'Subiendo…' : 'Subir'}
                           </Button>
                           <span className="help">Los archivos se guardan en GitHub.</span>
                         </Toolbar>

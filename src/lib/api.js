@@ -279,3 +279,27 @@ function parseDocPath(relPath){
   return { category: '', slug: '', filename: '' };
 }
 
+// Sube un archivo a <Categoria>/<slug>/<filename>
+export async function uploadDoc({ category, slug, file, filename }) {
+  if (!category || !slug || !file) {
+    throw new Error('Faltan parámetros: category, slug o file');
+  }
+  const url = '/.netlify/functions/upload-doc'; // si tu function es "upload-file", cambia esta línea
+  const body = new FormData();
+  body.append('category', category);
+  body.append('slug', slug);
+  body.append('filename', filename || file.name);
+  body.append('file', file);
+
+  const res = await fetch(url, { method: 'POST', body });
+  if (!res.ok) {
+    let msg = `${res.status} ${res.statusText}`;
+    try {
+      const j = await res.json();
+      if (j?.error) msg = j.error;
+    } catch {}
+    throw new Error(msg);
+  }
+  return await res.json(); // { ok: true, path, size, ... }
+}
+
