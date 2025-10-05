@@ -23,7 +23,7 @@ import { Toolbar } from '@/components/ui/Toolbar'
 import InvestorSlugPicker from '../components/InvestorSlugPicker'
 import { resolveInvestorSlug, setSlugInHash } from '../lib/slug'
 import { formatBytes } from '../lib/format'
-import { getGithubFolderUrl } from '../config'
+import { getGithubCategoryUrl } from '../config'
 
 const PORTFOLIO_OPTIONS = [
   { value: 'solarFarms', label: 'Granjas Solares' },
@@ -425,17 +425,15 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     void handleRefresh()
   }, [handleRefresh])
 
-  const handleViewFolder = useCallback(() => {
-    const slug = normalizeSlug(adminSlug)
-    if (!adminCategory || !slug){
-      setListError('Selecciona categoría y slug')
+  const handleOpenCategory = useCallback(() => {
+    if (!adminCategory){
       return
     }
-    const href = getGithubFolderUrl(adminCategory, slug)
+    const href = getGithubCategoryUrl(adminCategory)
     if (typeof window !== 'undefined'){
       window.open(href, '_blank', 'noopener')
     }
-  }, [adminCategory, adminSlug])
+  }, [adminCategory])
 
   useEffect(() => {
     if (!isAdmin){
@@ -2003,7 +2001,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                         <Toolbar>
                           <Button
                             type="button"
-                            onClick={handleViewFolder}
+                            onClick={handleOpenCategory}
                             disabled={!adminSlug || !adminCategory}
                           >
                             Ver carpeta
