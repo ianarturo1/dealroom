@@ -170,6 +170,9 @@ export default function Admin({ user }){
     setAdminSlug(resolveInvestorSlug())
   }, [location.hash])
 
+  const normalizedAdminSlug = normalizeSlug(adminSlug)
+  const effectiveAdminSlug = normalizedAdminSlug || DEFAULT_INVESTOR_ID
+
   const [investorList, setInvestorList] = useState([])
   const [investorSearch, setInvestorSearch] = useState('')
   const [investorListLoading, setInvestorListLoading] = useState(false)
@@ -394,15 +397,10 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   }, [])
 
   const handleRefresh = useCallback(async () => {
+    const slug = (normalizedAdminSlug || DEFAULT_INVESTOR_ID || '').trim().toLowerCase()
     const hasCategory = Boolean(adminCategory)
-    const hasSlug = Boolean(adminSlug)
+    const hasSlug = Boolean(slug)
     if (!hasCategory || !hasSlug){
-      setListFiles([])
-      setListError('Selecciona categoría y slug')
-      return
-    }
-    const slug = normalizeSlug(adminSlug)
-    if (!slug){
       setListFiles([])
       setListError('Selecciona categoría y slug')
       return
@@ -410,7 +408,10 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     setListLoading(true)
     setListError('')
     try{
-      const res = await apiClient.listDocs({ category: adminCategory, slug })
+      const res = await apiClient.listDocs({
+        category: adminCategory,
+        slug,
+      })
       setListFiles(Array.isArray(res?.files) ? res.files : [])
     }catch(error){
       setListFiles([])
@@ -418,7 +419,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     }finally{
       setListLoading(false)
     }
-  }, [adminCategory, adminSlug, apiClient])
+  }, [adminCategory, apiClient, normalizedAdminSlug])
 
   useEffect(() => {
     void handleRefresh()
@@ -873,9 +874,6 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const { className: decisionBadgeClass, label: decisionLabel } = getDecisionBadge(decisionDays)
   const normalizedPayloadSlug = normalizeSlug(payload.id)
   const canLoadInvestor = Boolean(normalizedPayloadSlug)
-  const normalizedAdminSlug = normalizeSlug(adminSlug)
-  const effectiveAdminSlug = normalizedAdminSlug || DEFAULT_INVESTOR_ID
-
   const investorNameBySlug = React.useMemo(() => {
     const map = {}
     investorList.forEach(item => {
@@ -2022,6 +2020,9 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                       <div className="help" style={{ marginTop: 8 }}>
                         Gestionando: <code>{adminCategory}/{effectiveAdminSlug}</code>
                       </div>
+                      <small style={{ color: '#666' }}>
+                        Carpeta: {`${import.meta.env.VITE_DOCS_ROOT_DIR || 'dealroom'}/${adminCategory || '(cat)'}/${(normalizedAdminSlug || DEFAULT_INVESTOR_ID || '').toLowerCase()}`}
+                      </small>
                       <form
                         onSubmit={handleDocUpload}
                         style={{ marginTop: 16, display: 'grid', gap: 12 }}
