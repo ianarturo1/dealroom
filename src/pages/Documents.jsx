@@ -1,14 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { api } from '@/lib/api'
+import { api, listDocs, getDocUrl } from '../lib/api'
 import InvestorSlugPicker from '../components/InvestorSlugPicker'
 import { resolveInvestorSlug } from '../lib/slug'
 import { DOCUMENT_SECTIONS_ORDER } from '../constants/documents'
 import { useToast } from '../lib/toast'
+import { formatBytes } from '../lib/format'
 
 export default function Documents(){
   const location = useLocation()
-  const [docsByCategory, setDocsByCategory] = useState({})
+  const [loadingByCat, setLoadingByCat] = useState({})
+  const [errorByCat, setErrorByCat] = useState({})
+  const [filesByCat, setFilesByCat] = useState({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [uploadingCategory, setUploadingCategory] = useState(null)
@@ -18,66 +21,56 @@ export default function Documents(){
   const showToast = useToast()
   const [selectedFiles, setSelectedFiles] = useState({})
   const [uploadInputKeys, setUploadInputKeys] = useState({})
-  const [downloadingDocId, setDownloadingDocId] = useState(null)
 
   const fetchDocs = useCallback(async (category) => {
     if (!slugForDocs){
-      return []
+      throw new Error('Slug no disponible para consultar documentos')
     }
-    const res = await api.listDocs({ category, slug: slugForDocs })
+    const res = await listDocs({ category, slug: slugForDocs })
     const files = Array.isArray(res?.files) ? res.files : []
     return files
   }, [slugForDocs])
 
   const refreshCategory = useCallback(async (category) => {
-    const files = await fetchDocs(category)
-    setDocsByCategory(prev => ({ ...prev, [category]: files }))
-    return files
+    setLoadingByCat(prev => ({ ...prev, [category]: true }))
+    setErrorByCat(prev => ({ ...prev, [category]: '' }))
+    try{
+      const files = await fetchDocs(category)
+      setFilesByCat(prev => ({ ...prev, [category]: files }))
+      return files
+    }catch(err){
+      const message = err?.message || 'No se pudieron cargar documentos'
+      setErrorByCat(prev => ({ ...prev, [category]: message }))
+      setFilesByCat(prev => ({ ...prev, [category]: [] }))
+      return []
+    }finally{
+      setLoadingByCat(prev => ({ ...prev, [category]: false }))
+    }
   }, [fetchDocs])
 
   const loadAll = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setErrorByCat({})
+    setLoadingByCat({})
     if (!slugForDocs){
-      setDocsByCategory({})
+      setFilesByCat({})
       setLoading(false)
       setHasLoaded(true)
       setError('Slug no disponible para consultar documentos')
       return
     }
     try{
-      const results = await Promise.allSettled(
-        DOCUMENT_SECTIONS_ORDER.map(async (category) => {
-          const files = await fetchDocs(category)
-          return [category, files]
-        })
+      await Promise.all(
+        DOCUMENT_SECTIONS_ORDER.map((category) => refreshCategory(category))
       )
-      const next = {}
-      const errors = []
-      results.forEach((result, index) => {
-        const fallbackCategory = DOCUMENT_SECTIONS_ORDER[index]
-        if (result.status === 'fulfilled'){
-          const [category, files] = result.value
-          next[category] = files
-        }else{
-          const message = result.reason?.message || 'Error desconocido'
-          next[fallbackCategory] = []
-          errors.push(`${fallbackCategory}: ${message}`)
-        }
-      })
-      setDocsByCategory(next)
-      if (errors.length){
-        const suffix = errors.length === 1 ? '' : 's'
-        setError(`No se pudieron cargar ${errors.length} categoría${suffix}.`)
-      }
     }catch(err){
-      setDocsByCategory({})
-      setError(err.message)
+      setError(err?.message || 'No se pudieron cargar los documentos')
     }finally{
       setLoading(false)
       setHasLoaded(true)
     }
-  }, [fetchDocs, slugForDocs])
+  }, [refreshCategory, slugForDocs])
 
   useEffect(() => {
     loadAll()
@@ -125,38 +118,6 @@ export default function Documents(){
     await uploadCategory(category)
   }, [uploadCategory])
 
-  const handleDownload = useCallback(async (category, doc, docKey) => {
-    if (!slugForDocs){
-      const message = 'Slug no disponible para la descarga'
-      showToast(message, { tone: 'error', duration: 5000 })
-      return
-    }
-
-    const fallbackName = (doc?.path || '').split('/').filter(Boolean).pop()
-    const filename = (doc?.filename || doc?.name || fallbackName || '').trim()
-
-    if (!filename){
-      const message = 'Nombre de archivo no disponible'
-      showToast(message, { tone: 'error', duration: 5000 })
-      return
-    }
-
-    try{
-      setDownloadingDocId(docKey)
-      await api.downloadDocument({
-        slug: slugForDocs,
-        category,
-        filename,
-        disposition: doc?.canPreview ? 'inline' : 'attachment'
-      })
-    }catch(err){
-      const message = err?.message || 'No se pudo descargar el archivo'
-      showToast(message, { tone: 'error', duration: 5000 })
-    }finally{
-      setDownloadingDocId(null)
-    }
-  }, [showToast, slugForDocs])
-
   return (
     <>
     <div className="container">
@@ -179,7 +140,9 @@ export default function Documents(){
 
       <div style={{ marginTop: 12, display: 'grid', gap: 24 }}>
         {DOCUMENT_SECTIONS_ORDER.map((category) => {
-          const docs = docsByCategory[category] || []
+          const files = filesByCat[category] || []
+          const catLoading = Boolean(loadingByCat[category])
+          const catError = errorByCat[category]
           const selectedFile = selectedFiles[category] || null
           const isUploading = uploadingCategory === category
           return (
@@ -213,44 +176,73 @@ export default function Documents(){
                     </tr>
                   </thead>
                   <tbody>
-                    {docs.map((d) => {
-                      const filename = d.name || d.filename || d.path || ''
-                      const sizeBytes = typeof d.size === 'number'
-                        ? d.size
-                        : typeof d.sizeBytes === 'number'
-                          ? d.sizeBytes
-                          : typeof d.sizeKB === 'number'
-                            ? Math.round(d.sizeKB * 1024)
-                            : 0
-                      const sizeLabel = sizeBytes > 0 ? `${(sizeBytes / 1024).toFixed(1)} KB` : '0.0 KB'
+                    {files.map((d) => {
+                      const displayName = d?.name || d?.filename || d?.path || ''
                       const slugForKey = slugForDocs || 'default'
-                      const key = d.path || `${category}/${slugForKey}/${filename}`
-                      const isDownloading = downloadingDocId === key
+                      const key = d?.path || `${category}/${slugForKey}/${displayName}`
+                      const sizeBytes = typeof d?.size === 'number'
+                        ? d.size
+                        : typeof d?.sizeBytes === 'number'
+                          ? d.sizeBytes
+                          : typeof d?.sizeKB === 'number'
+                            ? Math.round(d.sizeKB * 1024)
+                            : null
+                      const sizeLabel = typeof sizeBytes === 'number' && sizeBytes >= 0
+                        ? formatBytes(sizeBytes)
+                        : '—'
+                      const rawPath = typeof d?.path === 'string' ? d.path.replace(/^\/+/, '') : ''
+                      const pathParts = rawPath ? rawPath.split('/').filter(Boolean) : []
+                      let filenameForUrl = typeof d?.filename === 'string' && d.filename
+                        ? d.filename
+                        : typeof d?.name === 'string' && d.name
+                          ? d.name
+                          : ''
+                      if (!filenameForUrl && pathParts.length){
+                        if (pathParts.length >= 4 && pathParts[0] === 'data' && pathParts[1] === 'docs'){
+                          filenameForUrl = pathParts.slice(4).join('/') || pathParts[pathParts.length - 1] || ''
+                        }else if (pathParts.length >= 3){
+                          filenameForUrl = pathParts.slice(2).join('/') || pathParts[pathParts.length - 1] || ''
+                        }else{
+                          filenameForUrl = pathParts[pathParts.length - 1] || ''
+                        }
+                      }
+                      const downloadUrl = slugForDocs && filenameForUrl
+                        ? getDocUrl({ category, slug: slugForDocs, filename: filenameForUrl })
+                        : null
                       return (
                         <tr key={key}>
-                          <td>{filename}</td>
+                          <td>{displayName}</td>
                           <td>{sizeLabel}</td>
                           <td>
-                            <button
-                              type="button"
-                              className="btn secondary"
-                              onClick={() => handleDownload(category, d, key)}
-                              disabled={isDownloading}
-                            >
-                              {isDownloading ? 'Descargando…' : 'Descargar'}
-                            </button>
+                            {downloadUrl ? (
+                              <a
+                                className="btn secondary"
+                                href={downloadUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                Descargar
+                              </a>
+                            ) : (
+                              <span className="help">Slug no disponible.</span>
+                            )}
                           </td>
                         </tr>
                       )
                     })}
-                    {docs.length === 0 && hasLoaded && !loading && (
+                    {catError && (
                       <tr>
-                        <td colSpan="3">No hay documentos aún.</td>
+                        <td colSpan="3" style={{ color: 'red' }}>{catError}</td>
                       </tr>
                     )}
-                    {docs.length === 0 && loading && (
+                    {catLoading && (
                       <tr>
                         <td colSpan="3">Cargando…</td>
+                      </tr>
+                    )}
+                    {!catLoading && !catError && files.length === 0 && hasLoaded && (
+                      <tr>
+                        <td colSpan="3">No hay documentos aún.</td>
                       </tr>
                     )}
                   </tbody>

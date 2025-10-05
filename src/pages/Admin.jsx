@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { api, uploadDoc } from '@/lib/api'
+import * as api from '../lib/api'
 import RoleGate from '@/components/RoleGate'
 import { DEFAULT_INVESTOR_ID } from '@/lib/config'
 import { resolveDeadlineDocTarget } from '@/lib/deadlines'
@@ -22,6 +22,8 @@ import { FormRow } from '@/components/ui/FormRow'
 import { Toolbar } from '@/components/ui/Toolbar'
 import InvestorSlugPicker from '../components/InvestorSlugPicker'
 import { resolveInvestorSlug, setSlugInHash } from '../lib/slug'
+import { formatBytes } from '../lib/format'
+import { getGithubFolderUrl } from '../config'
 
 const PORTFOLIO_OPTIONS = [
   { value: 'solarFarms', label: 'Granjas Solares' },
@@ -126,6 +128,7 @@ const deadlinesToRows = (deadlines) => {
 export default function Admin({ user }){
   const location = useLocation()
   const showToast = useToast()
+  const apiClient = api.api
   const defaultName = DEFAULT_INVESTOR_ID === 'femsa'
     ? 'FEMSA'
     : DEFAULT_INVESTOR_ID.toUpperCase()
@@ -188,8 +191,9 @@ export default function Admin({ user }){
   const [projectSaving, setProjectSaving] = useState(false)
 
   const [adminCategory, setAdminCategory] = useState(DEFAULT_DOC_CATEGORY)
-  const [docList, setDocList] = useState([])
-  const [docsLoading, setDocsLoading] = useState(false)
+  const [listLoading, setListLoading] = useState(false)
+  const [listError, setListError] = useState('')
+  const [listFiles, setListFiles] = useState([])
   const [docsError, setDocsError] = useState(null)
   const [docsNotice, setDocsNotice] = useState(null)
   const [docsWorking, setDocsWorking] = useState(false)
@@ -292,7 +296,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     setInvestorDeleteMsg(null)
     setInvestorDeleteErr(null)
     try{
-      const res = await api.listInvestors()
+      const res = await apiClient.listInvestors()
       const items = Array.isArray(res?.items)
         ? res.items
         : Array.isArray(res?.investors)
@@ -331,7 +335,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     setInvestorDeleteMsg(null)
     setDeletingInvestor(slug)
     try{
-      await api.deleteInvestor(slug)
+      await apiClient.deleteInvestor(slug)
       setInvestorList(prev => prev.filter(item => item.slug !== slug))
       setInvestorDeleteMsg('Inversionista eliminado.')
       return true
@@ -375,7 +379,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     let active = true
     setProjectsLoading(true)
     setProjectLoadErr(null)
-    api.listProjects()
+    apiClient.listProjects()
       .then(items => {
         if (!active) return
         setProjectList(items.map(toFormProject))
@@ -390,28 +394,48 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     return () => { active = false }
   }, [])
 
-  const loadDocs = useCallback(async () => {
-    const slug = normalizeSlug(adminSlug) || DEFAULT_INVESTOR_ID
-    setDocsLoading(true)
-    setDocsError(null)
-    try{
-      const res = await api.listDocs({ category: adminCategory, slug })
-      setDocList(res.files || [])
-    }catch(error){
-      setDocList([])
-      setDocsError(error.message)
-    }finally{
-      setDocsLoading(false)
+  const handleRefresh = useCallback(async () => {
+    const hasCategory = Boolean(adminCategory)
+    const hasSlug = Boolean(adminSlug)
+    if (!hasCategory || !hasSlug){
+      setListFiles([])
+      setListError('Selecciona categoría y slug')
+      return
     }
-  }, [adminCategory, adminSlug])
-
-  const handleRefresh = useCallback(() => {
-    void loadDocs()
-  }, [loadDocs])
+    const slug = normalizeSlug(adminSlug)
+    if (!slug){
+      setListFiles([])
+      setListError('Selecciona categoría y slug')
+      return
+    }
+    setListLoading(true)
+    setListError('')
+    try{
+      const res = await apiClient.listDocs({ category: adminCategory, slug })
+      setListFiles(Array.isArray(res?.files) ? res.files : [])
+    }catch(error){
+      setListFiles([])
+      setListError(error?.message || 'No se pudo listar')
+    }finally{
+      setListLoading(false)
+    }
+  }, [adminCategory, adminSlug, apiClient])
 
   useEffect(() => {
-    loadDocs()
-  }, [loadDocs])
+    void handleRefresh()
+  }, [handleRefresh])
+
+  const handleViewFolder = useCallback(() => {
+    const slug = normalizeSlug(adminSlug)
+    if (!adminCategory || !slug){
+      setListError('Selecciona categoría y slug')
+      return
+    }
+    const href = getGithubFolderUrl(adminCategory, slug)
+    if (typeof window !== 'undefined'){
+      window.open(href, '_blank', 'noopener')
+    }
+  }, [adminCategory, adminSlug])
 
   useEffect(() => {
     if (!isAdmin){
@@ -433,7 +457,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       try{
         const entries = await Promise.all(investorList.map(async (item) => {
           try{
-            const data = await api.getInvestor(item.slug)
+            const data = await apiClient.getInvestor(item.slug)
             return [item.slug, data]
           }catch(error){
             return [item.slug, { __error: error.message }]
@@ -491,7 +515,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
           for (const investor of investorList){
             if (!active) return
             try{
-              const res = await api.listDocs({ category, slug: investor.slug })
+              const res = await apiClient.listDocs({ category, slug: investor.slug })
               const files = Array.isArray(res?.files) ? res.files : []
               categoryData[investor.slug] = { files, error: null }
             }catch(error){
@@ -530,7 +554,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     let active = true
     setActivityLoading(true)
     setActivityError(null)
-    api.listActivity()
+    apiClient.listActivity()
       .then(res => {
         if (!active) return
         const events = Array.isArray(res?.events) ? res.events.slice() : []
@@ -671,7 +695,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     setProjectSaving(true)
     try{
       const sanitized = sanitizeProjects()
-      await api.saveProjects(sanitized)
+      await apiClient.saveProjects(sanitized)
       setProjectList(sanitized.map(toFormProject))
       setProjectSaveMsg('Proyectos guardados y commiteados a GitHub.')
     }catch(error){
@@ -691,7 +715,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     if (finalSlug !== adminSlug){
       setAdminSlug(finalSlug)
     }else{
-      handleRefresh()
+      void handleRefresh()
     }
   }
 
@@ -728,7 +752,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       }
       const isAlsea = slug === 'alsea' && docsBackendFlagOn
       const uploadOptions = isAlsea ? { endpoint: '/.netlify/functions/upload-doc' } : undefined
-      const response = await api.uploadDoc(formData, uploadOptions)
+      const response = await apiClient.uploadDoc(formData, uploadOptions)
       const successMsg = options.strategy === 'rename'
         ? 'Archivo subido con sufijo automático.'
         : 'Archivo subido.'
@@ -737,7 +761,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       uploadInfo.form?.reset()
       setPendingDocUpload(null)
       setDocRenamePrompt(null)
-      await loadDocs()
+      await handleRefresh()
       return response
     }catch(error){
       if (error?.status === 409 && error?.data?.error === 'FILE_EXISTS' && options.strategy !== 'rename'){
@@ -769,7 +793,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     }finally{
       setDocsWorking(false)
     }
-  }, [docsBackendFlagOn, loadDocs, showToast])
+  }, [docsBackendFlagOn, handleRefresh, showToast])
 
   const handleDocUpload = async (e) => {
     e.preventDefault()
@@ -792,7 +816,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     setUploading(true)
     setDocsWorking(true)
     try {
-      await uploadDoc({
+      await apiClient.uploadDoc({
         category: adminCategory,
         slug,
         file,
@@ -801,7 +825,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
       const successMsg = 'Archivo subido.'
       setDocsNotice(successMsg)
       showToast(successMsg, { tone: 'success' })
-      typeof handleRefresh === 'function' && handleRefresh()
+      await handleRefresh()
     } catch (error) {
       console.error('upload error:', error)
       const message = error?.message || 'No se pudo subir el archivo'
@@ -834,12 +858,12 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     setDocsNotice(null)
     try{
       setDocsWorking(true)
-      await api.deleteDoc({
+      await apiClient.deleteDoc({
         path: file.path,
         message: `Delete ${file.name} desde Admin`
       })
       setDocsNotice('Documento eliminado.')
-      await loadDocs()
+      await handleRefresh()
     }catch(error){
       setDocsError(error.message)
     }finally{
@@ -852,7 +876,8 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const { className: decisionBadgeClass, label: decisionLabel } = getDecisionBadge(decisionDays)
   const normalizedPayloadSlug = normalizeSlug(payload.id)
   const canLoadInvestor = Boolean(normalizedPayloadSlug)
-  const effectiveAdminSlug = normalizeSlug(adminSlug) || DEFAULT_INVESTOR_ID
+  const normalizedAdminSlug = normalizeSlug(adminSlug)
+  const effectiveAdminSlug = normalizedAdminSlug || DEFAULT_INVESTOR_ID
 
   const investorNameBySlug = React.useMemo(() => {
     const map = {}
@@ -1054,7 +1079,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     setDeadlinesErr(null)
     setInvestorLoading(true)
     try {
-      const data = await api.getInvestor(slug)
+      const data = await apiClient.getInvestor(slug)
       setPayload(prev => ({
         ...prev,
         ...data,
@@ -1242,7 +1267,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
         deadlines: normalizedDeadlines
       }
 
-      await api.updateStatus(payloadToSend)
+      await apiClient.updateStatus(payloadToSend)
       setPayload(payloadToSend)
       setMsg('Guardado y commiteado a GitHub.')
     }catch(error){ setErr(error.message) }
@@ -1308,7 +1333,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
       const payload = { email: inv.email, companyName: inv.companyName, status: inv.status, deadlines: dl }
       if (inv.slug) payload.slug = inv.slug
-      const res = await api.createInvestor(payload)
+      const res = await apiClient.createInvestor(payload)
       setProgress(100)
       setInvMsg(res.link)
       showToast('Inversionista creado correctamente.', { tone: 'success' })
@@ -1940,7 +1965,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                             onChange={(s) => {
                               setSlugInHash(s)
                               setAdminSlug(s)
-                              typeof handleRefresh === 'function' && handleRefresh()
+                              void handleRefresh()
                             }}
                           />
                         </div>
@@ -1976,7 +2001,11 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                           </FormRow>
                         </div>
                         <Toolbar>
-                          <Button type="submit" disabled={docsLoading || docsWorking}>
+                          <Button
+                            type="button"
+                            onClick={handleViewFolder}
+                            disabled={!adminSlug || !adminCategory}
+                          >
                             Ver carpeta
                           </Button>
                           <Button
@@ -1985,11 +2014,11 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                             onClick={() => {
                               setDocsNotice(null)
                               setDocsError(null)
-                              loadDocs()
+                              void handleRefresh()
                             }}
-                            disabled={docsLoading || docsWorking}
+                            disabled={listLoading || docsWorking}
                           >
-                            Actualizar
+                            {listLoading ? 'Actualizando…' : 'Actualizar'}
                           </Button>
                         </Toolbar>
                       </form>
@@ -2019,8 +2048,9 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                       </form>
                       {docsError && <div className="notice" style={{ marginTop: 8 }}>{docsError}</div>}
                       {docsNotice && <div className="notice" style={{ marginTop: 8 }}>{docsNotice}</div>}
-                      {docsWorking && !docsLoading && <div style={{ marginTop: 8, color: 'var(--muted)' }}>Procesando...</div>}
-                      {docsLoading && <div style={{ marginTop: 8, color: 'var(--muted)' }}>Cargando documentos...</div>}
+                      {listError && <div style={{ marginTop: 8, color: 'red' }}>{listError}</div>}
+                      {docsWorking && !listLoading && <div style={{ marginTop: 8, color: 'var(--muted)' }}>Procesando...</div>}
+                      {listLoading && <div style={{ marginTop: 8, color: 'var(--muted)' }}>Cargando…</div>}
                       <table className="table" style={{ marginTop: 12 }} ref={docsTableRef}>
                         <thead>
                           <tr>
@@ -2030,31 +2060,58 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                           </tr>
                         </thead>
                         <tbody>
-                          {docList.map(file => (
-                            <tr key={file.path}>
-                              <td>{file.name}</td>
-                              <td>{(file.size / 1024).toFixed(1)} KB</td>
-                              <td style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                                <a
-                                  className="btn secondary"
-                                  href={api.downloadDocPath(file.path, { disposition: 'inline' })}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  Descargar
-                                </a>
-                                <Button
-                                  type="button"
-                                  variant="secondary"
-                                  onClick={() => handleDocDelete(file)}
-                                  disabled={docsWorking}
-                                >
-                                  Eliminar
-                                </Button>
-                              </td>
-                            </tr>
-                          ))}
-                          {!docList.length && !docsLoading && (
+                          {listFiles.map(file => {
+                            const displayName = file?.name || file?.filename || file?.path || ''
+                            const sizeBytes = typeof file?.size === 'number'
+                              ? file.size
+                              : typeof file?.sizeBytes === 'number'
+                                ? file.sizeBytes
+                                : typeof file?.sizeKB === 'number'
+                                  ? Math.round(file.sizeKB * 1024)
+                                  : null
+                            const sizeLabel = typeof sizeBytes === 'number' && sizeBytes >= 0
+                              ? formatBytes(sizeBytes)
+                              : '—'
+                            const slugForDownload = normalizedAdminSlug
+                            const fileNameForUrl = typeof file?.name === 'string' && file.name
+                              ? file.name
+                              : typeof file?.filename === 'string'
+                                ? file.filename
+                                : ''
+                            const canDownload = Boolean(slugForDownload && adminCategory && fileNameForUrl)
+                            const downloadUrl = canDownload
+                              ? api.getDocUrl({ category: adminCategory, slug: slugForDownload, filename: fileNameForUrl })
+                              : null
+                            return (
+                              <tr key={file.path || `${adminCategory}/${slugForDownload || 'slug'}/${displayName}`}>
+                                <td>{displayName}</td>
+                                <td>{sizeLabel}</td>
+                                <td style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                                  {downloadUrl ? (
+                                    <a
+                                      className="btn secondary"
+                                      href={downloadUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      Descargar
+                                    </a>
+                                  ) : (
+                                    <span className="help">Slug no disponible.</span>
+                                  )}
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => handleDocDelete(file)}
+                                    disabled={docsWorking}
+                                  >
+                                    Eliminar
+                                  </Button>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                          {!listFiles.length && !listLoading && !listError && (
                             <tr>
                               <td colSpan={3}>No hay documentos en esta carpeta.</td>
                             </tr>
