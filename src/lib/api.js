@@ -279,3 +279,20 @@ function parseDocPath(relPath){
   return { category: '', slug: '', filename: '' };
 }
 
+// Lista archivos de una categoría para un slug
+export async function listDocs({ category, slug }) {
+  const url = `/.netlify/functions/list-docs?category=${encodeURIComponent(category)}&slug=${encodeURIComponent(slug)}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+  const data = await r.json();
+  return {
+    ok: !!data?.ok,
+    files: Array.isArray(data?.files) ? data.files : [], // [{ name, size }]
+  };
+}
+
+// URL directa para descargar un archivo
+export function getDocUrl({ category, slug, filename }) {
+  return `/.netlify/functions/get-doc?category=${encodeURIComponent(category)}&slug=${encodeURIComponent(slug)}&filename=${encodeURIComponent(filename)}`;
+}
+
