@@ -23,7 +23,6 @@ import { Toolbar } from '@/components/ui/Toolbar'
 import InvestorSlugPicker from '../components/InvestorSlugPicker'
 import { resolveInvestorSlug, setSlugInHash } from '../lib/slug'
 import { formatBytes } from '../lib/format'
-import { getGithubCategoryUrl } from '../config'
 
 const PORTFOLIO_OPTIONS = [
   { value: 'solarFarms', label: 'Granjas Solares' },
@@ -229,9 +228,9 @@ useEffect(() => {
 }, []);
 
 // --- REFS Y ESTADOS (mantener de main) ---
-const docsCardRef = React.useRef(null);
+const docsCardRef = useRef(null);
 const fileInput = useRef(null);
-const docsTableRef = React.useRef(null);
+const docsTableRef = useRef(null);
 
 const [investorDetailsMap, setInvestorDetailsMap] = useState({});
 const [investorDetailsLoading, setInvestorDetailsLoading] = useState(false);
@@ -426,14 +425,14 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   }, [handleRefresh])
 
   const handleOpenCategory = useCallback(() => {
-    if (!adminCategory){
-      return
+    if (!adminCategory || !adminSlug) return;
+    setDocsNotice?.(null);
+    setDocsError?.(null);
+    void handleRefresh?.();
+    if (docsTableRef?.current && typeof docsTableRef.current.scrollIntoView === 'function') {
+      docsTableRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-    const href = getGithubCategoryUrl(adminCategory)
-    if (typeof window !== 'undefined'){
-      window.open(href, '_blank', 'noopener')
-    }
-  }, [adminCategory])
+  }, [adminCategory, adminSlug, handleRefresh])
 
   useEffect(() => {
     if (!isAdmin){
@@ -2004,7 +2003,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                             onClick={handleOpenCategory}
                             disabled={!adminSlug || !adminCategory}
                           >
-                            Ver carpeta
+                            Ver archivos
                           </Button>
                           <Button
                             type="button"
