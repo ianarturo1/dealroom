@@ -19,6 +19,8 @@ import { Card } from '@/components/ui/Card'
 import { Section } from '@/components/ui/Section'
 import { FormRow } from '@/components/ui/FormRow'
 import { Toolbar } from '@/components/ui/Toolbar'
+import InvestorSlugPicker from '../components/InvestorSlugPicker'
+import { resolveInvestorSlug, setSlugInHash } from '../lib/slug'
 
 const PORTFOLIO_OPTIONS = [
   { value: 'solarFarms', label: 'Granjas Solares' },
@@ -178,8 +180,7 @@ export default function Admin({ user }){
   const [projectSaveErr, setProjectSaveErr] = useState(null)
   const [projectSaving, setProjectSaving] = useState(false)
 
-  const [docSlugInput, setDocSlugInput] = useState(DEFAULT_INVESTOR_ID)
-  const [docSlug, setDocSlug] = useState(DEFAULT_INVESTOR_ID)
+  const [adminSlug, setAdminSlug] = useState(resolveInvestorSlug())
   const [docCategory, setDocCategory] = useState(DEFAULT_DOC_CATEGORY)
   const [docList, setDocList] = useState([])
   const [docsLoading, setDocsLoading] = useState(false)
@@ -201,8 +202,10 @@ useEffect(() => {
     const slug = normalizeSlug(data?.slug) || DEFAULT_INVESTOR_ID;
 
     setDocCategory(category);
-    setDocSlugInput(slug);
-    setDocSlug(slug);
+    skipNextSlugEffectRef.current = true;
+    setAdminSlug(slug);
+    setSlugInHash(slug);
+    handleRefresh({ slug, category });
 
     window.setTimeout(() => {
       const input = document.getElementById('docs-slug');
@@ -220,6 +223,8 @@ useEffect(() => {
 const docsCardRef = React.useRef(null);
 const docsUploadInputRef = React.useRef(null);
 const docsTableRef = React.useRef(null);
+const lastDocsRequestRef = React.useRef({ slug: null, category: null });
+const skipNextSlugEffectRef = React.useRef(false);
 
 const [investorDetailsMap, setInvestorDetailsMap] = useState({});
 const [investorDetailsLoading, setInvestorDetailsLoading] = useState(false);
@@ -378,12 +383,28 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     return () => { active = false }
   }, [])
 
-  const loadDocs = useCallback(async () => {
-    const slug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
+  const loadDocs = useCallback(async (options) => {
+    let slugValue = adminSlug
+    let categoryValue = docCategory
+    if (typeof options === 'string'){
+      slugValue = options
+    }else if (options && typeof options === 'object'){
+      if (Object.prototype.hasOwnProperty.call(options, 'slug')){
+        slugValue = options.slug
+      }
+      if (Object.prototype.hasOwnProperty.call(options, 'category')){
+        categoryValue = options.category
+      }
+    }
+    const slug = normalizeSlug(slugValue) || DEFAULT_INVESTOR_ID
+    const category = typeof categoryValue === 'string' && categoryValue
+      ? categoryValue
+      : docCategory
+    lastDocsRequestRef.current = { slug, category }
     setDocsLoading(true)
     setDocsError(null)
     try{
-      const res = await api.listDocs({ category: docCategory, slug })
+      const res = await api.listDocs({ category, slug })
       setDocList(res.files || [])
     }catch(error){
       setDocList([])
@@ -391,11 +412,36 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     }finally{
       setDocsLoading(false)
     }
-  }, [docCategory, docSlug])
+  }, [adminSlug, docCategory])
+
+  const handleRefresh = useCallback((nextSlug) => {
+    void loadDocs(nextSlug)
+  }, [loadDocs])
 
   useEffect(() => {
-    loadDocs()
-  }, [loadDocs])
+    if (skipNextSlugEffectRef.current){
+      skipNextSlugEffectRef.current = false
+      return
+    }
+    const currentSlug = normalizeSlug(adminSlug) || DEFAULT_INVESTOR_ID
+    if (
+      lastDocsRequestRef.current &&
+      lastDocsRequestRef.current.slug === currentSlug &&
+      lastDocsRequestRef.current.category === docCategory
+    ){
+      return
+    }
+    handleRefresh(currentSlug)
+  }, [adminSlug, docCategory, handleRefresh])
+
+  useEffect(() => {
+    const slug = resolveInvestorSlug()
+    if (slug === adminSlug) return
+    skipNextSlugEffectRef.current = true
+    setAdminSlug(slug)
+    setSlugInHash(slug)
+    handleRefresh(slug)
+  }, [location.hash])
 
   useEffect(() => {
     if (!isAdmin){
@@ -669,13 +715,12 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     e.preventDefault()
     setDocsNotice(null)
     setDocsError(null)
-    const normalized = normalizeSlug(docSlugInput)
-    const finalSlug = normalized || DEFAULT_INVESTOR_ID
-    setDocSlugInput(finalSlug)
-    if (finalSlug === docSlug){
-      loadDocs()
-    }else{
-      setDocSlug(finalSlug)
+    const finalSlug = normalizeSlug(adminSlug) || DEFAULT_INVESTOR_ID
+    const shouldReload = finalSlug === adminSlug
+    setAdminSlug(finalSlug)
+    setSlugInHash(finalSlug)
+    if (shouldReload){
+      handleRefresh(finalSlug)
     }
   }
 
@@ -764,7 +809,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
     const fileInput = form.file
     const file = fileInput && fileInput.files ? fileInput.files[0] : null
     if (!file) return
-    const slug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
+    const slug = normalizeSlug(adminSlug) || DEFAULT_INVESTOR_ID
     void performDocUpload({
       category: docCategory,
       filename: file.name,
@@ -813,7 +858,7 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const { className: decisionBadgeClass, label: decisionLabel } = getDecisionBadge(decisionDays)
   const normalizedPayloadSlug = normalizeSlug(payload.id)
   const canLoadInvestor = Boolean(normalizedPayloadSlug)
-  const effectiveDocSlug = normalizeSlug(docSlug) || DEFAULT_INVESTOR_ID
+  const effectiveDocSlug = normalizeSlug(adminSlug) || DEFAULT_INVESTOR_ID
 
   const investorNameBySlug = React.useMemo(() => {
     const map = {}
@@ -1894,12 +1939,27 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                     </Section>
                     <Section title="Documentos por inversionista" style={{ marginTop: 12 }} ref={docsCardRef}>
                       <form onSubmit={handleDocSlugSubmit} style={{ display: 'grid', gap: 16 }}>
+                        <InvestorSlugPicker
+                          value={adminSlug}
+                          onChange={(s) => {
+                            const next = (s || '').trim().toLowerCase()
+                            skipNextSlugEffectRef.current = true
+                            setSlugInHash(next)
+                            setAdminSlug(next)
+                            typeof handleRefresh === 'function' && handleRefresh(next)
+                          }}
+                        />
                         <div className="grid-2">
                           <FormRow label="Slug del inversionista">
                             <Input
                               id="docs-slug"
-                              value={docSlugInput}
-                              onChange={e => setDocSlugInput(e.target.value)}
+                              value={adminSlug}
+                              onChange={e => {
+                                const v = (e.target.value || '').trim().toLowerCase()
+                                skipNextSlugEffectRef.current = true
+                                setAdminSlug(v)
+                                setSlugInHash(v)
+                              }}
                               placeholder="slug"
                             />
                           </FormRow>
@@ -1908,9 +1968,12 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                               id="docs-category"
                               value={docCategory}
                               onChange={e => {
-                                setDocCategory(e.target.value)
+                                const nextCategory = e.target.value
+                                setDocCategory(nextCategory)
                                 setDocsNotice(null)
                                 setDocsError(null)
+                                skipNextSlugEffectRef.current = true
+                                handleRefresh({ slug: adminSlug, category: nextCategory })
                               }}
                             >
                               {DOCUMENT_SECTIONS_ORDER.map(cat => (
