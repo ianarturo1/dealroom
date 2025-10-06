@@ -1,0 +1,16 @@
+{
+  "id": "finsolar1",
+  "name": "FINSOLAR 1",
+  "status": "NDA",
+  "deadlines": {
+    "Firma": "2025-10-17"
+  },
+  "metrics": {},
+  "ui": {
+    "panelTitle": "Panel FINSOLAR 1",
+    "theme": {}
+  },
+  "createdAt": "2025-10-06T04:33:36.680Z",
+  "updatedAt": "2025-10-06T04:33:36.680Z",
+  "email": "nico@fin.solar"
+}
