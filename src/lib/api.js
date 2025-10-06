@@ -202,15 +202,7 @@ export const api = {
   },
   async uploadDoc(info, options = {}){
     const endpoint = options.endpoint || '/.netlify/functions/upload-doc';
-    const form = new FormData();
-    if (!info || !info.slug || !info.category || !info.file){
-      throw new Error('Faltan datos para subir: slug, category y file son obligatorios');
-    }
-    const filename = info.filename || info.file?.name || 'archivo';
-    form.append('slug', String(info.slug).trim());
-    form.append('category', String(info.category).trim());
-    form.append('file', info.file, filename);
-    return req(endpoint, { method: 'POST', body: form });
+    return req(endpoint, { method: 'POST', body: info });
   },
   async deleteDoc(info){
     return req('/.netlify/functions/delete-doc', { method: 'POST', body: info });
