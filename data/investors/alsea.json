@@ -1,23 +1,23 @@
 {
   "id": "alsea",
-  "name": "FEMSA",
+  "name": "Alsea",
   "status": "LOI",
   "deadlines": {
     "LOI": "2025-10-15",
-    "Firma": "2025-11-30"
+    "Firma": "2025-11-07"
   },
   "metrics": {
-    "fiscalCapitalInvestment": 20000000,
+    "fiscalCapitalInvestment": 60000000,
     "projectProfitability": {
       "amount": 12500000,
-      "years": 7
+      "years": 20
     },
     "portfolio": {
       "type": "mix",
       "mix": {
         "solarFarms": 40,
-        "aaaCompanies": 35,
-        "ownSites": 25
+        "aaaCompanies": 60,
+        "ownSites": 0
       }
     },
     "investorsActive": 12,
