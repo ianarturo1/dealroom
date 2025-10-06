@@ -1,100 +1,96 @@
-import { getFileBuffer } from './_shared/github.mjs'
-import { binary, badRequest, errorJson, getUrlAndParams, methodNotAllowed, notFound } from './_shared/http.mjs'
-import { ensureSlugAllowed } from './_shared/slug.mjs'
+import { Octokit } from 'octokit'
+import { getUrlAndParams, json, methodNotAllowed } from './_shared/http.mjs'
 
-const cors = { 'Access-Control-Allow-Origin': process.env.CORS_ORIGIN || '*' }
-
-function guessContentType(filename) {
-  const extension = filename.split('.').pop()?.toLowerCase()
-  if (extension === 'pdf') return 'application/pdf'
-  if (extension === 'png') return 'image/png'
-  if (extension === 'jpg' || extension === 'jpeg') return 'image/jpeg'
-  return 'application/octet-stream'
+function requiredEnv(name){
+  const v = (process.env[name] || '').trim()
+  if (!v){ const e = new Error(`Missing env ${name}`); e.status = 500; throw e }
+  return v
 }
 
-function sanitizeSegment(value, field) {
-  const segment = value?.trim()
-  if (!segment) {
-    const error = new Error(`Missing ${field}`)
-    error.statusCode = 400
-    throw error
-  }
-  if (segment.includes('..') || segment.includes('/') || segment.includes('\\')) {
-    const error = new Error(`Invalid ${field}`)
-    error.statusCode = 400
-    throw error
-  }
-  return segment
+const OWNER_REPO = requiredEnv('DOCS_REPO')      // "ianarturo1/dealroom"
+const BRANCH     = requiredEnv('DOCS_BRANCH')    // "main"
+const ROOT       = requiredEnv('DOCS_ROOT_DIR').replace(/^\/+|\/+$/g,'') // "dealroom"
+
+const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN || undefined })
+const gh = octokit.rest ? octokit.rest : octokit // compat
+
+const cleanCat  = s => String(s||'').trim().replace(/^\/+|\/+$/g,'')        // respeta mayúsculas/acentos
+const cleanSlug = s => String(s||'').trim().toLowerCase().replace(/^\/+|\/+$/g,'')
+const decode = s => decodeURIComponent(String(s||'')).replace(/\+/g,' ').trim()
+
+// Normalizador "tolerante" para comparar nombres
+function normName(s){
+  return String(s||'')
+    .replace(/\+/g,' ')               // plus -> espacio
+    .replace(/\s+/g,' ')              // colapsa espacios
+    .trim()
 }
 
-export default async function handler(request) {
-  const method = request.method?.toUpperCase()
+export default async function handler(request){
+  if (request.method?.toUpperCase() !== 'GET') return methodNotAllowed(['GET'])
+  const { params } = getUrlAndParams(request)
+  const category = cleanCat(decode(params.get('category')))
+  const slug     = cleanSlug(decode(params.get('slug')))
+  const filenameRaw = decode(params.get('filename'))
+  const filename = normName(filenameRaw)
 
-  if (method === 'OPTIONS') {
-    const headers = new Headers(cors)
-    headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS')
-    const requestedHeaders = request.headers.get('Access-Control-Request-Headers')
-    if (requestedHeaders) {
-      headers.set('Access-Control-Allow-Headers', requestedHeaders)
-    } else {
-      headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-    }
-    return new Response(null, { status: 204, headers })
+  if (!category || !slug || !filename){
+    return json({ ok:false, error:'Missing category, slug or filename' }, 400)
   }
 
-  if (method && method !== 'GET') {
-    return methodNotAllowed(['GET'], { headers: cors })
-  }
+  const [owner, repo] = OWNER_REPO.split('/')
+  const baseDir = [ROOT, category, slug].filter(Boolean).join('/')
+  const directPath = `${baseDir}/${filename}`
 
+  // 1) Intento directo
   try {
-    const { params } = getUrlAndParams(request)
-    const slugParam = params.get('slug')
-    const categoryParam = params.get('category')
-    const filenameParam = params.get('filename')
-    const dispositionParam = params.get('disposition')
+    const res = await gh.repos.getContent({ owner, repo, path: directPath, ref: BRANCH })
+    if (res.data?.type === 'file'){
+      const dl = res.data.download_url
+      if (dl) return new Response(null, { status: 302, headers: { Location: dl } })
+      const buf = Buffer.from(res.data.content || '', 'base64')
+      return new Response(buf, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        }
+      })
+    }
+  } catch (err){
+    // 404 → seguimos al fallback; otros errores, devolvemos
+    if (err.status && err.status !== 404){
+      return json({ ok:false, error: err.message || String(err), status: err.status, pathTried: directPath }, err.status)
+    }
+  }
 
-    if (!slugParam) return badRequest('Missing slug', {}, { headers: cors })
-    if (!categoryParam) return badRequest('Missing category', {}, { headers: cors })
-    if (!filenameParam) return badRequest('Missing filename', {}, { headers: cors })
-
-    const slug = ensureSlugAllowed(slugParam.trim())
-    const category = sanitizeSegment(categoryParam, 'category')
-    const filename = sanitizeSegment(filenameParam, 'filename')
-
-    const disposition = dispositionParam?.toLowerCase() === 'inline' ? 'inline' : 'attachment'
-    const path = `docs/${slug}/${category}/${filename}`
-
-    let buffer
-    try {
-      buffer = await getFileBuffer(path)
-    } catch (error) {
-      if (error?.status === 404 || error?.statusCode === 404) {
-        return notFound('File not found', {}, { headers: cors })
+  // 2) Fallback: listar carpeta y buscar por coincidencia tolerante
+  try {
+    const dir = await gh.repos.getContent({ owner, repo, path: baseDir, ref: BRANCH })
+    const items = Array.isArray(dir.data) ? dir.data : []
+    // Busca coincidencia exacta y luego normalizada
+    let hit = items.find(i => i.type === 'file' && i.name === filename)
+    if (!hit){
+      hit = items.find(i => i.type === 'file' && normName(i.name) === filename)
+    }
+    if (!hit){
+      return json({ ok:false, error:'File not found', pathDir: baseDir, filename }, 404)
+    }
+    if (hit.download_url){
+      return new Response(null, { status: 302, headers: { Location: hit.download_url } })
+    }
+    // Si no trae download_url, pide el archivo por path real
+    const fileRes = await gh.repos.getContent({ owner, repo, path: hit.path, ref: BRANCH })
+    const buf = Buffer.from(fileRes.data.content || '', 'base64')
+    return new Response(buf, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${hit.name}"`,
       }
-      throw error
-    }
-
-    if (!buffer || buffer.length === 0) {
-      return badRequest('Empty file', {}, { headers: cors })
-    }
-
-    const contentType = guessContentType(filename)
-
-    return binary(buffer, {
-      filename,
-      contentType,
-      disposition,
-      headers: cors,
     })
-  } catch (error) {
-    if (error?.message === 'ForbiddenSlug' || error?.statusCode === 403 || error?.status === 403) {
-      return errorJson('ForbiddenSlug', 403, {}, { headers: cors })
-    }
-
-    if (error?.statusCode === 400 || error?.status === 400) {
-      return badRequest(error.message || 'Bad Request', {}, { headers: cors })
-    }
-
-    return errorJson('Internal error', 500, {}, { headers: cors })
+  } catch(err){
+    const status = err.status || 500
+    return json({ ok:false, error: err.message || String(err), status, pathDir: baseDir }, status)
   }
 }

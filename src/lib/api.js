@@ -133,7 +133,15 @@ async function downloadDocument({ slug, category, filename, disposition = 'attac
   if (!resolvedSlug) {
     throw new Error('Slug no disponible para la descarga');
   }
-  const path = `/.netlify/functions/get-doc?slug=${encodeURIComponent(resolvedSlug)}&category=${encodeURIComponent(category)}&filename=${encodeURIComponent(filename)}&disposition=${encodeURIComponent(disposition)}`;
+  const normalizedCategory = String(category ?? '').trim();
+  const normalizedSlug = String(resolvedSlug || '').trim().toLowerCase();
+  const normalizedFilename = filename === undefined || filename === null ? '' : String(filename);
+  const safeDisposition = disposition === 'inline' ? 'inline' : 'attachment';
+  const path = `/.netlify/functions/get-doc`
+    + `?category=${encodeURIComponent(normalizedCategory)}`
+    + `&slug=${encodeURIComponent(normalizedSlug)}`
+    + `&filename=${encodeURIComponent(normalizedFilename)}`
+    + `&disposition=${encodeURIComponent(safeDisposition)}`;
   const res = await reqBlob(path, { method: 'GET' });
   const blob = await res.blob();
 
@@ -233,8 +241,8 @@ export const api = {
     return `/.netlify/functions/get-doc${qs ? `?${qs}` : ''}`;
   },
   docDownloadUrl({ category, slug, filename, disposition = 'attachment' }){
-    const normalizedSlug = (slug || '').trim().toLowerCase();
-    const normalizedCategory = (category || '').trim();
+    const normalizedSlug = String(slug || '').trim().toLowerCase();
+    const normalizedCategory = String(category ?? '').trim();
     const normalizedFilename = filename === undefined || filename === null ? '' : String(filename);
     const safeDisposition = disposition === 'inline' ? 'inline' : 'attachment';
     const isFeatureOn = import.meta.env?.VITE_DOCS_BACKEND_ALSEA === 'on';
@@ -247,12 +255,11 @@ export const api = {
       const qs = params.toString();
       return `/.netlify/functions/download-file${qs ? `?${qs}` : ''}`;
     }
-    const params = new URLSearchParams();
-    if (normalizedCategory) params.set('category', normalizedCategory);
-    if (slug) params.set('slug', slug);
-    if (normalizedFilename) params.set('filename', normalizedFilename);
-    const qs = params.toString();
-    return `/.netlify/functions/get-doc${qs ? `?${qs}` : ''}`;
+    return `/.netlify/functions/get-doc`
+      + `?category=${encodeURIComponent(normalizedCategory)}`
+      + `&slug=${encodeURIComponent(normalizedSlug)}`
+      + `&filename=${encodeURIComponent(normalizedFilename)}`
+      + `&disposition=${encodeURIComponent(safeDisposition)}`;
   },
   async listActivity(){
     return req('/.netlify/functions/list-activity');
