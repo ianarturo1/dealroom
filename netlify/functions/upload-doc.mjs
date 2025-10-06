@@ -101,7 +101,8 @@ export default async function handler(request) {
       return badRequest('Empty file', {}, { headers: cors })
     }
 
-    const path = `docs/${slug}/${category}/${filename}`
+    const ROOT = (process.env.DOCS_ROOT_DIR || 'data/docs').replace(/^\/+|\/+$/g, '')
+    const path = `${ROOT}/${slug}/${category}/${filename}`
     const message = `docs(${slug}): upload ${category}/${filename} from Dealroom UI`
     const contentType = file.type || DEFAULT_CONTENT_TYPE
 
