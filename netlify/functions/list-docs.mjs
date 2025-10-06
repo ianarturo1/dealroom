@@ -27,16 +27,19 @@ export default async function handler(request) {
   const { params } = getUrlAndParams(request)
   const category = cleanCat(params.get('category'))
   const slug = cleanSlug(params.get('slug'))
-  if (!category || !slug) return json({ ok: false, error: 'Falta category o slug' }, { status: 400 })
+  if (!category) return json({ ok: false, error: 'Falta category' }, { status: 400 })
 
   const candidates = [
     [ROOT, category, slug].filter(Boolean).join('/'),
+    [ROOT, category].filter(Boolean).join('/'),
     [category, slug].filter(Boolean).join('/'),
+    [category].filter(Boolean).join('/'),
     [ROOT, 'data', 'docs', slug, category].filter(Boolean).join('/'),
   ]
 
   const [owner, repo] = OWNER_REPO.split('/')
   for (const path of candidates) {
+    if (!path) continue
     try {
       const res = await gh.repos.getContent({ owner, repo, path, ref: BRANCH })
       const items = Array.isArray(res.data) ? res.data : []
@@ -48,7 +51,12 @@ export default async function handler(request) {
           path: item.path,
           download_url: item.download_url,
         }))
-      return json({ ok: true, repoUsed: OWNER_REPO, branchUsed: BRANCH, pathUsed: path, files })
+      const isInvestorScope = Boolean(
+        slug &&
+          (path.endsWith(`/${slug}`) || path.includes(`/${slug}/`))
+      )
+      const scope = isInvestorScope ? 'investor' : 'category'
+      return json({ ok: true, repoUsed: OWNER_REPO, branchUsed: BRANCH, pathUsed: path, scope, files })
     } catch (err) {
       if (err?.status === 404) continue
       return json(
