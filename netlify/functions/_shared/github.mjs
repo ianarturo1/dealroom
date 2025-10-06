@@ -5,9 +5,20 @@ export const octokit = new Octokit({
   auth: process.env.GITHUB_TOKEN,
 })
 
-export const owner = process.env.DOCS_OWNER || 'finsolar'
-export const repo = process.env.DOCS_REPO || 'dealroom'
-export const ref = process.env.DOCS_REF || 'main'
+const rawRepo = process.env.DOCS_REPO || 'dealroom'
+let owner = process.env.DOCS_OWNER || ''
+let repo = rawRepo
+
+if (!owner && rawRepo.includes('/')) {
+  const [maybeOwner, maybeRepo] = rawRepo.split('/', 2)
+  if (maybeOwner && maybeRepo) {
+    owner = maybeOwner
+    repo = maybeRepo
+  }
+}
+
+export { owner, repo }
+export const ref = process.env.DOCS_REF || process.env.DOCS_BRANCH || 'main'
 
 export async function listRepoPath(path) {
   const { data } = await octokit.rest.repos.getContent({ owner, repo, path, ref })
@@ -52,11 +63,6 @@ export async function putFileBuffer(path, buffer, message, contentType = 'applic
     branch: ref,
     ...(sha ? { sha } : {}),
   })
-
-  endpoint.headers = {
-    ...endpoint.headers,
-    'Content-Type': contentType,
-  }
 
   return octokit.request(endpoint)
 }
