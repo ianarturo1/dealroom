@@ -134,6 +134,13 @@
       "status": "Ajustes técnicos",
       "createdAt": "2025-10-01T15:49:02.539Z",
       "updatedAt": "2025-10-01T15:49:02.539Z"
+    },
+    "finsolar1": {
+      "name": "FINSOLAR 1",
+      "email": "nico@fin.solar",
+      "status": "NDA",
+      "createdAt": "2025-10-06T04:33:36.680Z",
+      "updatedAt": "2025-10-06T04:33:36.680Z"
     }
   }
 }
