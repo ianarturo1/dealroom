@@ -1,13 +1,13 @@
 {
   "id": "grupoherso",
-  "name": "Grupo Herso",
+  "name": "GrupoHerso",
   "status": "LOI",
   "deadlines": {
     "LOI": "2025-10-15",
     "Firma": "2025-11-03"
   },
   "metrics": {
-    "fiscalCapitalInvestment": 10000000,
+    "fiscalCapitalInvestment": 1000000,
     "projectProfitability": {
       "amount": 35451114,
       "years": 20
@@ -15,14 +15,12 @@
     "portfolio": {
       "type": "mix",
       "mix": {
-        "solarFarms": 30,
-        "aaaCompanies": 70,
-        "ownSites": 0
+        "solarFarms": 40,
+        "aaaCompanies": 60
       }
     },
     "investorsActive": 12,
     "dealsAccelerated": 38,
     "nps": 72
-  },
-  "updatedAt": "2025-10-07T17:42:02.134Z"
+  }
 }
