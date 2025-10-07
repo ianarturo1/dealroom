@@ -1,24 +1,22 @@
 {
   "id": "grupoherso",
-  "name": "FEMSA",
+  "name": "Herso",
   "status": "LOI",
   "deadlines": {
     "LOI": "2025-10-15",
-    "Firma": "2025-11-30"
+    "Firma": "2025-11-07"
   },
   "metrics": {
-    "decisionTime": 35,
-    "fiscalCapitalInvestment": 20000000,
+    "fiscalCapitalInvestment": 10000000,
     "projectProfitability": {
-      "amount": 12500000,
-      "years": 7
+      "amount": 35451114,
+      "years": 20
     },
     "portfolio": {
       "type": "mix",
       "mix": {
-        "solarFarms": 40,
-        "aaaCompanies": 35,
-        "ownSites": 25
+        "solarFarms": 60,
+        "aaaCompanies": 40
       }
     },
     "investorsActive": 12,
