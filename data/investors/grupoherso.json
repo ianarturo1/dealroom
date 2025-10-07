@@ -4,7 +4,7 @@
   "status": "LOI",
   "deadlines": {
     "LOI": "2025-10-15",
-    "Firma": "2025-11-07"
+    "Firma": "2025-11-05"
   },
   "metrics": {
     "fiscalCapitalInvestment": 10000000,
@@ -22,5 +22,6 @@
     "investorsActive": 12,
     "dealsAccelerated": 38,
     "nps": 72
-  }
+  },
+  "updatedAt": "2025-10-07T17:37:07.706Z"
 }
