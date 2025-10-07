@@ -1,0 +1,26 @@
+{
+  "id": "herso",
+  "name": "Herso",
+  "status": "LOI",
+  "deadlines": {
+    "LOI": "2025-10-15",
+    "Firma": "2025-11-07"
+  },
+  "metrics": {
+    "fiscalCapitalInvestment": 10000000,
+    "projectProfitability": {
+      "amount": 35451114,
+      "years": 20
+    },
+    "portfolio": {
+      "type": "mix",
+      "mix": {
+        "solarFarms": 60,
+        "aaaCompanies": 40
+      }
+    },
+    "investorsActive": 12,
+    "dealsAccelerated": 38,
+    "nps": 72
+  }
+}
