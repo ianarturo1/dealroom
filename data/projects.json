@@ -129,5 +129,19 @@
     "co2_tons": 2149.5,
     "termMonths": 0,
     "empresa": "CFE"
+  },
+  {
+    "id": "proj-30-noviembre",
+    "slug": "solis",
+    "name": "SOLIS",
+    "status": "Disponible",
+    "client": "SOLIS",
+    "location": "San pedreo Garza",
+    "power_kwp": 532,
+    "energy_mwh": 4534,
+    "co2_tons": 453,
+    "termMonths": 5,
+    "empresa": "CFE",
+    "notes": "todo bien"
   }
 ]
