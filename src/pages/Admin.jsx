@@ -20,7 +20,6 @@ import { Card } from '@/components/ui/Card'
 import { Section } from '@/components/ui/Section'
 import { FormRow } from '@/components/ui/FormRow'
 import { Toolbar } from '@/components/ui/Toolbar'
-import InvestorSlugPicker from '../components/InvestorSlugPicker'
 import { resolveInvestorSlug, setSlugInHash } from '../lib/slug'
 import { formatBytes } from '../lib/format'
 
@@ -1968,16 +1967,6 @@ const [activityRefreshKey, setActivityRefreshKey] = useState(0);
                     </Section>
                     <Section title="Documentos por inversionista" style={{ marginTop: 12 }} ref={docsCardRef}>
                       <form onSubmit={handleDocSlugSubmit} style={{ display: 'grid', gap: 16 }}>
-                        <div style={{ marginBottom: 12 }}>
-                          <InvestorSlugPicker
-                            value={adminSlug}
-                            onChange={(s) => {
-                              setSlugInHash(s)
-                              setAdminSlug(s)
-                              void handleRefresh()
-                            }}
-                          />
-                        </div>
                         <div className="grid-2">
                           <FormRow label="Slug del inversionista">
                             <Input
