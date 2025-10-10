@@ -1,23 +1,18 @@
 export function ensureSlugAllowed(inputSlug) {
-  const slug = inputSlug ?? ''
-  const allowed = new Set()
+  const slug = String(inputSlug || '').trim().toLowerCase()
+  const allowedSingle = (process.env.PUBLIC_INVESTOR_SLUG || '').trim().toLowerCase()
+  const allowedList = (process.env.PUBLIC_INVESTOR_SLUGS || '').trim().toLowerCase()
 
-  const singleSlug = process.env.PUBLIC_INVESTOR_SLUG?.trim()
-  if (singleSlug) allowed.add(singleSlug)
+  // Si no hay restricciones, permitir todos
+  if (!allowedSingle && !allowedList) return slug
 
-  const multipleSlugs = process.env.PUBLIC_INVESTOR_SLUGS?.split(',') ?? []
-  for (const slug of multipleSlugs) {
-    const trimmed = slug.trim()
-    if (trimmed) allowed.add(trimmed)
-  }
+  // Si coincide con el slug único permitido
+  if (allowedSingle && slug === allowedSingle) return slug
 
-  if (allowed.size === 0) return slug
+  // Si hay lista separada por coma
+  if (allowedList && allowedList.split(',').map(s => s.trim()).includes(slug)) return slug
 
-  if (!allowed.has(slug)) {
-    const error = new Error('ForbiddenSlug')
-    error.statusCode = 403
-    throw error
-  }
-
-  return slug
+  const err = new Error('Slug not allowed')
+  err.status = 403
+  throw err
 }
