@@ -1,6 +1,6 @@
 import { listRepoPath } from './_shared/github.mjs'
 import { getUrlAndParams, json, badRequest, notFound, methodNotAllowed, errorJson } from './_shared/http.mjs'
-import { ensureSlugAllowed } from './_shared/slug.mjs'
+import { ensureSlugAllowed } from './_shared/ensureSlugAllowed.mjs'
 
 export default async function handler(request) {
   if (request.method && request.method.toUpperCase() !== 'GET') {

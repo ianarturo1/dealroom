@@ -1,7 +1,7 @@
 // netlify/functions/download-file.mjs
 import { getGithubFileBinary } from './lib/storage.mjs'
 import { json, binary, getUrlAndParams } from './_shared/http.mjs'
-import { ensureSlugAllowed } from './_shared/slug.mjs'
+import { ensureSlugAllowed } from './_shared/ensureSlugAllowed.mjs'
 
 const DEFAULT_CONTENT_TYPE = 'application/octet-stream'
 const DEFAULT_DISPOSITION = 'attachment'

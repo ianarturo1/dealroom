@@ -1,6 +1,6 @@
 import { Octokit } from 'octokit'
 import { readSingleFileFromFormData, json, methodNotAllowed } from './_shared/http.mjs'
-import { ensureSlugAllowed } from './_shared/slug.mjs'
+import { ensureSlugAllowed } from './_shared/ensureSlugAllowed.mjs'
 
 function requiredEnv(name) {
   const v = (process.env[name] || '').trim()
