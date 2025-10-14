@@ -5,7 +5,8 @@
   "deadlines": {
     "Primera reunión": "2025-08-11",
     "NDA": "2025-09-08",
-    "Cronograma de inversión": "2025-10-30"
+    "Cronograma de inversión": "2025-10-30",
+    "Firma": "2025-11-05"
   },
   "metrics": {},
   "ui": {
@@ -13,6 +14,6 @@
     "theme": {}
   },
   "createdAt": "2025-10-14T21:12:03.157Z",
-  "updatedAt": "2025-10-14T21:12:03.157Z",
+  "updatedAt": "2025-10-14T21:16:14.258Z",
   "email": "crojas@rotoplas.com"
 }
