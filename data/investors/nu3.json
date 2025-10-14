@@ -3,10 +3,10 @@
   "name": "nu3",
   "status": "Due diligence fiscal/financiero/riesgos",
   "deadlines": {
-    "Cronograma de inversión": "2025-10-30",
-    "Firma": "2025-11-07",
     "Primera reunión": "2025-08-11",
-    "NDA": "2025-08-19"
+    "NDA": "2025-08-19",
+    "Cronograma de inversión": "2025-10-30",
+    "Firma": "2025-11-07"
   },
   "metrics": {
     "fiscalCapitalInvestment": 16600000,
