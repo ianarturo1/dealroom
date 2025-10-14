@@ -12,21 +12,35 @@ function requiredEnv(name) {
   return v
 }
 
-function cleanSegment(s) {
-  const x = String(s || '').normalize('NFKC').trim()
-  if (!x || x.includes('..') || x.includes('/') || x.includes('\\')) {
-    const e = new Error('Invalid path segment')
+const sanitize = (s = '') =>
+  String(s)
+    .normalize('NFKC')
+    .replace(/[^\p{L}\p{N}._() \-]/gu, '')
+    .trim()
+const trimSlashes = (s) => String(s || '').replace(/^\/+|\/+$/g, '')
+const joinPath = (...parts) =>
+  parts
+    .filter(Boolean)
+    .map(trimSlashes)
+    .filter(Boolean)
+    .join('/')
+    .replace(/\/+/g, '/')
+const BASE_DIR = trimSlashes(process.env.DOCS_BASE_DIR || process.env.DOCS_ROOT_DIR || '')
+
+function ensureSafeSegment(value, label) {
+  const clean = sanitize(value)
+  if (!clean || clean.includes('..')) {
+    const e = new Error(`Invalid ${label || 'segment'}`)
     e.status = 400
     throw e
   }
-  return x
+  return clean
 }
 
 const cors = { 'Access-Control-Allow-Origin': process.env.CORS_ORIGIN || '*' }
 
 const REPO_FULL = requiredEnv('DOCS_REPO')
 const DOCS_BRANCH = requiredEnv('DOCS_BRANCH')
-const ROOT = requiredEnv('DOCS_ROOT_DIR').replace(/^\/+|\/+$/g, '')
 const TOKEN = requiredEnv('GITHUB_TOKEN')
 
 const [owner, repo] = REPO_FULL.split('/')
@@ -56,9 +70,10 @@ async function main(request, context) {
 
   const categoryString = typeof categoryValue === 'string' ? categoryValue : String(categoryValue)
 
+  let allowedSlug = normalizedSlug
   try {
     if (typeof ensureSlugAllowed === 'function') {
-      ensureSlugAllowed(normalizedSlug)
+      allowedSlug = ensureSlugAllowed(normalizedSlug)
     }
   } catch (e) {
     const code = e?.statusCode || e?.status || 403
@@ -68,16 +83,16 @@ async function main(request, context) {
     )
   }
 
-  const safeSlug = cleanSegment(normalizedSlug)
-  const safeCategory = cleanSegment(categoryString)
+  const safeSlug = ensureSafeSegment(allowedSlug, 'slug')
+  const safeCategory = ensureSafeSegment(categoryString, 'category')
   const filename = typeof file.name === 'string' ? file.name : 'upload.bin'
-  const safeFilename = cleanSegment(filename)
+  const safeFilename = ensureSafeSegment(filename, 'filename')
 
   const buffer = Buffer.from(await file.arrayBuffer())
   const content = buffer.toString('base64')
 
-  const parts = [ROOT, safeCategory, safeSlug, safeFilename].filter(Boolean)
-  const path = parts.join('/')
+  const dir = joinPath(BASE_DIR, safeCategory, safeSlug)
+  const path = joinPath(dir, safeFilename)
 
   const octokit = new Octokit({ auth: TOKEN })
 
@@ -95,7 +110,7 @@ async function main(request, context) {
     if (status && status !== 404) throw err
   }
 
-  const message = `chore(upload-doc): ${safeCategory}/${safeSlug}/${safeFilename}`
+  const message = `chore(upload-doc): ${joinPath(safeCategory, safeSlug, safeFilename)}`
   const payload = { owner, repo, path, message, content, branch: DOCS_BRANCH }
   if (sha) payload.sha = sha
 

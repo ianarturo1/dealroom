@@ -13,29 +13,63 @@ function requiredEnv(name) {
 
 const OWNER_REPO = requiredEnv('DOCS_REPO')
 const BRANCH = requiredEnv('DOCS_BRANCH')
-const ROOT = requiredEnv('DOCS_ROOT_DIR').replace(/^\/+|\/+$/g, '')
+
+const sanitize = (s = '') =>
+  String(s)
+    .normalize('NFKC')
+    .replace(/[^\p{L}\p{N}._() \-]/gu, '')
+    .trim()
+const trimSlashes = (s) => String(s || '').replace(/^\/+|\/+$/g, '')
+const joinPath = (...parts) =>
+  parts
+    .filter(Boolean)
+    .map(trimSlashes)
+    .filter(Boolean)
+    .join('/')
+    .replace(/\/+/g, '/')
+const BASE_DIR = trimSlashes(process.env.DOCS_BASE_DIR || process.env.DOCS_ROOT_DIR || '')
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN || undefined })
 const gh = octokit.rest ? octokit.rest : octokit
 
-const cleanCat = (s) => String(s || '').trim().replace(/^\/+|\/+$/g, '')
-const cleanSlug = (s) => String(s || '').trim().toLowerCase().replace(/^\/+|\/+$/g, '')
+const cleanCategory = (s) => {
+  const value = sanitize(s)
+  if (!value || value.includes('..')) return ''
+  return value
+}
+const cleanSlug = (s) => {
+  const value = sanitize(String(s || '').toLowerCase())
+  if (!value) return ''
+  if (value.includes('..')) return ''
+  return value
+}
 
 export default async function handler(request) {
   if (request.method?.toUpperCase() !== 'GET') return methodNotAllowed(['GET'])
 
   const { params } = getUrlAndParams(request)
-  const category = cleanCat(params.get('category'))
-  const slug = cleanSlug(params.get('slug'))
+  const rawCategory = params.get('category')
+  const rawSlug = params.get('slug')
+  const category = cleanCategory(rawCategory)
+  const slug = cleanSlug(rawSlug)
   if (!category) return json({ ok: false, error: 'Falta category' }, { status: 400 })
+  if (rawSlug && !slug) {
+    return json({ ok: false, error: 'Slug inválido' }, { status: 400 })
+  }
 
-  const candidates = [
-    [ROOT, category, slug].filter(Boolean).join('/'),
-    [ROOT, category].filter(Boolean).join('/'),
-    [category, slug].filter(Boolean).join('/'),
-    [category].filter(Boolean).join('/'),
-    [ROOT, 'data', 'docs', slug, category].filter(Boolean).join('/'),
-  ]
+  const legacyBase = BASE_DIR || 'data/docs'
+  const candidateSet = new Set(
+    [
+      joinPath(BASE_DIR, category, slug),
+      joinPath(BASE_DIR, category),
+      joinPath(BASE_DIR, slug, category),
+      joinPath(BASE_DIR, slug),
+      joinPath(category, slug),
+      joinPath(category),
+      joinPath(legacyBase, slug, category),
+    ].filter(Boolean),
+  )
+  const candidates = Array.from(candidateSet)
 
   const [owner, repo] = OWNER_REPO.split('/')
   for (const path of candidates) {
