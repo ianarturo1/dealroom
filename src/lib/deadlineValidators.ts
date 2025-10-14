@@ -17,15 +17,13 @@ export function normalize(s: string) {
 }
 
 /**
- * rows: Array<{ stage: string; date: string }>
- * Valida:
- *  - formato de fecha
- *  - etapas duplicadas
- *  - orden cronológico según STAGES (solo compara etapas presentes)
+ * Filas sin fecha NO bloquean el guardado; se ignoran.
+ * Si hay fecha, valida formato, etapa válida, duplicados y orden (cuando aplique).
  */
 export function validateRows(rows: Array<{ stage?: string; date?: string }> = []) {
   try {
     const safeRows = Array.isArray(rows) ? rows : []
+
     const stageByNorm: Record<string, string> = {}
     STAGES.forEach(s => (stageByNorm[normalize(s)] = s))
 
@@ -33,18 +31,20 @@ export function validateRows(rows: Array<{ stage?: string; date?: string }> = []
     const deadlines: Record<string, string> = {}
 
     for (const r of safeRows) {
-      const stageInput = r?.stage?.trim() || ""
-      const date = r?.date?.trim() || ""
+      const stageInput = (r?.stage || "").trim()
+      const date = (r?.date || "").trim()
 
       if (!stageInput && !date) continue
 
       const canonical = stageByNorm[normalize(stageInput)]
-      if (!canonical) {
+      if (stageInput && !canonical) {
         return { ok: false, message: `Etapa inválida: "${stageInput}". Selecciona una de la lista.` }
       }
 
-      if (!date) {
-        return { ok: false, message: `Falta la fecha para "${canonical}".` }
+      if (!date) continue
+
+      if (!canonical) {
+        return { ok: false, message: `Etapa inválida: "${stageInput}". Selecciona una de la lista.` }
       }
 
       if (!isValidISODate(date)) {
@@ -54,18 +54,17 @@ export function validateRows(rows: Array<{ stage?: string; date?: string }> = []
       if (usedStages.has(canonical)) {
         return { ok: false, message: `La etapa "${canonical}" está repetida.` }
       }
+
       usedStages.add(canonical)
       deadlines[canonical] = date
     }
 
-    const present = STAGES.filter(s => deadlines[s])
-    for (let i = 0; i < present.length - 1; i++) {
-      const a = present[i]
-      const b = present[i + 1]
-      if (deadlines[a] > deadlines[b]) {
-        return {
-          ok: false,
-          message: `La fecha de "${a}" (${deadlines[a]}) no puede ser posterior a "${b}" (${deadlines[b]}).`,
+    const seq = STAGES
+    for (let i = 0; i < seq.length; i++) {
+      for (let j = i + 1; j < seq.length; j++) {
+        const a = seq[i], b = seq[j]
+        if (deadlines[a] && deadlines[b] && deadlines[a] > deadlines[b]) {
+          return { ok: false, message: `La fecha de "${a}" (${deadlines[a]}) no puede ser posterior a "${b}" (${deadlines[b]}).` }
         }
       }
     }
@@ -77,7 +76,6 @@ export function validateRows(rows: Array<{ stage?: string; date?: string }> = []
   }
 }
 
-/** devuelve la siguiente etapa sugerida que aún no está en rows */
 export function suggestNextStage(rows: Array<{ stage?: string }> = []) {
   const current = new Set(
     (Array.isArray(rows) ? rows : [])
@@ -85,9 +83,7 @@ export function suggestNextStage(rows: Array<{ stage?: string }> = []) {
       .map(s => stageByCanonicalOrNull(s))
       .filter(Boolean) as string[]
   )
-  for (const s of STAGES) {
-    if (!current.has(s)) return s
-  }
+  for (const s of STAGES) if (!current.has(s)) return s
   return ""
 }
 
