@@ -58,27 +58,29 @@ CONTENT_BRANCH=main
 # Repo privado de documentos
 DOCS_REPO=owner/nombre-del-repo-docs
 DOCS_BRANCH=main
-# Prefijo opcional (vacío => NDA/<slug>, data/docs => modo legado)
+# Prefijo opcional (vacío => /<Categoría>/<slug>; evita usar "dealroom")
 DOCS_BASE_DIR=
 
 # Token con permisos de contents:read/write en ambos repos
 GITHUB_TOKEN=ghp_xxx
 
-# Slug público por defecto (opcional)
+# Slug público(s) permitidos (opcional)
 PUBLIC_INVESTOR_SLUG=femsa
+# o bien coma-separado:
+# PUBLIC_INVESTOR_SLUGS=femsa,alsea
 
 # Slug público para el build del frontend (opcional)
 VITE_PUBLIC_INVESTOR_ID=femsa
 ```
 
 > Sin `GITHUB_TOKEN`, el sitio funciona en modo demo (lee `/data` local y no lista documentos).
-> Para habilitar el backend de documentos asegúrate de definir `DOCS_REPO`, `DOCS_BRANCH` y `GITHUB_TOKEN`, y de dejar apagada la bandera `DOCS_BACKEND_ALSEA` (sin definir o distinta de `on`). Puedes fijar un único slug público con `PUBLIC_INVESTOR_SLUG`. Usa `DOCS_BASE_DIR` solo si necesitas un prefijo (por ejemplo `data/docs` para mantener el esquema legado `data/docs/<slug>/<Categoría>/`).
+> Para habilitar el backend de documentos asegúrate de definir `DOCS_REPO`, `DOCS_BRANCH` y `GITHUB_TOKEN`, y de dejar apagada la bandera `DOCS_BACKEND_ALSEA` (sin definir o distinta de `on`). El layout por defecto escribe en `/<Categoría>/<slug>/`; usa `DOCS_BASE_DIR` solo si necesitas un prefijo distinto (por ejemplo `data/docs` para mantener el esquema legado `data/docs/<slug>/<Categoría>/`).
 
 ---
 
 ## 5) Flujo de documentos (solo GitHub + Netlify)
 
-- **Listar:** `/.netlify/functions/list-docs?category=NDA` busca primero en `<DOCS_BASE_DIR?>/<Categoría>/<slug>/` (esquema nuevo) y, si no existe, intenta `<DOCS_BASE_DIR?>/<slug>/<Categoría>/` y `data/docs/<slug>/<Categoría>/` (esquema legado). Si varias rutas existen, combina los archivos sin duplicados.
+- **Listar:** `/.netlify/functions/list-docs?category=NDA` usa por defecto `/<Categoría>/<slug>/` (o `<DOCS_BASE_DIR>/<Categoría>/<slug>/` si defines base) y, si la carpeta no existe o está vacía, intenta `data/docs/<slug>/<Categoría>/` para compatibilidad. Deduplica por nombre y `sha`.
 - **Subir:** UI de `/documents` llama `upload-doc` → commit al repo de documentos.
 - **Descargar:** `download-file` entrega el archivo desde GitHub (inline o attachment) para el slug permitido.
   - Valida que la metadata de GitHub reporte tamaño > 0 y que el binario descargado tenga contenido antes de regresarlo al navegador.
@@ -100,7 +102,7 @@ Cada proyecto activo define su propio `slug` en `data/projects.json`; los botone
 > Procesos/<slug>/*.pdf
 > ```
 >
-> Para mantener compatibilidad con el layout anterior puedes usar `DOCS_BASE_DIR=data/docs` y conservar `data/docs/<slug>/<Categoría>/`.
+> Para mantener compatibilidad con el layout anterior puedes usar `DOCS_BASE_DIR=data/docs` y conservar `data/docs/<slug>/<Categoría>/`; si lo dejas vacío, la función leerá esa ruta como fallback y escribirá en `/<Categoría>/<slug>/`.
 
 ---
 

@@ -1,6 +1,13 @@
 import { Octokit } from 'octokit'
 import { readSingleFileFromFormData, json, methodNotAllowed } from './_shared/http.mjs'
-import { ensureSlugAllowed } from './_shared/ensureSlugAllowed.mjs'
+import {
+  joinPath,
+  stripDealroom,
+  BASE_DIR,
+  ensureSlugAllowed,
+  ensureCategory,
+  ensureFilename,
+} from './_shared/doc-paths.mjs'
 
 function requiredEnv(name) {
   const v = (process.env[name] || '').trim()
@@ -10,31 +17,6 @@ function requiredEnv(name) {
     throw e
   }
   return v
-}
-
-const sanitize = (s = '') =>
-  String(s)
-    .normalize('NFKC')
-    .replace(/[^\p{L}\p{N}._() \-]/gu, '')
-    .trim()
-const trimSlashes = (s) => String(s || '').replace(/^\/+|\/+$/g, '')
-const joinPath = (...parts) =>
-  parts
-    .filter(Boolean)
-    .map(trimSlashes)
-    .filter(Boolean)
-    .join('/')
-    .replace(/\/+/g, '/')
-const BASE_DIR = trimSlashes(process.env.DOCS_BASE_DIR || process.env.DOCS_ROOT_DIR || '')
-
-function ensureSafeSegment(value, label) {
-  const clean = sanitize(value)
-  if (!clean || clean.includes('..')) {
-    const e = new Error(`Invalid ${label || 'segment'}`)
-    e.status = 400
-    throw e
-  }
-  return clean
 }
 
 const cors = { 'Access-Control-Allow-Origin': process.env.CORS_ORIGIN || '*' }
@@ -70,11 +52,9 @@ async function main(request, context) {
 
   const categoryString = typeof categoryValue === 'string' ? categoryValue : String(categoryValue)
 
-  let allowedSlug = normalizedSlug
+  let safeSlug = ''
   try {
-    if (typeof ensureSlugAllowed === 'function') {
-      allowedSlug = ensureSlugAllowed(normalizedSlug)
-    }
+    safeSlug = ensureSlugAllowed(normalizedSlug)
   } catch (e) {
     const code = e?.statusCode || e?.status || 403
     return json(
@@ -83,15 +63,40 @@ async function main(request, context) {
     )
   }
 
-  const safeSlug = ensureSafeSegment(allowedSlug, 'slug')
-  const safeCategory = ensureSafeSegment(categoryString, 'category')
+  if (!safeSlug) {
+    return json(
+      { ok: false, error: 'Missing slug' },
+      { status: 400, headers: buildCorsHeaders() },
+    )
+  }
+
+  let safeCategory
+  try {
+    safeCategory = ensureCategory(categoryString)
+  } catch (e) {
+    const code = e?.statusCode || e?.status || 400
+    return json(
+      { ok: false, error: e?.message || 'Invalid category' },
+      { status: code, headers: buildCorsHeaders() },
+    )
+  }
+
   const filename = typeof file.name === 'string' ? file.name : 'upload.bin'
-  const safeFilename = ensureSafeSegment(filename, 'filename')
+  let safeFilename
+  try {
+    safeFilename = ensureFilename(filename)
+  } catch (e) {
+    const code = e?.statusCode || e?.status || 400
+    return json(
+      { ok: false, error: e?.message || 'Invalid filename' },
+      { status: code, headers: buildCorsHeaders() },
+    )
+  }
 
   const buffer = Buffer.from(await file.arrayBuffer())
   const content = buffer.toString('base64')
 
-  const dir = joinPath(BASE_DIR, safeCategory, safeSlug)
+  const dir = stripDealroom(joinPath(BASE_DIR, safeCategory, safeSlug))
   const path = joinPath(dir, safeFilename)
 
   const octokit = new Octokit({ auth: TOKEN })

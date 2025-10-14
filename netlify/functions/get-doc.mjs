@@ -1,5 +1,12 @@
 import { Octokit } from 'octokit'
 import { getUrlAndParams, json, methodNotAllowed } from './_shared/http.mjs'
+import {
+  joinPath,
+  stripDealroom,
+  BASE_DIR,
+  parseSlug,
+  ensureCategory,
+} from './_shared/doc-paths.mjs'
 
 function requiredEnv(name) {
   const v = (process.env[name] || '').trim()
@@ -14,36 +21,10 @@ function requiredEnv(name) {
 const OWNER_REPO = requiredEnv('DOCS_REPO')
 const BRANCH = requiredEnv('DOCS_BRANCH')
 
-const sanitize = (s = '') =>
-  String(s)
-    .normalize('NFKC')
-    .replace(/[^\p{L}\p{N}._() \-]/gu, '')
-    .trim()
-const trimSlashes = (s) => String(s || '').replace(/^\/+|\/+$/g, '')
-const joinPath = (...parts) =>
-  parts
-    .filter(Boolean)
-    .map(trimSlashes)
-    .filter(Boolean)
-    .join('/')
-    .replace(/\/+/g, '/')
-const BASE_DIR = trimSlashes(process.env.DOCS_BASE_DIR || process.env.DOCS_ROOT_DIR || '')
-
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN || undefined })
 const gh = octokit.rest ? octokit.rest : octokit
 
 const decode = (s) => decodeURIComponent(String(s || '')).replace(/\+/g, ' ').trim()
-const cleanCategory = (s) => {
-  const value = sanitize(s)
-  if (!value || value.includes('..')) return ''
-  return value
-}
-const cleanSlug = (s) => {
-  const value = sanitize(String(s || '').toLowerCase())
-  if (!value) return ''
-  if (value.includes('..')) return ''
-  return value
-}
 const normName = (s) => String(s || '').replace(/\+/g, ' ').replace(/\s+/g, ' ').trim()
 const normalizeDisposition = (value) => {
   const v = String(value || '').trim().toLowerCase()
@@ -51,66 +32,198 @@ const normalizeDisposition = (value) => {
 }
 const escapeFilename = (name) => String(name || '').replace(/"/g, '\\"')
 
+const legacyCandidate = (dirNew, slug, category) => {
+  const legacy = joinPath('data/docs', slug, category)
+  if (!legacy) return ''
+  if (legacy === dirNew) return ''
+  return legacy
+}
+
+const findMatch = (items, filename) => {
+  if (!Array.isArray(items)) return undefined
+  return (
+    items.find((i) => i.type === 'file' && i.name === filename) ||
+    items.find((i) => i.type === 'file' && normName(i.name) === filename)
+  )
+}
+
+const buildFileResponse = (fileData, disposition, fallbackName) => {
+  if (fileData?.download_url) {
+    return new Response(null, { status: 302, headers: { Location: fileData.download_url } })
+  }
+  const buf = Buffer.from(fileData?.content || '', 'base64')
+  const safeName = escapeFilename(fileData?.name || fallbackName)
+  return new Response(buf, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'Content-Disposition': `${disposition}; filename="${safeName}"`,
+    },
+  })
+}
+
+async function fetchListing(owner, repo, path) {
+  if (!path) return { exists: false, items: [] }
+  try {
+    const res = await gh.repos.getContent({ owner, repo, path, ref: BRANCH })
+    if (!Array.isArray(res.data)) {
+      return { exists: true, items: [] }
+    }
+    return { exists: true, items: res.data }
+  } catch (err) {
+    if (err?.status === 404) {
+      return { exists: false, items: [] }
+    }
+    throw err
+  }
+}
+
+async function fetchFile(owner, repo, path) {
+  const res = await gh.repos.getContent({ owner, repo, path, ref: BRANCH })
+  return res.data
+}
+
 export default async function handler(request) {
   if (request.method?.toUpperCase() !== 'GET') return methodNotAllowed(['GET'])
 
   const { params } = getUrlAndParams(request)
   const rawCategory = decode(params.get('category'))
   const rawSlug = decode(params.get('slug'))
-  const category = cleanCategory(rawCategory)
-  const slug = cleanSlug(rawSlug)
   const filename = normName(decode(params.get('filename')))
   const disposition = normalizeDisposition(params.get('disposition'))
 
-  if (!category || !filename) {
-    return json({ ok: false, error: 'Missing category or filename' }, { status: 400 })
+  let category
+  try {
+    category = ensureCategory(rawCategory)
+  } catch (err) {
+    const status = err?.statusCode || err?.status || 400
+    return json({ ok: false, error: err?.message || 'Missing category' }, { status })
   }
-  if (rawSlug && !slug) {
-    return json({ ok: false, error: 'Slug inválido' }, { status: 400 })
+
+  if (!filename) {
+    return json({ ok: false, error: 'Missing filename' }, { status: 400 })
   }
+
   if (/[\\/]/.test(filename)) {
     return json({ ok: false, error: 'Invalid filename' }, { status: 400 })
   }
 
-  const legacyBase = BASE_DIR || 'data/docs'
-  const candidateSet = new Set(
-    [
-      joinPath(BASE_DIR, category, slug),
-      joinPath(BASE_DIR, category),
-      joinPath(BASE_DIR, slug, category),
-      joinPath(BASE_DIR, slug),
-      joinPath(category, slug),
-      joinPath(category),
-      joinPath(legacyBase, slug, category),
-    ].filter(Boolean),
-  )
-  const candidates = Array.from(candidateSet)
+  let slug = ''
+  try {
+    slug = parseSlug(rawSlug)
+  } catch (err) {
+    const status = err?.statusCode || err?.status || 400
+    return json({ ok: false, error: err?.message || 'Slug inválido' }, { status })
+  }
+
+  const dirNew = stripDealroom(joinPath(BASE_DIR, category, slug))
+  const legacyDir = legacyCandidate(dirNew, slug, category)
 
   const [owner, repo] = OWNER_REPO.split('/')
+  const pathsTried = []
   let baseDir = ''
-  let dirListing = null
+  let legacyUsed = false
 
-  for (const path of candidates) {
-    if (!path) continue
+  const attemptDirectory = async (path, legacy) => {
+    if (!path) return { status: 'skip' }
+
+    pathsTried.push(path)
+    const directPath = joinPath(path, filename)
+
+    if (directPath) {
+      try {
+        const direct = await gh.repos.getContent({ owner, repo, path: directPath, ref: BRANCH })
+        if (direct?.data?.type === 'file') {
+          return { status: 'found', response: buildFileResponse(direct.data, disposition, filename), baseDir: path, legacy }
+        }
+      } catch (err) {
+        if (err?.status && err.status !== 404) {
+          return { status: 'error', error: err, pathTried: directPath }
+        }
+      }
+    }
+
+    let listing
     try {
-      const res = await gh.repos.getContent({ owner, repo, path, ref: BRANCH })
-      if (!Array.isArray(res.data)) continue
-      baseDir = path
-      dirListing = res.data
-      break
+      listing = await fetchListing(owner, repo, path)
     } catch (err) {
-      if (err?.status === 404) continue
-      return json(
-        {
-          ok: false,
-          error: err?.message || String(err),
-          status: err?.status || 500,
-          repoUsed: OWNER_REPO,
-          branchUsed: BRANCH,
-          pathTried: path,
-        },
-        { status: err?.status || 500 },
-      )
+      const status = err?.status || err?.statusCode || 500
+      return { status: 'error', error: err, pathTried: path, httpStatus: status }
+    }
+
+    if (!baseDir && listing.exists) {
+      baseDir = path
+      legacyUsed = legacy
+    }
+
+    const hit = findMatch(listing.items, filename)
+    if (hit) {
+      try {
+        const fileData = hit.download_url ? hit : await fetchFile(owner, repo, hit.path)
+        return { status: 'found', response: buildFileResponse(fileData, disposition, hit.name), baseDir: path, legacy }
+      } catch (err) {
+        const status = err?.status || err?.statusCode || 500
+        return { status: 'error', error: err, pathTried: hit.path, httpStatus: status, baseDir: path }
+      }
+    }
+
+    return { status: listing.exists ? 'not-found' : 'missing', listing: listing.items, baseDir: listing.exists ? path : '', legacy }
+  }
+
+  const primary = await attemptDirectory(dirNew, false)
+  if (primary.status === 'found') {
+    return primary.response
+  }
+  if (primary.status === 'error') {
+    const status = primary.httpStatus || primary.error?.status || primary.error?.statusCode || 500
+    return json(
+      {
+        ok: false,
+        error: primary.error?.message || String(primary.error),
+        status,
+        repoUsed: OWNER_REPO,
+        branchUsed: BRANCH,
+        pathTried: primary.pathTried,
+      },
+      { status },
+    )
+  }
+  if (primary.baseDir) {
+    baseDir = primary.baseDir
+    legacyUsed = primary.legacy
+  }
+
+  let fallback
+  if (legacyDir) {
+    const shouldFallback =
+      primary.status === 'missing' ||
+      primary.status === 'skip' ||
+      primary.status === 'not-found' ||
+      !primary.listing ||
+      primary.listing.length === 0
+    if (shouldFallback) {
+      fallback = await attemptDirectory(legacyDir, true)
+      if (fallback.status === 'found') {
+        return fallback.response
+      }
+      if (fallback.status === 'error') {
+        const status = fallback.httpStatus || fallback.error?.status || fallback.error?.statusCode || 500
+        return json(
+          {
+            ok: false,
+            error: fallback.error?.message || String(fallback.error),
+            status,
+            repoUsed: OWNER_REPO,
+            branchUsed: BRANCH,
+            pathTried: fallback.pathTried,
+          },
+          { status },
+        )
+      }
+      if (fallback.baseDir && !baseDir) {
+        baseDir = fallback.baseDir
+        legacyUsed = fallback.legacy
+      }
     }
   }
 
@@ -121,107 +234,24 @@ export default async function handler(request) {
         error: 'Directory not found',
         repoUsed: OWNER_REPO,
         branchUsed: BRANCH,
-        tried: candidates,
+        tried: pathsTried,
         filename,
       },
       { status: 404 },
     )
   }
 
-  const allowDirect = !filename.includes('..')
-  const directPath = allowDirect ? joinPath(baseDir, filename) : ''
-  if (directPath) {
-    try {
-      const res = await gh.repos.getContent({ owner, repo, path: directPath, ref: BRANCH })
-      if (res.data?.type === 'file') {
-        const dl = res.data.download_url
-        if (dl) {
-          return new Response(null, { status: 302, headers: { Location: dl } })
-        }
-        const buf = Buffer.from(res.data.content || '', 'base64')
-        const safeName = escapeFilename(res.data?.name || filename)
-        return new Response(buf, {
-          status: 200,
-          headers: {
-            'Content-Type': 'application/octet-stream',
-            'Content-Disposition': `${disposition}; filename="${safeName}"`,
-          },
-        })
-      }
-    } catch (err) {
-      if (err?.status && err.status !== 404) {
-        return json(
-          {
-            ok: false,
-            error: err?.message || String(err),
-            status: err.status,
-            repoUsed: OWNER_REPO,
-            branchUsed: BRANCH,
-            pathTried: directPath,
-            pathDir: baseDir,
-          },
-          { status: err.status },
-        )
-      }
-    }
-  }
-
-  let items = Array.isArray(dirListing) ? dirListing : null
-  if (!items) {
-    try {
-      const res = await gh.repos.getContent({ owner, repo, path: baseDir, ref: BRANCH })
-      items = Array.isArray(res.data) ? res.data : []
-    } catch (err) {
-      const status = err?.status || 500
-      return json(
-        {
-          ok: false,
-          error: err?.message || String(err),
-          status,
-          repoUsed: OWNER_REPO,
-          branchUsed: BRANCH,
-          pathDir: baseDir,
-        },
-        { status },
-      )
-    }
-  }
-
-  const hit = items.find((i) => i.type === 'file' && i.name === filename) ||
-    items.find((i) => i.type === 'file' && normName(i.name) === filename)
-
-  if (!hit) {
-    return json({ ok: false, error: 'File not found', pathDir: baseDir, filename }, { status: 404 })
-  }
-
-  if (hit.download_url) {
-    return new Response(null, { status: 302, headers: { Location: hit.download_url } })
-  }
-
-  try {
-    const fileRes = await gh.repos.getContent({ owner, repo, path: hit.path, ref: BRANCH })
-    const buf = Buffer.from(fileRes.data.content || '', 'base64')
-    const safeName = escapeFilename(hit.name || filename)
-    return new Response(buf, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/octet-stream',
-        'Content-Disposition': `${disposition}; filename="${safeName}"`,
-      },
-    })
-  } catch (err) {
-    const status = err?.status || 500
-    return json(
-      {
-        ok: false,
-        error: err?.message || String(err),
-        status,
-        repoUsed: OWNER_REPO,
-        branchUsed: BRANCH,
-        pathDir: baseDir,
-        pathTried: hit.path,
-      },
-      { status },
-    )
-  }
+  return json(
+    {
+      ok: false,
+      error: 'File not found',
+      repoUsed: OWNER_REPO,
+      branchUsed: BRANCH,
+      pathDir: baseDir,
+      filename,
+      legacyFallbackUsed: legacyUsed,
+      pathsTried,
+    },
+    { status: 404 },
+  )
 }
