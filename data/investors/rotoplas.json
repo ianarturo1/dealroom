@@ -1,19 +1,26 @@
 {
   "id": "rotoplas",
-  "name": "rotoplas",
+  "name": "Rotoplas",
   "status": "Due diligence fiscal/financiero/riesgos",
   "deadlines": {
-    "Primera reunión": "2025-08-11",
-    "NDA": "2025-09-08",
     "Cronograma de inversión": "2025-10-30",
     "Firma": "2025-11-05"
   },
-  "metrics": {},
-  "ui": {
-    "panelTitle": "Panel rotoplas",
-    "theme": {}
-  },
-  "createdAt": "2025-10-14T21:12:03.157Z",
-  "updatedAt": "2025-10-14T21:16:14.258Z",
-  "email": "crojas@rotoplas.com"
+  "metrics": {
+    "fiscalCapitalInvestment": 14000000,
+    "projectProfitability": {
+      "amount": 44011675,
+      "years": 15
+    },
+    "portfolio": {
+      "type": "mix",
+      "mix": {
+        "aaaCompanies": 0,
+        "ownSites": 100
+      }
+    },
+    "investorsActive": 12,
+    "dealsAccelerated": 38,
+    "nps": 72
+  }
 }
