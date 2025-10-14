@@ -1,18 +1,29 @@
 {
   "id": "nu3",
-  "name": "NU3",
+  "name": "nu3",
   "status": "Due diligence fiscal/financiero/riesgos",
   "deadlines": {
     "Cronograma de inversión": "2025-10-30",
+    "Firma": "2025-11-07",
     "Primera reunión": "2025-08-11",
-    "NDA": "2025-09-08"
+    "NDA": "2025-08-19"
   },
-  "metrics": {},
-  "ui": {
-    "panelTitle": "Panel NU3",
-    "theme": {}
-  },
-  "createdAt": "2025-10-14T14:11:26.813Z",
-  "updatedAt": "2025-10-14T14:11:26.813Z",
-  "email": "aureliano.granillo@nu3.com.mx"
+  "metrics": {
+    "fiscalCapitalInvestment": 16600000,
+    "projectProfitability": {
+      "amount": 125000000,
+      "years": 15
+    },
+    "portfolio": {
+      "type": "mix",
+      "mix": {
+        "solarFarms": 0,
+        "aaaCompanies": 0,
+        "ownSites": 100
+      }
+    },
+    "investorsActive": 12,
+    "dealsAccelerated": 38,
+    "nps": 72
+  }
 }
