@@ -20,9 +20,10 @@ export function sanitizeSegment(s) {
  *     Si PUBLIC_INVESTOR_SLUG está definido, solo se permite ese slug (case-insensitive).
  *     Si no está definido, se permite el slug solicitado.
  */
-export function ensureSlugAllowed(inputSlug) {
+export function ensureSlugAllowed(inputSlug, _event) {
   const asked = sanitizeSegment(inputSlug).toLowerCase();
   if (!asked) throw httpError(400, "Missing slug");
+  if (asked.includes("..")) throw httpError(400, "Invalid slug");
 
   const isPreview = (process.env.CONTEXT || "").toLowerCase() === "deploy-preview";
   const adminBypass = (process.env.ADMIN_BYPASS_ALL_SLUGS || "").toLowerCase() === "true";
@@ -31,9 +32,30 @@ export function ensureSlugAllowed(inputSlug) {
     return asked; // Admin / preview: no restringir
   }
 
-  const envSlug = sanitizeSegment(process.env.PUBLIC_INVESTOR_SLUG || "").toLowerCase();
-  if (envSlug && asked !== envSlug) {
-    throw httpError(403, "Slug not allowed");
+  const singleSlug = sanitizeSegment(process.env.PUBLIC_INVESTOR_SLUG || "").toLowerCase();
+  const multipleSlugsRaw = String(process.env.PUBLIC_INVESTOR_SLUGS || "");
+  const slugList = multipleSlugsRaw
+    .split(",")
+    .map((value) => sanitizeSegment(value).toLowerCase())
+    .filter(Boolean);
+
+  const allowsAll = slugList.includes("*");
+  if (allowsAll) {
+    return asked;
   }
-  return asked || envSlug;
+
+  const allowedSet = new Set(slugList);
+  if (singleSlug) {
+    allowedSet.add(singleSlug);
+  }
+
+  if (allowedSet.size === 0) {
+    return asked;
+  }
+
+  if (allowedSet.has(asked)) {
+    return asked;
+  }
+
+  throw httpError(403, "Slug not allowed");
 }

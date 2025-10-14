@@ -1,5 +1,13 @@
 import { Octokit } from 'octokit'
 import { getUrlAndParams, json, methodNotAllowed } from './_shared/http.mjs'
+import {
+  buildNewLayoutPath,
+  buildLegacyPath,
+  joinPath,
+  stripDealroom,
+  sanitize,
+} from './_shared/paths.mjs'
+import { ensureSlugAllowed } from './_shared/ensureSlugAllowed.mjs'
 
 function requiredEnv(name) {
   const v = (process.env[name] || '').trim()
@@ -14,85 +22,111 @@ function requiredEnv(name) {
 const OWNER_REPO = requiredEnv('DOCS_REPO')
 const BRANCH = requiredEnv('DOCS_BRANCH')
 
-const sanitize = (s = '') =>
-  String(s)
-    .normalize('NFKC')
-    .replace(/[^\p{L}\p{N}._() \-]/gu, '')
-    .trim()
-const trimSlashes = (s) => String(s || '').replace(/^\/+|\/+$/g, '')
-const joinPath = (...parts) =>
-  parts
-    .filter(Boolean)
-    .map(trimSlashes)
-    .filter(Boolean)
-    .join('/')
-    .replace(/\/+/g, '/')
-const BASE_DIR = trimSlashes(process.env.DOCS_BASE_DIR || process.env.DOCS_ROOT_DIR || '')
-
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN || undefined })
 const gh = octokit.rest ? octokit.rest : octokit
 
-const cleanCategory = (s) => {
-  const value = sanitize(s)
-  if (!value || value.includes('..')) return ''
-  return value
-}
-const cleanSlug = (s) => {
-  const value = sanitize(String(s || '').toLowerCase())
-  if (!value) return ''
-  if (value.includes('..')) return ''
-  return value
+function ensureCategory(value) {
+  const clean = sanitize(value)
+  if (!clean || clean.includes('..')) {
+    const e = new Error('Invalid category')
+    e.status = 400
+    throw e
+  }
+  return clean
 }
 
-export default async function handler(request) {
+function normalizeSlug(value, event) {
+  if (!value) return ''
+  try {
+    return ensureSlugAllowed(value, event)
+  } catch (err) {
+    throw err
+  }
+}
+
+function uniqueByPath(entries) {
+  const seen = new Set()
+  const out = []
+  for (const entry of entries) {
+    if (!entry?.path) continue
+    const key = entry.path
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(entry)
+  }
+  return out
+}
+
+export default async function handler(request, context) {
   if (request.method?.toUpperCase() !== 'GET') return methodNotAllowed(['GET'])
 
   const { params } = getUrlAndParams(request)
   const rawCategory = params.get('category')
   const rawSlug = params.get('slug')
-  const category = cleanCategory(rawCategory)
-  const slug = cleanSlug(rawSlug)
-  if (!category) return json({ ok: false, error: 'Falta category' }, { status: 400 })
-  if (rawSlug && !slug) {
-    return json({ ok: false, error: 'Slug inválido' }, { status: 400 })
+
+  let category
+  try {
+    category = ensureCategory(rawCategory)
+  } catch (err) {
+    const status = err?.status || err?.statusCode || 400
+    return json({ ok: false, error: err?.message || 'Invalid category' }, { status })
   }
 
-  const legacyBase = BASE_DIR || 'data/docs'
-  const candidateSet = new Set(
-    [
-      joinPath(BASE_DIR, category, slug),
-      joinPath(BASE_DIR, category),
-      joinPath(BASE_DIR, slug, category),
-      joinPath(BASE_DIR, slug),
-      joinPath(category, slug),
-      joinPath(category),
-      joinPath(legacyBase, slug, category),
-    ].filter(Boolean),
-  )
-  const candidates = Array.from(candidateSet)
+  let slug = ''
+  if (rawSlug) {
+    try {
+      slug = normalizeSlug(rawSlug, { request, context })
+    } catch (err) {
+      const status = err?.status || err?.statusCode || 403
+      return json({ ok: false, error: err?.message || 'Slug inválido' }, { status })
+    }
+  }
+
+  const dirNew = buildNewLayoutPath(category, slug)
+  const dirLegacy = buildLegacyPath(category, slug)
+  const directories = uniqueByPath([
+    { type: 'new', path: dirNew },
+    { type: 'legacy', path: dirLegacy },
+  ])
 
   const [owner, repo] = OWNER_REPO.split('/')
-  for (const path of candidates) {
+  const attempted = []
+  const hits = []
+  const filesMap = new Map()
+  let firstHitPath = ''
+
+  for (const entry of directories) {
+    const path = entry?.path
     if (!path) continue
+    const normalizedDirPath = stripDealroom(joinPath(path))
+    attempted.push({ type: entry.type, path: normalizedDirPath })
     try {
       const res = await gh.repos.getContent({ owner, repo, path, ref: BRANCH })
       const items = Array.isArray(res.data) ? res.data : []
-      const files = items
-        .filter((item) => item.type === 'file')
-        .map((item) => ({
+      const fileItems = items.filter((item) => item.type === 'file')
+      if (fileItems.length > 0 && !firstHitPath) {
+        firstHitPath = normalizedDirPath
+      }
+      if (fileItems.length > 0) {
+        hits.push({ type: entry.type, path: normalizedDirPath, count: fileItems.length })
+      }
+      for (const item of fileItems) {
+        const normalizedPath = stripDealroom(item.path || '')
+        const key = item.sha || normalizedPath
+        if (filesMap.has(key)) continue
+        filesMap.set(key, {
           name: item.name,
           size: item.size,
-          path: item.path,
+          path: normalizedPath,
           download_url: item.download_url,
-        }))
-      const isInvestorScope = Boolean(
-        slug &&
-          (path.endsWith(`/${slug}`) || path.includes(`/${slug}/`))
-      )
-      const scope = isInvestorScope ? 'investor' : 'category'
-      return json({ ok: true, repoUsed: OWNER_REPO, branchUsed: BRANCH, pathUsed: path, scope, files })
+          sha: item.sha,
+          source: entry.type,
+        })
+      }
     } catch (err) {
-      if (err?.status === 404) continue
+      if (err?.status === 404) {
+        continue
+      }
       return json(
         {
           ok: false,
@@ -100,12 +134,24 @@ export default async function handler(request) {
           status: err?.status || 500,
           repoUsed: OWNER_REPO,
           branchUsed: BRANCH,
-          pathTried: path,
+          pathTried: normalizedDirPath,
         },
         { status: err?.status || 500 },
       )
     }
   }
 
-  return json({ ok: true, repoUsed: OWNER_REPO, branchUsed: BRANCH, tried: candidates, files: [] })
+  const files = Array.from(filesMap.values())
+  const scope = slug ? 'investor' : 'category'
+
+  return json({
+    ok: true,
+    repoUsed: OWNER_REPO,
+    branchUsed: BRANCH,
+    scope,
+    files,
+    tried: attempted.map((item) => item.path),
+    hits,
+    firstHitPath: firstHitPath || null,
+  })
 }

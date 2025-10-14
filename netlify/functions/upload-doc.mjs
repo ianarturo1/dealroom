@@ -1,5 +1,12 @@
 import { Octokit } from 'octokit'
 import { readSingleFileFromFormData, json, methodNotAllowed } from './_shared/http.mjs'
+import {
+  buildNewLayoutPath,
+  buildLegacyPath,
+  joinPath,
+  stripDealroom,
+  sanitize,
+} from './_shared/paths.mjs'
 import { ensureSlugAllowed } from './_shared/ensureSlugAllowed.mjs'
 
 function requiredEnv(name) {
@@ -11,21 +18,6 @@ function requiredEnv(name) {
   }
   return v
 }
-
-const sanitize = (s = '') =>
-  String(s)
-    .normalize('NFKC')
-    .replace(/[^\p{L}\p{N}._() \-]/gu, '')
-    .trim()
-const trimSlashes = (s) => String(s || '').replace(/^\/+|\/+$/g, '')
-const joinPath = (...parts) =>
-  parts
-    .filter(Boolean)
-    .map(trimSlashes)
-    .filter(Boolean)
-    .join('/')
-    .replace(/\/+/g, '/')
-const BASE_DIR = trimSlashes(process.env.DOCS_BASE_DIR || process.env.DOCS_ROOT_DIR || '')
 
 function ensureSafeSegment(value, label) {
   const clean = sanitize(value)
@@ -65,16 +57,15 @@ async function main(request, context) {
     )
   }
 
-  const slugString = typeof slugValue === 'string' ? slugValue : String(slugValue)
-  const normalizedSlug = slugString.trim()
+  const input = {
+    slug: typeof slugValue === 'string' ? slugValue : String(slugValue),
+    category: typeof categoryValue === 'string' ? categoryValue : String(categoryValue),
+    filename: typeof file.name === 'string' ? file.name : 'upload.bin',
+  }
 
-  const categoryString = typeof categoryValue === 'string' ? categoryValue : String(categoryValue)
-
-  let allowedSlug = normalizedSlug
+  let slug
   try {
-    if (typeof ensureSlugAllowed === 'function') {
-      allowedSlug = ensureSlugAllowed(normalizedSlug)
-    }
+    slug = ensureSlugAllowed(input.slug, { request, context })
   } catch (e) {
     const code = e?.statusCode || e?.status || 403
     return json(
@@ -83,22 +74,22 @@ async function main(request, context) {
     )
   }
 
-  const safeSlug = ensureSafeSegment(allowedSlug, 'slug')
-  const safeCategory = ensureSafeSegment(categoryString, 'category')
-  const filename = typeof file.name === 'string' ? file.name : 'upload.bin'
-  const safeFilename = ensureSafeSegment(filename, 'filename')
+  const category = ensureSafeSegment(input.category, 'category')
+  const safeFilename = ensureSafeSegment(sanitize(input.filename), 'filename')
 
   const buffer = Buffer.from(await file.arrayBuffer())
   const content = buffer.toString('base64')
 
-  const dir = joinPath(BASE_DIR, safeCategory, safeSlug)
-  const path = joinPath(dir, safeFilename)
+  const dirNew = buildNewLayoutPath(category, slug)
+  const filePath = joinPath(dirNew, safeFilename)
+  const dirLegacy = buildLegacyPath(category, slug)
+  const messagePath = stripDealroom(joinPath(category, slug, safeFilename))
 
   const octokit = new Octokit({ auth: TOKEN })
 
   let sha
   try {
-    const res = await octokit.rest.repos.getContent({ owner, repo, path, ref: DOCS_BRANCH })
+    const res = await octokit.rest.repos.getContent({ owner, repo, path: filePath, ref: DOCS_BRANCH })
     if (Array.isArray(res.data)) {
       const e = new Error('Path points to a directory')
       e.status = 400
@@ -110,14 +101,19 @@ async function main(request, context) {
     if (status && status !== 404) throw err
   }
 
-  const message = `chore(upload-doc): ${joinPath(safeCategory, safeSlug, safeFilename)}`
-  const payload = { owner, repo, path, message, content, branch: DOCS_BRANCH }
+  const message = `chore(upload-doc): ${messagePath}`
+  const payload = { owner, repo, path: filePath, message, content, branch: DOCS_BRANCH }
   if (sha) payload.sha = sha
 
   const writeRes = await octokit.rest.repos.createOrUpdateFileContents(payload)
 
   return json(
-    { ok: true, path, commit: writeRes?.data?.commit },
+    {
+      ok: true,
+      path: filePath,
+      legacyPath: dirLegacy,
+      commit: writeRes?.data?.commit,
+    },
     { status: 200, headers: buildCorsHeaders() },
   )
 }
