@@ -12,28 +12,49 @@ export function sanitizeSegment(s) {
     .trim();
 }
 
+// Nota: mantenemos compatibilidad hacia atrás con PUBLIC_INVESTOR_SLUG (singular)
+// y añadimos PUBLIC_INVESTOR_SLUGS (lista separada por comas) y wildcard "*"/"all".
+function parseAllowedSlugs() {
+  const singular = String(process.env.PUBLIC_INVESTOR_SLUG || "").trim();
+  const plural = String(process.env.PUBLIC_INVESTOR_SLUGS || "").trim();
+
+  const raw = [singular, plural].filter(Boolean).join(",");
+  if (!raw) return new Set(); // sin restricción
+
+  const parts = raw
+    .split(",")
+    .map((v) => sanitizeSegment(v).toLowerCase())
+    .filter(Boolean);
+
+  if (parts.includes("*") || parts.includes("all")) {
+    return new Set(["*"]);
+  }
+  return new Set(parts);
+}
+
 /**
  * Política de acceso a slugs:
- * - En deploy-preview (process.env.CONTEXT === "deploy-preview") -> permitir cualquier slug.
- * - O si ADMIN_BYPASS_ALL_SLUGS === "true" -> permitir cualquier slug.
- * - En caso contrario (producción/branch deploy sin bypass):
- *     Si PUBLIC_INVESTOR_SLUG está definido, solo se permite ese slug (case-insensitive).
- *     Si no está definido, se permite el slug solicitado.
+ * - En deploy previews o si ADMIN_BYPASS_ALL_SLUGS=true => sin restricción.
+ * - Si PUBLIC_INVESTOR_SLUG(S) no está definida => sin restricción.
+ * - Si PUBLIC_INVESTOR_SLUG(S) está definida:
+ *     - '*' o 'all' => sin restricción.
+ *     - lista separada por comas => permitir sólo esos slugs (case-insensitive).
  */
 export function ensureSlugAllowed(inputSlug) {
   const asked = sanitizeSegment(inputSlug).toLowerCase();
-  if (!asked) throw httpError(400, "Missing slug");
 
   const isPreview = (process.env.CONTEXT || "").toLowerCase() === "deploy-preview";
   const adminBypass = (process.env.ADMIN_BYPASS_ALL_SLUGS || "").toLowerCase() === "true";
+  if (isPreview || adminBypass) return asked;
 
-  if (isPreview || adminBypass) {
-    return asked; // Admin / preview: no restringir
+  const allowed = parseAllowedSlugs(); // Set
+  if (allowed.size === 0 || allowed.has("*")) return asked;
+
+  if (!asked) {
+    throw httpError(400, "Missing slug");
   }
-
-  const envSlug = sanitizeSegment(process.env.PUBLIC_INVESTOR_SLUG || "").toLowerCase();
-  if (envSlug && asked !== envSlug) {
+  if (!allowed.has(asked)) {
     throw httpError(403, "Slug not allowed");
   }
-  return asked || envSlug;
+  return asked;
 }

@@ -67,12 +67,19 @@ GITHUB_TOKEN=ghp_xxx
 # Slug público por defecto (opcional)
 PUBLIC_INVESTOR_SLUG=femsa
 
+# Lista de slugs permitidos (opcional; separa por comas o usa * para todos)
+PUBLIC_INVESTOR_SLUGS=femsa,alsea
+
 # Slug público para el build del frontend (opcional)
 VITE_PUBLIC_INVESTOR_ID=femsa
 ```
 
 > Sin `GITHUB_TOKEN`, el sitio funciona en modo demo (lee `/data` local y no lista documentos).
-> Para habilitar el backend de documentos asegúrate de definir `DOCS_REPO`, `DOCS_BRANCH` y `GITHUB_TOKEN`, y de dejar apagada la bandera `DOCS_BACKEND_ALSEA` (sin definir o distinta de `on`). Puedes fijar un único slug público con `PUBLIC_INVESTOR_SLUG`. Usa `DOCS_BASE_DIR` solo si necesitas un prefijo (por ejemplo `data/docs` para mantener el esquema legado `data/docs/<slug>/<Categoría>/`).
+> Para habilitar el backend de documentos asegúrate de definir `DOCS_REPO`, `DOCS_BRANCH` y `GITHUB_TOKEN`, y de dejar apagada la bandera `DOCS_BACKEND_ALSEA` (sin definir o distinta de `on`). Puedes fijar slugs públicos con `PUBLIC_INVESTOR_SLUGS` (coma separada o `*` para todos) o mantener compatibilidad con `PUBLIC_INVESTOR_SLUG`. Usa `DOCS_BASE_DIR` solo si necesitas un prefijo (por ejemplo `data/docs` para mantener el esquema legado `data/docs/<slug>/<Categoría>/`).
+
+PUBLIC_INVESTOR_SLUGS = lista separada por comas (ej. femsa, alsea) o * para todos.
+Sigue soportándose PUBLIC_INVESTOR_SLUG (singular) por compatibilidad.
+En Deploy Previews o con ADMIN_BYPASS_ALL_SLUGS=true no hay restricción.
 
 ---
 
