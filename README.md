@@ -58,6 +58,8 @@ CONTENT_BRANCH=main
 # Repo privado de documentos
 DOCS_REPO=owner/nombre-del-repo-docs
 DOCS_BRANCH=main
+# Prefijo opcional (vacío => NDA/<slug>, data/docs => modo legado)
+DOCS_BASE_DIR=
 
 # Token con permisos de contents:read/write en ambos repos
 GITHUB_TOKEN=ghp_xxx
@@ -70,13 +72,13 @@ VITE_PUBLIC_INVESTOR_ID=femsa
 ```
 
 > Sin `GITHUB_TOKEN`, el sitio funciona en modo demo (lee `/data` local y no lista documentos).
-> Para habilitar el backend de documentos asegúrate de definir `DOCS_REPO`, `DOCS_BRANCH` y `GITHUB_TOKEN`, y de dejar apagada la bandera `DOCS_BACKEND_ALSEA` (sin definir o distinta de `on`). Puedes fijar un único slug público con `PUBLIC_INVESTOR_SLUG`.
+> Para habilitar el backend de documentos asegúrate de definir `DOCS_REPO`, `DOCS_BRANCH` y `GITHUB_TOKEN`, y de dejar apagada la bandera `DOCS_BACKEND_ALSEA` (sin definir o distinta de `on`). Puedes fijar un único slug público con `PUBLIC_INVESTOR_SLUG`. Usa `DOCS_BASE_DIR` solo si necesitas un prefijo (por ejemplo `data/docs` para mantener el esquema legado `data/docs/<slug>/<Categoría>/`).
 
 ---
 
 ## 5) Flujo de documentos (solo GitHub + Netlify)
 
-- **Listar:** `/.netlify/functions/list-docs?category=NDA` busca primero en `<Categoría>/<slug>/` (esquema nuevo) y, si no existe, intenta `data/docs/<slug>/<Categoría>/` (esquema legado). Si ambas rutas existen, combina los archivos sin duplicados.
+- **Listar:** `/.netlify/functions/list-docs?category=NDA` busca primero en `<DOCS_BASE_DIR?>/<Categoría>/<slug>/` (esquema nuevo) y, si no existe, intenta `<DOCS_BASE_DIR?>/<slug>/<Categoría>/` y `data/docs/<slug>/<Categoría>/` (esquema legado). Si varias rutas existen, combina los archivos sin duplicados.
 - **Subir:** UI de `/documents` llama `upload-doc` → commit al repo de documentos.
 - **Descargar:** `download-file` entrega el archivo desde GitHub (inline o attachment) para el slug permitido.
   - Valida que la metadata de GitHub reporte tamaño > 0 y que el binario descargado tenga contenido antes de regresarlo al navegador.
@@ -88,15 +90,17 @@ Cada proyecto activo define su propio `slug` en `data/projects.json`; los botone
 > Sugerencia: estructura de carpetas en el repo de docs
 >
 > ```
-> data/docs/<slug>/NDA/*.pdf
-> data/docs/<slug>/Propuestas/*.pdf
-> data/docs/<slug>/Modelos financieros/*.xlsx
-> data/docs/<slug>/Contratos/*.docx
-> data/docs/<slug>/LOIs/*.pdf
-> data/docs/<slug>/Sustento fiscal/*.pdf
-> data/docs/<slug>/Mitigación de riesgos/*.pdf
-> data/docs/<slug>/Procesos/*.pdf
+> NDA/<slug>/*.pdf
+> Propuestas/<slug>/*.pdf
+> Modelos financieros/<slug>/*.xlsx
+> Contratos/<slug>/*.docx
+> LOIs/<slug>/*.pdf
+> Sustento fiscal/<slug>/*.pdf
+> Mitigación de riesgos/<slug>/*.pdf
+> Procesos/<slug>/*.pdf
 > ```
+>
+> Para mantener compatibilidad con el layout anterior puedes usar `DOCS_BASE_DIR=data/docs` y conservar `data/docs/<slug>/<Categoría>/`.
 
 ---
 
