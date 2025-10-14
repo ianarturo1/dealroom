@@ -1,6 +1,14 @@
 export const DOCS_REPO_WEB = import.meta.env.VITE_DOCS_REPO_WEB || 'https://github.com/ianarturo1/dealroom';
 export const DOCS_BRANCH   = import.meta.env.VITE_DOCS_BRANCH   || 'main';
-export const DOCS_ROOT_DIR = (import.meta.env.VITE_DOCS_ROOT_DIR ?? 'dealroom').trim(); // puede ser ''
+
+function stripDealroomBase(value: string): string {
+  const trimmed = (value ?? '').trim().replace(/^\/+|\/+$/g, '');
+  let clean = trimmed.replace(/^dealroom\/?/i, '').replace(/^dealroom\/?/i, '');
+  clean = clean.replace(/^\/+|\/+$/g, '');
+  return clean;
+}
+
+export const DOCS_ROOT_DIR = stripDealroomBase(import.meta.env.VITE_DOCS_ROOT_DIR ?? '');
 
 function normalizePath(p: string) {
   return p.replace(/\/+/g, '/').replace(/(^\/|\/$)/g, '');
