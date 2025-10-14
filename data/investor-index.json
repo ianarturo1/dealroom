@@ -141,6 +141,13 @@
       "status": "NDA",
       "createdAt": "2025-10-06T04:33:36.680Z",
       "updatedAt": "2025-10-06T04:33:36.680Z"
+    },
+    "nu3": {
+      "name": "NU3",
+      "email": "aureliano.granillo@nu3.com.mx",
+      "status": "Due diligence fiscal/financiero/riesgos",
+      "createdAt": "2025-10-14T14:11:26.813Z",
+      "updatedAt": "2025-10-14T14:11:26.813Z"
     }
   }
 }
