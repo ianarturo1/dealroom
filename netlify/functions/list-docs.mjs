@@ -1,5 +1,12 @@
 import { Octokit } from 'octokit'
 import { getUrlAndParams, json, methodNotAllowed } from './_shared/http.mjs'
+import {
+  joinPath,
+  stripDealroom,
+  BASE_DIR,
+  parseSlug,
+  ensureCategory,
+} from './_shared/doc-paths.mjs'
 
 function requiredEnv(name) {
   const v = (process.env[name] || '').trim()
@@ -14,34 +21,38 @@ function requiredEnv(name) {
 const OWNER_REPO = requiredEnv('DOCS_REPO')
 const BRANCH = requiredEnv('DOCS_BRANCH')
 
-const sanitize = (s = '') =>
-  String(s)
-    .normalize('NFKC')
-    .replace(/[^\p{L}\p{N}._() \-]/gu, '')
-    .trim()
-const trimSlashes = (s) => String(s || '').replace(/^\/+|\/+$/g, '')
-const joinPath = (...parts) =>
-  parts
-    .filter(Boolean)
-    .map(trimSlashes)
-    .filter(Boolean)
-    .join('/')
-    .replace(/\/+/g, '/')
-const BASE_DIR = trimSlashes(process.env.DOCS_BASE_DIR || process.env.DOCS_ROOT_DIR || '')
-
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN || undefined })
 const gh = octokit.rest ? octokit.rest : octokit
 
-const cleanCategory = (s) => {
-  const value = sanitize(s)
-  if (!value || value.includes('..')) return ''
-  return value
+const legacyCandidate = (dirNew, slug, category) => {
+  const legacy = joinPath('data/docs', slug, category)
+  if (!legacy) return ''
+  if (legacy === dirNew) return ''
+  return legacy
 }
-const cleanSlug = (s) => {
-  const value = sanitize(String(s || '').toLowerCase())
-  if (!value) return ''
-  if (value.includes('..')) return ''
-  return value
+
+async function fetchDir(owner, repo, path) {
+  if (!path) return { files: [], exists: false }
+
+  try {
+    const res = await gh.repos.getContent({ owner, repo, path, ref: BRANCH })
+    const items = Array.isArray(res.data) ? res.data : []
+    const files = items
+      .filter((item) => item.type === 'file')
+      .map((item) => ({
+        name: item.name,
+        size: item.size,
+        path: item.path,
+        sha: item.sha,
+        download_url: item.download_url,
+      }))
+    return { files, exists: true }
+  } catch (err) {
+    if (err?.status === 404) {
+      return { files: [], exists: false }
+    }
+    throw err
+  }
 }
 
 export default async function handler(request) {
@@ -50,62 +61,103 @@ export default async function handler(request) {
   const { params } = getUrlAndParams(request)
   const rawCategory = params.get('category')
   const rawSlug = params.get('slug')
-  const category = cleanCategory(rawCategory)
-  const slug = cleanSlug(rawSlug)
-  if (!category) return json({ ok: false, error: 'Falta category' }, { status: 400 })
-  if (rawSlug && !slug) {
-    return json({ ok: false, error: 'Slug inválido' }, { status: 400 })
+
+  let category
+  try {
+    category = ensureCategory(rawCategory)
+  } catch (err) {
+    const status = err?.statusCode || err?.status || 400
+    return json({ ok: false, error: err?.message || 'Falta category' }, { status })
   }
 
-  const legacyBase = BASE_DIR || 'data/docs'
-  const candidateSet = new Set(
-    [
-      joinPath(BASE_DIR, category, slug),
-      joinPath(BASE_DIR, category),
-      joinPath(BASE_DIR, slug, category),
-      joinPath(BASE_DIR, slug),
-      joinPath(category, slug),
-      joinPath(category),
-      joinPath(legacyBase, slug, category),
-    ].filter(Boolean),
-  )
-  const candidates = Array.from(candidateSet)
+  let slug = ''
+  try {
+    slug = parseSlug(rawSlug)
+  } catch (err) {
+    const status = err?.statusCode || err?.status || 400
+    return json({ ok: false, error: err?.message || 'Slug inválido' }, { status })
+  }
+
+  const dirNew = stripDealroom(joinPath(BASE_DIR, category, slug))
+  const legacyDir = legacyCandidate(dirNew, slug, category)
 
   const [owner, repo] = OWNER_REPO.split('/')
-  for (const path of candidates) {
-    if (!path) continue
+  const pathsTried = []
+  const seen = new Map()
+  let pathUsed = ''
+  let legacyUsed = false
+
+  const handleDir = async (path, legacy) => {
+    if (!path) return { files: [], exists: false }
+
+    pathsTried.push(path)
     try {
-      const res = await gh.repos.getContent({ owner, repo, path, ref: BRANCH })
-      const items = Array.isArray(res.data) ? res.data : []
-      const files = items
-        .filter((item) => item.type === 'file')
-        .map((item) => ({
-          name: item.name,
-          size: item.size,
-          path: item.path,
-          download_url: item.download_url,
-        }))
-      const isInvestorScope = Boolean(
-        slug &&
-          (path.endsWith(`/${slug}`) || path.includes(`/${slug}/`))
-      )
-      const scope = isInvestorScope ? 'investor' : 'category'
-      return json({ ok: true, repoUsed: OWNER_REPO, branchUsed: BRANCH, pathUsed: path, scope, files })
+      const listing = await fetchDir(owner, repo, path)
+      for (const file of listing.files) {
+        const key = `${file.name}:${file.sha || file.path}`
+        if (!seen.has(key)) {
+          seen.set(key, { ...file, sourcePath: path })
+          if (!pathUsed) {
+            pathUsed = path
+            legacyUsed = legacy
+          }
+        }
+      }
+      return listing
     } catch (err) {
-      if (err?.status === 404) continue
+      const status = err?.status || err?.statusCode || 500
+      throw Object.assign(err, {
+        status,
+        pathTried: path,
+      })
+    }
+  }
+
+  const primary = await handleDir(dirNew, false).catch((err) => err)
+  if (primary instanceof Error) {
+    return json(
+      {
+        ok: false,
+        error: primary?.message || String(primary),
+        status: primary.status || 500,
+        repoUsed: OWNER_REPO,
+        branchUsed: BRANCH,
+        pathTried: primary.pathTried,
+      },
+      { status: primary.status || 500 },
+    )
+  }
+
+  let fallback
+  if ((!primary.exists || primary.files.length === 0) && legacyDir) {
+    fallback = await handleDir(legacyDir, true).catch((err) => err)
+    if (fallback instanceof Error) {
       return json(
         {
           ok: false,
-          error: err?.message || String(err),
-          status: err?.status || 500,
+          error: fallback?.message || String(fallback),
+          status: fallback.status || 500,
           repoUsed: OWNER_REPO,
           branchUsed: BRANCH,
-          pathTried: path,
+          pathTried: fallback.pathTried,
         },
-        { status: err?.status || 500 },
+        { status: fallback.status || 500 },
       )
     }
   }
 
-  return json({ ok: true, repoUsed: OWNER_REPO, branchUsed: BRANCH, tried: candidates, files: [] })
+  const files = Array.from(seen.values())
+  const legacyFallbackUsed = Boolean(legacyUsed)
+  const scope = slug ? 'investor' : 'category'
+
+  return json({
+    ok: true,
+    repoUsed: OWNER_REPO,
+    branchUsed: BRANCH,
+    pathUsed,
+    pathsTried,
+    legacyFallbackUsed,
+    scope,
+    files,
+  })
 }
