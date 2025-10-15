@@ -1,22 +1,23 @@
 {
   "id": "rotoplas",
-  "name": "Rotoplas",
-  "status": "Due diligence fiscal/financiero/riesgos",
+  "name": "FEMSA",
+  "status": "LOI",
   "deadlines": {
-    "Cronograma de inversión": "2025-10-30",
-    "Firma": "2025-11-05"
+    "LOI": "2025-10-15",
+    "Firma": "2025-11-30"
   },
   "metrics": {
-    "fiscalCapitalInvestment": 14000000,
+    "fiscalCapitalInvestment": 20000000,
     "projectProfitability": {
-      "amount": 44011675,
-      "years": 15
+      "amount": 12500000,
+      "years": 7
     },
     "portfolio": {
       "type": "mix",
       "mix": {
-        "aaaCompanies": 0,
-        "ownSites": 100
+        "solarFarms": 40,
+        "aaaCompanies": 35,
+        "ownSites": 25
       }
     },
     "investorsActive": 12,
