@@ -74,9 +74,16 @@ async function main(request, context) {
   const buffer = Buffer.from(await file.arrayBuffer());
   const content = buffer.toString('base64');
 
-  // Use the new, simplified path builder
+  // --- START DIAGNOSTIC LOGGING ---
+  console.log('[upload-doc] Received category:', category);
+  console.log('[upload-doc] Received slug:', slug);
+
   const documentDir = buildDocumentPath(category, slug);
+  console.log('[upload-doc] Path from buildDocumentPath:', documentDir);
+
   const filePath = joinPath(documentDir, safeFilename);
+  console.log('[upload-doc] Final path sent to GitHub:', filePath);
+  // --- END DIAGNOSTIC LOGGING ---
 
   const octokit = new Octokit({ auth: TOKEN });
 
