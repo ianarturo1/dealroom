@@ -67,6 +67,11 @@ export default async function handler(request, context) {
   const documentPath = buildDocumentPath(category, slug);
   const files = [];
 
+  // --- START DIAGNOSTIC LOGGING ---
+  console.log(`[list-docs] Attempting to list files from path: "${documentPath}"`);
+  console.log(`[list-docs] Params received: category="${rawCategory}", slug="${rawSlug}"`);
+  // --- END DIAGNOSTIC LOGGING ---
+
   try {
     const res = await gh.repos.getContent({ owner, repo, path: documentPath, ref: BRANCH });
     const items = Array.isArray(res.data) ? res.data : [];
