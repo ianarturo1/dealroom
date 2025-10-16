@@ -1,35 +1,46 @@
 // _shared/paths.mjs (Node 18 ESM)
-export const trim = s => String(s).replace(/^\/+|\/+$/g,'');
-export const joinPath = (...p) => p.filter(Boolean).map(trim).join('/').replace(/\/+/g,'/');
-export const stripDealroom = s => {
-  let out = trim(String(s));
-  // quita cualquier "dealroom" al inicio (una o dos veces)
-  out = out.replace(/^dealroom\/?/i,'');
-  out = out.replace(/^dealroom\/?/i,'');
-  return trim(out);
-};
-export const sanitize = (s='') =>
-  String(s).normalize('NFKC').replace(/[^\p{L}\p{N}._() \-]/gu,'').trim();
 
-export function baseDir() {
-  const RAW_BASE =
-    process.env.DOCS_ROOT_DIR ??
-    process.env.DOCS_BASE_DIR ??
-    process.env.CONTENT_ROOT_DIR ??
-    '';
-  return stripDealroom(RAW_BASE); // nunca debe empezar con "dealroom"
-}
+/**
+ * Elimina las barras iniciales y finales de un string.
+ * @param {string} s
+ * @returns {string}
+ */
+export const trim = s => String(s).replace(/^\/+|\/+$/g, '');
 
-export function buildNewLayoutPath(category, slug) {
+/**
+ * Une múltiples partes de una ruta en un solo string, eliminando barras duplicadas.
+ * @param {...string} p - Las partes de la ruta a unir.
+ * @returns {string}
+ */
+export const joinPath = (...p) => p.filter(Boolean).map(trim).join('/').replace(/\/+/g, '/');
+
+/**
+ * Limpia un string para usarlo como parte de una ruta, eliminando caracteres no seguros.
+ * @param {string} s
+ * @returns {string}
+ */
+export const sanitize = (s = '') =>
+  String(s)
+    .normalize('NFKC')
+    .replace(/[^\p{L}\p{N}._() \-]/gu, '')
+    .trim();
+
+/**
+ * El directorio base para todos los documentos en el repositorio.
+ * Esta es la ruta que el usuario quiere forzar.
+ */
+const DOCS_BASE_PATH = 'dealroom';
+
+/**
+ * Construye la ruta estandarizada para un documento dentro del repositorio.
+ * La estructura final siempre será: `dealroom/<categoría>/<slug>`.
+ *
+ * @param {string} category - La categoría del documento (ej. "NDA", "Propuestas").
+ * @param {string} slug - El slug del inversionista o proyecto.
+ * @returns {string} - La ruta completa y normalizada.
+ */
+export function buildDocumentPath(category, slug) {
   const cat = sanitize(category);
   const s = sanitize(slug).toLowerCase();
-  // <base>/<category>/<slug>
-  return stripDealroom(joinPath(baseDir(), cat, s));
-}
-
-export function buildLegacyPath(category, slug) {
-  const cat = sanitize(category);
-  const s = sanitize(slug).toLowerCase();
-  // data/docs/<slug>/<category>
-  return joinPath('data/docs', s, cat);
+  return joinPath(DOCS_BASE_PATH, cat, s);
 }
