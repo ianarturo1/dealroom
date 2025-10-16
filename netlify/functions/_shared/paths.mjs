@@ -34,8 +34,11 @@ export const sanitize = (s = '') =>
  * @returns {string} - La ruta completa y normalizada.
  */
 export function buildDocumentPath(category, slug) {
-  const basePath = 'dealroom'; // Simple, predictable, no environment variables.
+  // Esta es la única fuente de verdad para la ruta base.
+  const basePath = 'dealroom';
+
   const cat = sanitize(category);
   const s = sanitize(slug).toLowerCase();
+
   return joinPath(basePath, cat, s);
 }
