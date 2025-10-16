@@ -1,109 +1,107 @@
-// netlify/functions/delete-doc.mjs
-import { Octokit } from "octokit";
-import { ensureSlugAllowed, httpError, sanitizeSegment } from "./_shared/ensureSlugAllowed.mjs";
+import { Octokit } from 'octokit';
+import { json, methodNotAllowed, getUrlAndParams } from './_shared/http.mjs';
+import { buildDocumentPath, joinPath, sanitize } from './_shared/paths.mjs';
+import { ensureSlugAllowed } from './_shared/ensureSlugAllowed.mjs';
 
-function getEnv(name, required = true) {
-  const v = process.env[name];
-  if (required && (!v || !v.trim())) throw new Error(`Missing env ${name}`);
+function requiredEnv(name) {
+  const v = (process.env[name] || '').trim();
+  if (!v) {
+    const e = new Error(`Missing env ${name}`);
+    e.status = 500;
+    throw e;
+  }
   return v;
 }
 
-function jsonResponse(status, body) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "access-control-allow-origin": "*",
-      "access-control-allow-methods": "POST,OPTIONS",
-      "access-control-allow-headers": "content-type,authorization",
-    },
-  });
+function ensureSafeSegment(value, label) {
+  const clean = sanitize(value);
+  if (!clean || clean.includes('..') || clean.includes('/') || clean.includes('\\')) {
+    const e = new Error(`Invalid ${label || 'segment'}`);
+    e.status = 400;
+    throw e;
+  }
+  return clean;
 }
 
-export default async (req) => {
-  if (req.method === "OPTIONS") {
-    return jsonResponse(200, { ok: true });
+const REPO_FULL = requiredEnv('DOCS_REPO');
+const DOCS_BRANCH = requiredEnv('DOCS_BRANCH');
+const TOKEN = requiredEnv('GITHUB_TOKEN');
+
+const [owner, repo] = REPO_FULL.split('/');
+if (!owner || !repo) {
+  throw Object.assign(new Error('Invalid DOCS_REPO'), { status: 500 });
+}
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export default async function handler(request, context) {
+  const method = request.method?.toUpperCase();
+
+  if (method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
-  if (req.method !== "POST") {
-    return jsonResponse(405, { ok: false, message: "Method not allowed" });
+
+  // We use POST for the delete operation for semantic reasons, even though params are in the URL.
+  if (method !== 'POST') {
+    return methodNotAllowed(['POST'], { headers: corsHeaders });
   }
 
   try {
-    const { slug: rawSlug, category: rawCategory, name: rawName, path: rawPath } = await req.json();
+    const { params } = getUrlAndParams(request);
+    const rawSlug = params.get('slug');
+    const rawCategory = params.get('category');
+    const rawName = params.get('name');
 
-    const slug = ensureSlugAllowed(rawSlug || "");
-    const category = sanitizeSegment(rawCategory || "");
-    const name = sanitizeSegment(rawName || "");
-
-    if ((!rawPath || !rawPath.trim()) && (!category || !name)) {
-      throw httpError(400, "Missing category/name or path");
+    if (!rawSlug || !rawCategory || !rawName) {
+      return json(
+        { ok: false, error: 'Missing query parameters: slug, category, and name are all required.' },
+        { status: 400, headers: corsHeaders },
+      );
     }
 
-    const DOCS_REPO = getEnv("DOCS_REPO");
-    const DOCS_BRANCH = getEnv("DOCS_BRANCH");
-    const token = getEnv("GITHUB_TOKEN");
+    const slug = ensureSlugAllowed(String(rawSlug), { request, context });
+    const category = ensureSafeSegment(String(rawCategory), 'category');
+    const filename = ensureSafeSegment(String(rawName), 'filename');
 
-    const octokit = new Octokit({ auth: token });
+    const documentDir = buildDocumentPath(category, slug);
+    const filePath = joinPath(documentDir, filename);
 
-    // Determinar posibles rutas (nuevo esquema y legacy)
-    const normalizedPathFromParts = category && name ? `${category}/${slug}/${name}` : null;
+    const octokit = new Octokit({ auth: TOKEN });
 
-    const candidatePaths = [];
-    if (rawPath && rawPath.trim()) {
-      // Si el frontend envió un path, normalizamos separadores y limpiamos
-      const clean = String(rawPath).replace(/\\/g, "/").replace(/^\/+/, "");
-      candidatePaths.push(clean);
-    }
-    if (normalizedPathFromParts) {
-      candidatePaths.push(normalizedPathFromParts);
-    }
-    // Ruta legacy
-    if (category && name) {
-      candidatePaths.push(`data/docs/${slug}/${category}/${name}`);
-    }
-
-    // Intentar encontrar SHA y borrar en el primer path existente
-    let deleted = false;
-    let lastError = null;
-
-    for (const p of candidatePaths) {
-      try {
-        // 1) Obtener SHA del archivo
-        const { data: meta } = await octokit.repos.getContent({
-          repo: DOCS_REPO.split("/")[1],
-          owner: DOCS_REPO.split("/")[0],
-          path: p,
-          ref: DOCS_BRANCH,
-        });
-
-        const sha = Array.isArray(meta) ? null : meta.sha;
-        if (!sha) throw httpError(404, "File not found");
-
-        // 2) Borrar
-        await octokit.repos.deleteFile({
-          repo: DOCS_REPO.split("/")[1],
-          owner: DOCS_REPO.split("/")[0],
-          path: p,
-          message: `chore(docs): delete ${p} via admin`,
-          sha,
-          branch: DOCS_BRANCH,
-        });
-
-        deleted = true;
-        return jsonResponse(200, { ok: true, path: p });
-      } catch (e) {
-        lastError = e;
-        // si no existe en este path, probamos el siguiente
+    let sha;
+    try {
+      const res = await octokit.rest.repos.getContent({ owner, repo, path: filePath, ref: DOCS_BRANCH });
+      if (Array.isArray(res.data)) {
+        throw new Error('Path points to a directory, not a file.');
       }
+      sha = res.data.sha;
+    } catch (err) {
+      if (err?.status === 404) {
+        return json({ ok: false, error: `File not found at path: ${filePath}` }, { status: 404, headers: corsHeaders });
+      }
+      throw err;
     }
 
-    if (!deleted) {
-      const msg =
-        (lastError && (lastError.statusText || lastError.message)) || "File not found";
-      return jsonResponse(404, { ok: false, message: msg });
-    }
+    const message = `chore(delete-doc): ${category}/${slug}/${filename}`;
+    await octokit.rest.repos.deleteFile({
+      owner,
+      repo,
+      path: filePath,
+      message,
+      sha,
+      branch: DOCS_BRANCH,
+    });
+
+    return json({ ok: true, path: filePath }, { status: 200, headers: corsHeaders });
+
   } catch (err) {
-    const status = err?.statusCode || err?.status || 500;
-    return jsonResponse(status, { ok: false, message: err.message || "Delete failed" });
+    const code = err?.status || err?.statusCode || 500;
+    const msg = err?.message || 'Internal Error';
+    console.error('[delete-doc]', { status: code, message: msg, url: request.url });
+    return json({ ok: false, error: msg }, { status: code, headers: corsHeaders });
   }
-};
+}

@@ -171,11 +171,34 @@ async function uploadDocument({ slug, category, file }) {
   return req('/.netlify/functions/upload-doc', { method: 'POST', body: form });
 }
 
+// Eliminar un documento
+async function deleteDocument({ slug, category, name }) {
+  const resolvedSlug = (slug && String(slug).trim()) || resolveInvestorSlug();
+  if (!resolvedSlug) {
+    throw new Error('Slug no disponible para eliminar');
+  }
+  if (!category || !name) {
+    throw new Error('Faltan datos para eliminar: category y name son obligatorios');
+  }
+
+  const params = new URLSearchParams({
+    slug: resolvedSlug,
+    category: category,
+    name: name,
+  });
+
+  const path = `/.netlify/functions/delete-doc?${params.toString()}`;
+
+  // Aunque los datos van en la URL, usamos POST por semántica de que es una operación de borrado.
+  return req(path, { method: 'POST' });
+}
+
 export const api = {
   req,               // JSON/texto
   reqBlob,           // binario (Response)
   downloadDocument,  // descarga controlada
   uploadDocument,    // subida con FormData
+  deleteDocument,    // eliminación de documentos
   listProjects(){ return req('/.netlify/functions/list-projects'); },
   saveProjects(projects){
     return req('/.netlify/functions/save-projects', {
@@ -363,4 +386,3 @@ export function toErrMessage(res, fallback = 'Error') {
   }
   return fallback;
 }
-
