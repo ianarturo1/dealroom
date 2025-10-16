@@ -1,5 +1,5 @@
 import { Octokit } from 'octokit';
-import { json, methodNotAllowed } from './_shared/http.mjs';
+import { json, methodNotAllowed, getUrlAndParams } from './_shared/http.mjs';
 import { buildDocumentPath, joinPath, sanitize } from './_shared/paths.mjs';
 import { ensureSlugAllowed } from './_shared/ensureSlugAllowed.mjs';
 
@@ -38,66 +38,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-async function main(request, context) {
-  const body = await request.json();
-
-  const { slug: rawSlug, category: rawCategory, name: rawName } = body;
-
-  if (!rawSlug || !rawCategory || !rawName) {
-    return json(
-      { ok: false, error: 'Missing fields: slug, category, name' },
-      { status: 400, headers: corsHeaders },
-    );
-  }
-
-  let slug;
-  try {
-    slug = ensureSlugAllowed(String(rawSlug), { request, context });
-  } catch (e) {
-    return json(
-      { ok: false, error: e?.message || 'ForbiddenSlug' },
-      { status: e?.statusCode || 403, headers: corsHeaders },
-    );
-  }
-
-  const category = ensureSafeSegment(String(rawCategory), 'category');
-  const filename = ensureSafeSegment(String(rawName), 'filename');
-
-  // Build the one, true path to the document.
-  const documentDir = buildDocumentPath(category, slug);
-  const filePath = joinPath(documentDir, filename);
-
-  const octokit = new Octokit({ auth: TOKEN });
-
-  // 1. Get the SHA of the file to be deleted.
-  let sha;
-  try {
-    const res = await octokit.rest.repos.getContent({ owner, repo, path: filePath, ref: DOCS_BRANCH });
-    if (Array.isArray(res.data)) {
-      throw new Error('Path points to a directory, not a file.');
-    }
-    sha = res.data.sha;
-  } catch (err) {
-    if (err?.status === 404) {
-      return json({ ok: false, error: 'File not found at path: ' + filePath }, { status: 404, headers: corsHeaders });
-    }
-    throw err; // For other errors, let the generic handler catch it.
-  }
-
-  // 2. Delete the file using its SHA.
-  const message = `chore(delete-doc): ${category}/${slug}/${filename}`;
-  await octokit.rest.repos.deleteFile({
-    owner,
-    repo,
-    path: filePath,
-    message,
-    sha,
-    branch: DOCS_BRANCH,
-  });
-
-  return json({ ok: true, path: filePath }, { status: 200, headers: corsHeaders });
-}
-
 export default async function handler(request, context) {
   const method = request.method?.toUpperCase();
 
@@ -105,16 +45,63 @@ export default async function handler(request, context) {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
+  // We use POST for the delete operation for semantic reasons, even though params are in the URL.
   if (method !== 'POST') {
     return methodNotAllowed(['POST'], { headers: corsHeaders });
   }
 
   try {
-    return await main(request, context);
+    const { params } = getUrlAndParams(request);
+    const rawSlug = params.get('slug');
+    const rawCategory = params.get('category');
+    const rawName = params.get('name');
+
+    if (!rawSlug || !rawCategory || !rawName) {
+      return json(
+        { ok: false, error: 'Missing query parameters: slug, category, and name are all required.' },
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const slug = ensureSlugAllowed(String(rawSlug), { request, context });
+    const category = ensureSafeSegment(String(rawCategory), 'category');
+    const filename = ensureSafeSegment(String(rawName), 'filename');
+
+    const documentDir = buildDocumentPath(category, slug);
+    const filePath = joinPath(documentDir, filename);
+
+    const octokit = new Octokit({ auth: TOKEN });
+
+    let sha;
+    try {
+      const res = await octokit.rest.repos.getContent({ owner, repo, path: filePath, ref: DOCS_BRANCH });
+      if (Array.isArray(res.data)) {
+        throw new Error('Path points to a directory, not a file.');
+      }
+      sha = res.data.sha;
+    } catch (err) {
+      if (err?.status === 404) {
+        return json({ ok: false, error: `File not found at path: ${filePath}` }, { status: 404, headers: corsHeaders });
+      }
+      throw err;
+    }
+
+    const message = `chore(delete-doc): ${category}/${slug}/${filename}`;
+    await octokit.rest.repos.deleteFile({
+      owner,
+      repo,
+      path: filePath,
+      message,
+      sha,
+      branch: DOCS_BRANCH,
+    });
+
+    return json({ ok: true, path: filePath }, { status: 200, headers: corsHeaders });
+
   } catch (err) {
     const code = err?.status || err?.statusCode || 500;
     const msg = err?.message || 'Internal Error';
-    console.error('[delete-doc]', { status: code, message: msg });
+    console.error('[delete-doc]', { status: code, message: msg, url: request.url });
     return json({ ok: false, error: msg }, { status: code, headers: corsHeaders });
   }
 }

@@ -172,7 +172,7 @@ export default function Documents(){
                     <tr>
                       <th>Archivo</th>
                       <th>Tamaño</th>
-                      <th></th>
+                      <th style={{ width: '1%' }}>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -190,30 +190,34 @@ export default function Documents(){
                       const sizeLabel = typeof sizeBytes === 'number' && sizeBytes >= 0
                         ? formatBytes(sizeBytes)
                         : '—'
-                      const rawPath = typeof d?.path === 'string' ? d.path.replace(/^\/+/, '') : ''
-                      const pathParts = rawPath ? rawPath.split('/').filter(Boolean) : []
-                      let filenameForUrl = typeof d?.filename === 'string' && d.filename
-                        ? d.filename
-                        : typeof d?.name === 'string' && d.name
-                          ? d.name
-                          : ''
-                      if (!filenameForUrl && pathParts.length){
-                        if (pathParts.length >= 4 && pathParts[0] === 'data' && pathParts[1] === 'docs'){
-                          filenameForUrl = pathParts.slice(4).join('/') || pathParts[pathParts.length - 1] || ''
-                        }else if (pathParts.length >= 3){
-                          filenameForUrl = pathParts.slice(2).join('/') || pathParts[pathParts.length - 1] || ''
-                        }else{
-                          filenameForUrl = pathParts[pathParts.length - 1] || ''
-                        }
-                      }
-                      const downloadUrl = slugForDocs && filenameForUrl
-                        ? getDocUrl({ category, slug: slugForDocs, filename: filenameForUrl })
+
+                      const filename = d?.name || ''
+
+                      const downloadUrl = slugForDocs && filename
+                        ? getDocUrl({ category, slug: slugForDocs, filename: filename })
                         : null
+
+                      const handleDelete = async () => {
+                        if (!slugForDocs || !filename) {
+                          showToast('No se puede eliminar: falta slug o nombre de archivo.', { tone: 'error' });
+                          return;
+                        }
+                        if (window.confirm(`¿Estás seguro de que quieres eliminar "${filename}"?`)) {
+                          try {
+                            await api.deleteDocument({ slug: slugForDocs, category, name: filename });
+                            showToast('Documento eliminado.', { tone: 'success' });
+                            await refreshCategory(category);
+                          } catch (err) {
+                            showToast(err.message || 'Error al eliminar el documento.', { tone: 'error' });
+                          }
+                        }
+                      };
+
                       return (
                         <tr key={key}>
                           <td>{displayName}</td>
                           <td>{sizeLabel}</td>
-                          <td>
+                          <td style={{ display: 'flex', gap: '8px' }}>
                             {downloadUrl ? (
                               <a
                                 className="btn secondary"
@@ -224,8 +228,11 @@ export default function Documents(){
                                 Descargar
                               </a>
                             ) : (
-                              <span className="help">Slug no disponible.</span>
+                              <span className="help">N/A</span>
                             )}
+                            <button className="btn danger" onClick={handleDelete}>
+                              Eliminar
+                            </button>
                           </td>
                         </tr>
                       )

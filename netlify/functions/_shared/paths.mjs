@@ -26,12 +26,6 @@ export const sanitize = (s = '') =>
     .trim();
 
 /**
- * El directorio base para todos los documentos en el repositorio.
- * Esta es la ruta que el usuario quiere forzar.
- */
-const DOCS_BASE_PATH = 'dealroom';
-
-/**
  * Construye la ruta estandarizada para un documento dentro del repositorio.
  * La estructura final siempre será: `dealroom/<categoría>/<slug>`.
  *
@@ -40,7 +34,8 @@ const DOCS_BASE_PATH = 'dealroom';
  * @returns {string} - La ruta completa y normalizada.
  */
 export function buildDocumentPath(category, slug) {
+  const basePath = 'dealroom'; // Simple, predictable, no environment variables.
   const cat = sanitize(category);
   const s = sanitize(slug).toLowerCase();
-  return joinPath(DOCS_BASE_PATH, cat, s);
+  return joinPath(basePath, cat, s);
 }
