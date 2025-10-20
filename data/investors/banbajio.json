@@ -1,16 +1,22 @@
 {
   "id": "banbajio",
-  "name": "Banbajio",
+  "name": "banbajio",
   "status": "Presentación de propuesta",
   "deadlines": {
-    "Presentación de propuesta": "2025-10-20"
+    "Ajustes técnicos": "2025-10-20",
+    "LOI": "2025-10-31"
   },
-  "metrics": {},
-  "ui": {
-    "panelTitle": "Panel Banbajio",
-    "theme": {}
-  },
-  "createdAt": "2025-10-20T18:04:02.341Z",
-  "updatedAt": "2025-10-20T18:04:02.341Z",
-  "email": "carlosodom@gmail.com"
+  "metrics": {
+    "fiscalCapitalInvestment": 50000000,
+    "projectProfitability": {
+      "amount": 175253271,
+      "years": 20
+    },
+    "portfolio": {
+      "type": "aaaCompanies"
+    },
+    "investorsActive": 12,
+    "dealsAccelerated": 38,
+    "nps": 72
+  }
 }
