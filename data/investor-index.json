@@ -155,6 +155,13 @@
       "status": "Due diligence fiscal/financiero/riesgos",
       "createdAt": "2025-10-14T21:12:03.157Z",
       "updatedAt": "2025-10-14T21:12:03.157Z"
+    },
+    "banbajio": {
+      "name": "Banbajio",
+      "email": "carlosodom@gmail.com",
+      "status": "Presentación de propuesta",
+      "createdAt": "2025-10-20T18:04:02.341Z",
+      "updatedAt": "2025-10-20T18:04:02.341Z"
     }
   }
 }
