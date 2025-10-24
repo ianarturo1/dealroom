@@ -13,7 +13,10 @@
       "amount": 35827559,
       "years": 20
     },
-    "portfolio": null
+    "portfolio": {
+      "type": "mix",
+      "mix": {}
+    }
   },
   "ui": {
     "panelTitle": "Panel GPP",
