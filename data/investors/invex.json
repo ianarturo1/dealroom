@@ -5,7 +5,9 @@
   "deadlines": {
     "Ajustes técnicos": "2025-10-30",
     "Presentación de propuesta": "2025-10-30",
-    "Revisión de contratos": "2025-10-30"
+    "Revisión de contratos": "2025-10-30",
+    "Cronograma de inversión": "2025-11-05",
+    "Firma": "2025-11-15"
   },
   "metrics": {},
   "ui": {
@@ -13,6 +15,6 @@
     "theme": {}
   },
   "createdAt": "2025-10-24T02:12:47.742Z",
-  "updatedAt": "2025-10-24T02:15:05.138Z",
+  "updatedAt": "2025-10-24T02:22:34.580Z",
   "email": "fgarciam@invex.com"
 }
