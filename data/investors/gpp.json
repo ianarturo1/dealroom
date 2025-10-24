@@ -7,7 +7,14 @@
     "Due Diligence": "2025-10-30",
     "Firma": "2025-11-07"
   },
-  "metrics": {},
+  "metrics": {
+    "fiscalCapitalInvestment": 10000000,
+    "projectProfitability": {
+      "amount": 35827559,
+      "years": 20
+    },
+    "portfolio": null
+  },
   "ui": {
     "panelTitle": "Panel GPP",
     "theme": {}
