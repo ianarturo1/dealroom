@@ -1,0 +1,16 @@
+{
+  "id": "invex",
+  "name": "Invex",
+  "status": "Presentación de propuesta",
+  "deadlines": {
+    "Ajustes técnicos": "2025-10-30"
+  },
+  "metrics": {},
+  "ui": {
+    "panelTitle": "Panel Invex",
+    "theme": {}
+  },
+  "createdAt": "2025-10-24T02:12:47.742Z",
+  "updatedAt": "2025-10-24T02:12:47.742Z",
+  "email": "fgarciam@invex.com"
+}
