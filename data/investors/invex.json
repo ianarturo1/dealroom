@@ -3,7 +3,9 @@
   "name": "Invex",
   "status": "Presentación de propuesta",
   "deadlines": {
-    "Ajustes técnicos": "2025-10-30"
+    "Ajustes técnicos": "2025-10-30",
+    "Presentación de propuesta": "2025-10-30",
+    "Revisión de contratos": "2025-10-30"
   },
   "metrics": {},
   "ui": {
@@ -11,6 +13,6 @@
     "theme": {}
   },
   "createdAt": "2025-10-24T02:12:47.742Z",
-  "updatedAt": "2025-10-24T02:12:47.742Z",
+  "updatedAt": "2025-10-24T02:15:05.138Z",
   "email": "fgarciam@invex.com"
 }
