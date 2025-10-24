@@ -162,6 +162,13 @@
       "status": "Presentación de propuesta",
       "createdAt": "2025-10-20T18:04:02.341Z",
       "updatedAt": "2025-10-20T18:04:02.341Z"
+    },
+    "invex": {
+      "name": "Invex",
+      "email": "fgarciam@invex.com",
+      "status": "Presentación de propuesta",
+      "createdAt": "2025-10-24T02:12:47.742Z",
+      "updatedAt": "2025-10-24T02:12:47.742Z"
     }
   }
 }
