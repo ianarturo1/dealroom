@@ -1,0 +1,18 @@
+{
+  "id": "gpp",
+  "name": "GPP",
+  "status": "Generación de propuesta",
+  "deadlines": {
+    "Presentación de propuesta": "2025-10-28",
+    "Due Diligence": "2025-10-30",
+    "Firma": "2025-11-07"
+  },
+  "metrics": {},
+  "ui": {
+    "panelTitle": "Panel GPP",
+    "theme": {}
+  },
+  "createdAt": "2025-10-24T18:15:59.882Z",
+  "updatedAt": "2025-10-24T18:15:59.882Z",
+  "email": "david@gpp-dist.com"
+}
