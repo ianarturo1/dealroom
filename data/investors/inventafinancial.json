@@ -1,0 +1,17 @@
+{
+  "id": "inventafinancial",
+  "name": "Inventa Financial",
+  "status": "Entrega de información",
+  "deadlines": {
+    "Presentación de propuesta": "2025-11-10",
+    "Firma": "2025-11-25"
+  },
+  "metrics": {},
+  "ui": {
+    "panelTitle": "Panel Inventa Financial",
+    "theme": {}
+  },
+  "createdAt": "2025-11-04T01:39:30.450Z",
+  "updatedAt": "2025-11-04T01:39:30.450Z",
+  "email": "eramirezll@inventafinancial.mx"
+}
