@@ -176,6 +176,13 @@
       "status": "Generación de propuesta",
       "createdAt": "2025-10-24T18:15:59.882Z",
       "updatedAt": "2025-10-24T18:15:59.882Z"
+    },
+    "inventafinancial": {
+      "name": "Inventa Financial",
+      "email": "eramirezll@inventafinancial.mx",
+      "status": "Entrega de información",
+      "createdAt": "2025-11-04T01:39:30.450Z",
+      "updatedAt": "2025-11-04T01:39:30.450Z"
     }
   }
 }
