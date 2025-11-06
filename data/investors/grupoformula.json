@@ -1,0 +1,16 @@
+{
+  "id": "grupoformula",
+  "name": "Grupo Formula",
+  "status": "Revisión de contratos",
+  "deadlines": {
+    "Cronograma de inversión": "2025-11-14"
+  },
+  "metrics": {},
+  "ui": {
+    "panelTitle": "Panel Grupo Formula",
+    "theme": {}
+  },
+  "createdAt": "2025-11-06T14:42:23.210Z",
+  "updatedAt": "2025-11-06T14:42:23.210Z",
+  "email": "igallardo@radioformula.com.mx"
+}
