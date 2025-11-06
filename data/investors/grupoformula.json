@@ -5,7 +5,16 @@
   "deadlines": {
     "Cronograma de inversión": "2025-11-14"
   },
-  "metrics": {},
+  "metrics": {
+    "fiscalCapitalInvestment": 10000000,
+    "projectProfitability": {
+      "amount": 50766116,
+      "years": 20
+    },
+    "portfolio": {
+      "type": "ownSites"
+    }
+  },
   "ui": {
     "panelTitle": "Panel Grupo Formula",
     "theme": {}
