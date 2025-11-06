@@ -3,7 +3,8 @@
   "name": "Grupo Formula",
   "status": "Revisión de contratos",
   "deadlines": {
-    "Cronograma de inversión": "2025-11-14"
+    "Cronograma de inversión": "2025-11-14",
+    "Firma": "2025-11-28"
   },
   "metrics": {
     "fiscalCapitalInvestment": 10000000,
