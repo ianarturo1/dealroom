@@ -183,6 +183,13 @@
       "status": "Entrega de información",
       "createdAt": "2025-11-04T01:39:30.450Z",
       "updatedAt": "2025-11-04T01:39:30.450Z"
+    },
+    "grupoformula": {
+      "name": "Grupo Formula",
+      "email": "igallardo@radioformula.com.mx",
+      "status": "Revisión de contratos",
+      "createdAt": "2025-11-06T14:42:23.210Z",
+      "updatedAt": "2025-11-06T14:42:23.210Z"
     }
   }
 }
