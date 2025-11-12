@@ -1,0 +1,17 @@
+{
+  "id": "capem",
+  "name": "Capem",
+  "status": "Generación de propuesta",
+  "deadlines": {
+    "Presentación de propuesta": "2025-11-18",
+    "Firma": "2025-12-01"
+  },
+  "metrics": {},
+  "ui": {
+    "panelTitle": "Panel Capem",
+    "theme": {}
+  },
+  "createdAt": "2025-11-12T22:38:51.567Z",
+  "updatedAt": "2025-11-12T22:38:51.567Z",
+  "email": "lcrodriguez@grupocapem.com"
+}
