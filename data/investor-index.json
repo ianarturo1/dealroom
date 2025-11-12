@@ -190,6 +190,13 @@
       "status": "Revisión de contratos",
       "createdAt": "2025-11-06T14:42:23.210Z",
       "updatedAt": "2025-11-06T14:42:23.210Z"
+    },
+    "capem": {
+      "name": "Capem",
+      "email": "lcrodriguez@grupocapem.com",
+      "status": "Generación de propuesta",
+      "createdAt": "2025-11-12T22:38:51.567Z",
+      "updatedAt": "2025-11-12T22:38:51.567Z"
     }
   }
 }
