@@ -1,0 +1,17 @@
+{
+  "id": "ios",
+  "name": "IOS",
+  "status": "Generación de propuesta",
+  "deadlines": {
+    "Ajustes técnicos": "2025-11-28",
+    "Firma": "2025-12-05"
+  },
+  "metrics": {},
+  "ui": {
+    "panelTitle": "Panel IOS",
+    "theme": {}
+  },
+  "createdAt": "2025-11-24T16:58:33.486Z",
+  "updatedAt": "2025-11-24T16:58:33.486Z",
+  "email": "mauricio.martinez@iosoffices.com"
+}
