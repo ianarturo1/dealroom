@@ -197,6 +197,13 @@
       "status": "Generación de propuesta",
       "createdAt": "2025-11-12T22:38:51.567Z",
       "updatedAt": "2025-11-12T22:38:51.567Z"
+    },
+    "ios": {
+      "name": "IOS",
+      "email": "mauricio.martinez@iosoffices.com",
+      "status": "Generación de propuesta",
+      "createdAt": "2025-11-24T16:58:33.486Z",
+      "updatedAt": "2025-11-24T16:58:33.486Z"
     }
   }
 }
