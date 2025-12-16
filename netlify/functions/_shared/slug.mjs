@@ -1,4 +1,9 @@
 export function ensureSlugAllowed(inputSlug) {
+  console.warn('[ensureSlugAllowed]', {
+    slug: String(inputSlug || '').trim(),
+    single: String(process.env.PUBLIC_INVESTOR_SLUG || '').trim(),
+    list: String(process.env.PUBLIC_INVESTOR_SLUGS || '').trim()
+  })
   const slug = String(inputSlug || '').trim().toLowerCase()
   const allowedSingle = (process.env.PUBLIC_INVESTOR_SLUG || '').trim().toLowerCase()
   const allowedList = (process.env.PUBLIC_INVESTOR_SLUGS || '').trim().toLowerCase()
